@@ -56,8 +56,43 @@ describe('bin/claude-dashboard-hook.mjs', () => {
       sessionId: 'sess-1',
       cwd: '/work/app',
       message: 'Claude needs your permission to use Bash',
+      notificationType: null,
+      title: null,
     })
     expect(Number.isNaN(Date.parse(record.ts))).toBe(false)
+  })
+
+  it('records notification_type and title from a Notification payload', () => {
+    const result = run(
+      JSON.stringify({
+        hook_event_name: 'Notification',
+        session_id: 'sess-typed',
+        notification_type: 'permission_prompt',
+        title: 'Permission needed',
+        message: 'Claude needs your permission to use Bash',
+      }),
+    )
+    expect(result.status).toBe(0)
+    expect(JSON.parse(logLines()[0])).toMatchObject({
+      event: 'Notification',
+      notificationType: 'permission_prompt',
+      title: 'Permission needed',
+      message: 'Claude needs your permission to use Bash',
+    })
+  })
+
+  it('records notificationType and title as null when the payload omits them', () => {
+    run(JSON.stringify({ hook_event_name: 'Notification', session_id: 'sess-bare', message: 'hi' }))
+    const record = JSON.parse(logLines()[0])
+    expect(record.notificationType).toBeNull()
+    expect(record.title).toBeNull()
+  })
+
+  it('records non-string notification_type and title as null', () => {
+    run(JSON.stringify({ hook_event_name: 'Notification', session_id: 's', notification_type: 7, title: ['x'] }))
+    const record = JSON.parse(logLines()[0])
+    expect(record.notificationType).toBeNull()
+    expect(record.title).toBeNull()
   })
 
   it('records Stop events with null for absent cwd and message', () => {

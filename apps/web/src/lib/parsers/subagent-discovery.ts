@@ -42,3 +42,18 @@ export async function discoverSubagentFiles(
 
   return result
 }
+
+/**
+ * Last-write time (epoch ms) of each subagent transcript under a session directory.
+ * The map uses it to tell a running subagent (written recently) from a finished one.
+ * Keyed by agentId, like discoverSubagentFiles. A missing file is simply absent.
+ */
+export async function readSubagentWriteTimes(sessionDir: string): Promise<Map<string, number>> {
+  const times = new Map<string, number>()
+  const files = await discoverSubagentFiles(sessionDir)
+  for (const [agentId, filePath] of files) {
+    const stat = await fs.promises.stat(filePath).catch(() => null)
+    if (stat) times.set(agentId, stat.mtimeMs)
+  }
+  return times
+}

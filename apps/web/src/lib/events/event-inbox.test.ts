@@ -39,6 +39,21 @@ describe('HookEventSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  it('accepts notificationType and title, and older lines without them', () => {
+    const typed = HookEventSchema.safeParse({
+      ts: 't',
+      event: 'Notification',
+      sessionId: 's',
+      notificationType: 'idle_prompt',
+      title: null,
+    })
+    expect(typed.success).toBe(true)
+    expect(typed.success && typed.data.notificationType).toBe('idle_prompt')
+
+    const older = HookEventSchema.safeParse({ ts: 't', event: 'Notification', sessionId: 's', message: 'm' })
+    expect(older.success).toBe(true)
+  })
+
   it('rejects an event without a session id', () => {
     expect(HookEventSchema.safeParse({ ts: 't', event: 'Stop' }).success).toBe(false)
   })

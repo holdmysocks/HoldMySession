@@ -91,9 +91,9 @@ describe('queue-operation lines do not hide a session', () => {
 
     const sessions = [summary, other]
     expect(groupMapProjects(sessions)).toEqual([
-      expect.objectContaining({ projectPath: '/work/app', sessionCount: 2, projectDisplayName: 'My App' }),
+      expect.objectContaining({ projectKey: summary.projectKey, projectPath: '/work/app', sessionCount: 2, projectDisplayName: 'My App' }),
     ])
-    expect(selectMapSessions(sessions, '/work/app').map((s) => s.sessionId)).toEqual(['interactive', 'other'])
+    expect(selectMapSessions(sessions, summary.projectKey).map((s) => s.sessionId)).toEqual(['interactive', 'other'])
 
     const page = await paginateAndFilterSessions(sessions, {
       page: 1, pageSize: 10, search: '', status: 'all', project: '', sort: 'lastActive', sortDir: 'desc',

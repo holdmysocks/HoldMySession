@@ -9,8 +9,9 @@ import { NodeDetailPanel } from './NodeDetailPanel'
 import { HookEventsPanel } from './HookEventsPanel'
 
 interface ProjectMapPageProps {
+  /** Project key (directory name), from the URL. */
   project: string | undefined
-  onProjectChange: (projectPath: string) => void
+  onProjectChange: (projectKey: string) => void
 }
 
 export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps) {
@@ -18,9 +19,9 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   const projectsQuery = useQuery(mapProjectsQuery)
   const projects = projectsQuery.data ?? []
 
-  const selectedPath = project || projects[0]?.projectPath || ''
-  const selectedProject = projects.find((p) => p.projectPath === selectedPath) ?? null
-  const mapQuery = useQuery(projectMapQuery(selectedPath))
+  const selectedKey = project || projects[0]?.projectKey || ''
+  const selectedProject = projects.find((p) => p.projectKey === selectedKey) ?? null
+  const mapQuery = useQuery(projectMapQuery(selectedKey))
   const eventsQuery = useQuery(hookEventsQuery)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -36,9 +37,9 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   const activeCount = sessionNodes.filter((n) => n.status === 'active').length
   const needsYouCount = sessionNodes.filter((n) => n.status === 'needs-you').length
 
-  function handleProjectChange(projectPath: string) {
+  function handleProjectChange(projectKey: string) {
     setSelectedId(null)
-    onProjectChange(projectPath)
+    onProjectChange(projectKey)
   }
 
   if (projectsQuery.isLoading) {
@@ -59,7 +60,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
         <Header />
         <div className="mt-10 rounded-xl border border-dashed border-gray-800 p-8 text-center">
           <p className="text-sm text-gray-300">No projects found</p>
-          <p className="mt-1 text-xs text-gray-500">The map reads sessions from ~/.claude/projects.</p>
+          <p className="mt-1 text-xs text-gray-500">The map reads sessions from the projects folder in your Claude config directory.</p>
         </div>
       </div>
     )
@@ -79,12 +80,12 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
         <label className="flex items-center gap-2 text-sm text-gray-400">
           <span>Project</span>
           <select
-            value={selectedPath}
+            value={selectedKey}
             onChange={(e) => handleProjectChange(e.target.value)}
             className="max-w-xs rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-100 focus:border-brand-500 focus:outline-none"
           >
             {projects.map((p) => (
-              <option key={p.projectPath} value={p.projectPath}>
+              <option key={p.projectKey} value={p.projectKey}>
                 {privacyMode ? anonymizeProjectName(p.projectDisplayName) : p.projectDisplayName} ({p.sessionCount})
               </option>
             ))}
@@ -123,7 +124,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
 
         <div className="space-y-4">
           <NeedsYouPanel nodes={nodes} onSelect={setSelectedId} />
-          <NodeDetailPanel node={selectedNode} projectPath={selectedPath} />
+          <NodeDetailPanel node={selectedNode} projectKey={selectedKey} />
           <HookEventsPanel events={eventsQuery.data} />
         </div>
       </div>

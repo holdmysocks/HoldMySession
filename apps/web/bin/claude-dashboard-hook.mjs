@@ -36,6 +36,8 @@ async function main() {
     sessionId,
     cwd: typeof payload.cwd === 'string' ? payload.cwd : null,
     message: typeof payload.message === 'string' ? payload.message : null,
+    notificationType: typeof payload.notification_type === 'string' ? payload.notification_type : null,
+    title: typeof payload.title === 'string' ? payload.title : null,
   };
 
   const file = eventLogPath();

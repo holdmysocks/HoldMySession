@@ -4,6 +4,8 @@ import type { RawJsonlMessage } from './types'
 export const MAX_SESSION_NAME_LENGTH = 80
 
 export interface SessionNameState {
+  /** Text of the most recent `custom-title` line: the name the user set with /rename or --name. */
+  customTitle: string | null
   /** Text of the most recent `summary` line seen so far (Claude Code's auto-title). */
   summary: string | null
   /** Text of the first real user message seen so far. */
@@ -11,15 +13,15 @@ export interface SessionNameState {
 }
 
 export function createSessionNameState(): SessionNameState {
-  return { summary: null, firstUserText: null }
+  return { customTitle: null, summary: null, firstUserText: null }
 }
 
 /**
- * Feed one parsed JSONL line, in file order. Later summary lines overwrite earlier
- * ones, so the newest title wins. The first user text is kept once it is found.
+ * Feed one parsed JSONL line, in file order. Later title lines overwrite earlier ones, so
+ * the newest name wins. The first user text is kept once it is found.
  */
 export function observeSessionName(state: SessionNameState, msg: RawJsonlMessage): void {
-  observeSummaryLine(state, msg)
+  observeTitleLine(state, msg)
 
   if (state.firstUserText === null && msg.type === 'user' && !msg.isMeta) {
     const text = firstUserText(msg)
@@ -28,17 +30,28 @@ export function observeSessionName(state: SessionNameState, msg: RawJsonlMessage
 }
 
 /**
- * Only the summary title. Use this for lines from the end of a file, where the first
- * user message is not in view.
+ * Only the title lines (`custom-title` and `summary`). Use this for lines from the end of
+ * a file, where the first user message is not in view.
  */
-export function observeSummaryLine(state: SessionNameState, msg: RawJsonlMessage): void {
+export function observeTitleLine(state: SessionNameState, msg: RawJsonlMessage): void {
+  if (msg.type === 'custom-title' && typeof msg.customTitle === 'string' && msg.customTitle.trim()) {
+    state.customTitle = msg.customTitle
+  }
   if (msg.type === 'summary' && typeof msg.summary === 'string' && msg.summary.trim()) {
     state.summary = msg.summary
   }
 }
 
+/**
+ * Precedence: the user's name (custom-title), then Claude Code's summary title, then the
+ * first user message. This is the order Claude Code's own picker uses, minus agent names.
+ */
 export function resolveSessionName(state: SessionNameState): string | null {
-  return truncateSessionName(state.summary) ?? truncateSessionName(state.firstUserText)
+  return (
+    truncateSessionName(state.customTitle) ??
+    truncateSessionName(state.summary) ??
+    truncateSessionName(state.firstUserText)
+  )
 }
 
 /**

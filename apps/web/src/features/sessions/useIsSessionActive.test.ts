@@ -17,6 +17,8 @@ describe('useIsSessionActive', () => {
   const createMockSession = (sessionId: string): SessionSummary => ({
     sessionId,
     projectPath: '/path/to/project',
+    projectKey: 'app',
+    forkedFrom: null,
     projectName: 'test-project',
     branch: 'main',
     cwd: '/path/to/project',

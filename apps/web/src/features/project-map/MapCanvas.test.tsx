@@ -10,6 +10,8 @@ function summary(sessionId: string, overrides: Partial<SessionSummary> = {}): Se
   return {
     sessionId,
     projectPath: '/work/app',
+    projectKey: 'app',
+    forkedFrom: null,
     projectName: 'app',
     branch: 'feature/map',
     cwd: '/work/app',
@@ -41,7 +43,7 @@ const agent: AgentInvocation = {
 }
 
 function buildLayout(inputs: MapSessionInput[]) {
-  return layoutProjectMap(buildProjectMap('/work/app', 'app', inputs))
+  return layoutProjectMap(buildProjectMap('app', '/work/app', 'My App', inputs))
 }
 
 function renderCanvas(layout: ReturnType<typeof buildLayout>, onSelect = vi.fn(), selectedId: string | null = null) {
@@ -58,6 +60,7 @@ describe('MapCanvas', () => {
     {
       summary: summary('aaaaaaaa-1111', { isActive: true }),
       agents: [agent],
+      subagentWriteTimes: new Map(),
       pendingQuestions: [],
       lastNotificationAt: null,
       totalTokens: 500,
@@ -65,6 +68,7 @@ describe('MapCanvas', () => {
     {
       summary: summary('bbbbbbbb-2222', { isActive: true }),
       agents: [],
+      subagentWriteTimes: new Map(),
       pendingQuestions: [
         { toolUseId: 'q', timestamp: '2026-01-01T10:00:00Z', questions: [{ header: 'H', question: 'Q?' }] },
       ],
@@ -84,10 +88,10 @@ describe('MapCanvas', () => {
 
   it('labels session and subagent nodes with kind, session name, status and needs-you', () => {
     renderCanvas(layout)
-    expect(screen.getByRole('button', { name: 'Session, Fix the map labels, Active' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Session, My App, Fix the map labels, Active' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Subagent, Explore, Done' })).toBeTruthy()
     expect(
-      screen.getByRole('button', { name: 'Session, Fix the map labels, Needs you, needs you' }),
+      screen.getByRole('button', { name: 'Session, My App, Fix the map labels, Needs you, needs you' }),
     ).toBeTruthy()
   })
 
@@ -99,13 +103,14 @@ describe('MapCanvas', () => {
 
   it('selects a node on Enter', () => {
     const onSelect = renderCanvas(layout)
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Session, Fix the map labels, Active' }), { key: 'Enter' })
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Session, My App, Fix the map labels, Active' }), { key: 'Enter' })
     expect(onSelect).toHaveBeenCalledWith(layout.nodes[0].id)
+    expect(layout.nodes[0].kind).toBe('session')
   })
 
   it('selects a node on Space and ignores other keys', () => {
     const onSelect = renderCanvas(layout)
-    const node = screen.getByRole('button', { name: 'Session, Fix the map labels, Active' })
+    const node = screen.getByRole('button', { name: 'Session, My App, Fix the map labels, Active' })
     fireEvent.keyDown(node, { key: 'a' })
     expect(onSelect).not.toHaveBeenCalled()
     fireEvent.keyDown(node, { key: ' ' })
@@ -113,24 +118,43 @@ describe('MapCanvas', () => {
   })
 
   it('marks the selected node with aria-pressed', () => {
-    const selectedId = layout.nodes[0].id
+    const selectedId = layout.nodes.find((n) => n.kind === 'session')!.id
     renderCanvas(layout, vi.fn(), selectedId)
-    expect(screen.getByRole('button', { name: 'Session, Fix the map labels, Active' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Session, My App, Fix the map labels, Active' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByRole('button', { name: 'Subagent, Explore, Done' }).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('shows the project display name, short id and message count in the subtitle', () => {
+  it('shows the project name first, then the session name, branch, short id and message count', () => {
     renderCanvas(layout)
-    expect(screen.getByText('My App · aaaaaaaa · 4 msgs')).toBeTruthy()
+    expect(screen.getAllByText('My App').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Fix the map labels').length).toBeGreaterThan(0)
+    expect(screen.getByText('feature/map · aaaaaaaa · 4 msgs')).toBeTruthy()
     expect(screen.getAllByText('example-1').length).toBeGreaterThan(0)
   })
 
-  it('shows the branch as the title when the session has no name', () => {
+  it('uses a neutral title, not the branch, when the session has no name', () => {
     const plain = buildLayout([
-      { summary: summary('cccccccc-3333', { sessionName: null }), agents: [], pendingQuestions: [], lastNotificationAt: null, totalTokens: 0 },
+      { summary: summary('cccccccc-3333', { sessionName: null }), agents: [], subagentWriteTimes: new Map(), pendingQuestions: [], lastNotificationAt: null, totalTokens: 0 },
     ])
     renderCanvas(plain)
-    expect(screen.getByRole('button', { name: 'Session, feature/map, Idle' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Session, My App, Untitled session, Idle' })).toBeTruthy()
+  })
+
+  it('labels a running subagent as running and a fork as a forked session', () => {
+    const forked = buildLayout([
+      { summary: summary('aaaaaaaa-1111'), agents: [], subagentWriteTimes: new Map(), pendingQuestions: [], lastNotificationAt: null, totalTokens: 0 },
+      {
+        summary: summary('eeeeeeee-5555', { forkedFrom: { sessionId: 'aaaaaaaa-1111', messageUuid: null } }),
+        agents: [{ ...agent, agentId: 'live' }],
+        subagentWriteTimes: new Map([['live', Date.now()]]),
+        pendingQuestions: [],
+        lastNotificationAt: null,
+        totalTokens: 0,
+      },
+    ])
+    renderCanvas(forked)
+    expect(screen.getByRole('button', { name: 'Subagent, Explore, Running' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Forked session, My App/ })).toBeTruthy()
   })
 })
 
@@ -144,6 +168,7 @@ describe('MapCanvas status styling', () => {
           lastActiveAt: new Date().toISOString(),
         }),
         agents: [],
+        subagentWriteTimes: new Map(),
         pendingQuestions: status.pending
           ? [{ toolUseId: 'q', timestamp: new Date().toISOString(), questions: [] }]
           : [],

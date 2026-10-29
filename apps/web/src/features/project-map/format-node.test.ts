@@ -7,15 +7,16 @@ describe('statusLabel', () => {
     expect(statusLabel('active')).toBe('Active')
     expect(statusLabel('completed')).toBe('Completed')
     expect(statusLabel('idle')).toBe('Idle')
+    expect(statusLabel('running')).toBe('Running')
     expect(statusLabel('done')).toBe('Done')
-    expect(statusLabel('unknown')).toBe('Unknown')
   })
 })
 
 describe('kindLabel', () => {
-  it('distinguishes sessions from subagents', () => {
-    expect(kindLabel({ kind: 'session' })).toBe('Session')
-    expect(kindLabel({ kind: 'subagent' })).toBe('Subagent')
+  it('distinguishes sessions, forks and subagents', () => {
+    expect(kindLabel({ kind: 'session', isFork: false })).toBe('Session')
+    expect(kindLabel({ kind: 'session', isFork: true })).toBe('Forked session')
+    expect(kindLabel({ kind: 'subagent', isFork: false })).toBe('Subagent')
   })
 })
 

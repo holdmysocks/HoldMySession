@@ -235,6 +235,8 @@ describe('parseStats', () => {
       const recentSession = {
         sessionId: 'new-session',
         projectPath: '/proj',
+        projectKey: 'app',
+        forkedFrom: null,
         projectName: 'proj',
         branch: 'main',
         cwd: '/proj',
@@ -360,6 +362,8 @@ describe('hour bucketing (via computeStatsFromSessions)', () => {
       toolCallCount: 0,
       fileSizeBytes: 256,
       projectDisplayName: 'Test Project', sessionName: null, lastStopReason: null,
+      projectKey: 'app',
+      forkedFrom: null,
       filePath: '/proj/hour-test.jsonl',
     }
 
@@ -401,6 +405,8 @@ describe('hour bucketing (via computeStatsFromSessions)', () => {
       toolCallCount: 0,
       fileSizeBytes: 0,
       projectDisplayName: 'Test Project', sessionName: null, lastStopReason: null,
+      projectKey: 'app',
+      forkedFrom: null,
       filePath: '/proj/no-time.jsonl',
     }
 

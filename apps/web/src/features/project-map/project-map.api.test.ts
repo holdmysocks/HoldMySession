@@ -12,6 +12,8 @@ function session(overrides: Partial<SessionSummary> = {}): SessionSummary {
   return {
     sessionId: `session-${Math.random().toString(36).slice(2)}`,
     projectPath: '/work/app',
+    projectKey: 'app',
+    forkedFrom: null,
     projectName: 'app',
     branch: 'main',
     cwd: '/work/app',
@@ -42,68 +44,74 @@ describe('groupMapProjects', () => {
 
   it('counts every session and the active ones per project', () => {
     const projects = groupMapProjects([
-      session({ projectPath: '/a', projectName: 'a', isActive: true }),
-      session({ projectPath: '/a', projectName: 'a', isActive: false }),
-      session({ projectPath: '/b', projectName: 'b', isActive: false }),
+      session({ projectKey: 'a', projectName: 'a', isActive: true }),
+      session({ projectKey: 'a', projectName: 'a', isActive: false }),
+      session({ projectKey: 'b', projectName: 'b', isActive: false }),
     ])
-    const a = projects.find((p) => p.projectPath === '/a')
+    const a = projects.find((p) => p.projectKey === 'a')
     expect(a).toMatchObject({ sessionCount: 2, activeCount: 1 })
-    expect(projects.find((p) => p.projectPath === '/b')).toMatchObject({ sessionCount: 1, activeCount: 0 })
+    expect(projects.find((p) => p.projectKey === 'b')).toMatchObject({ sessionCount: 1, activeCount: 0 })
   })
 
   it('uses the display name from the sessions of each project', () => {
     const projects = groupMapProjects([
-      session({ projectPath: '/a', projectName: 'a', projectDisplayName: 'Alpha Service' }),
+      session({ projectKey: 'a', projectName: 'a', projectDisplayName: 'Alpha Service' }),
     ])
-    expect(projects[0]).toMatchObject({ projectPath: '/a', projectDisplayName: 'Alpha Service' })
+    expect(projects[0]).toMatchObject({ projectKey: 'a', projectDisplayName: 'Alpha Service' })
   })
 
   it('counts every session in a project, whatever lines they contain', () => {
     const projects = groupMapProjects([
-      session({ projectPath: '/mcla', sessionId: 'one' }),
-      session({ projectPath: '/mcla', sessionId: 'two' }),
-      session({ projectPath: '/mcla', sessionId: 'three' }),
+      session({ projectKey: 'mcla', sessionId: 'one' }),
+      session({ projectKey: 'mcla', sessionId: 'two' }),
+      session({ projectKey: 'mcla', sessionId: 'three' }),
     ])
     expect(projects).toEqual([expect.objectContaining({ sessionCount: 3 })])
   })
 
   it('takes the latest lastActiveAt across a project\'s sessions', () => {
     const projects = groupMapProjects([
-      session({ projectPath: '/a', lastActiveAt: '2026-01-01T09:00:00.000Z' }),
-      session({ projectPath: '/a', lastActiveAt: '2026-01-03T09:00:00.000Z' }),
-      session({ projectPath: '/a', lastActiveAt: '2026-01-02T09:00:00.000Z' }),
+      session({ projectKey: 'a', lastActiveAt: '2026-01-01T09:00:00.000Z' }),
+      session({ projectKey: 'a', lastActiveAt: '2026-01-03T09:00:00.000Z' }),
+      session({ projectKey: 'a', lastActiveAt: '2026-01-02T09:00:00.000Z' }),
     ])
     expect(projects[0].lastActiveAt).toBe('2026-01-03T09:00:00.000Z')
   })
 
   it('sorts projects by most recent activity first', () => {
     const projects = groupMapProjects([
-      session({ projectPath: '/old', lastActiveAt: '2026-01-01T00:00:00.000Z' }),
-      session({ projectPath: '/new', lastActiveAt: '2026-02-01T00:00:00.000Z' }),
-      session({ projectPath: '/mid', lastActiveAt: '2026-01-15T00:00:00.000Z' }),
+      session({ projectKey: 'old', lastActiveAt: '2026-01-01T00:00:00.000Z' }),
+      session({ projectKey: 'new', lastActiveAt: '2026-02-01T00:00:00.000Z' }),
+      session({ projectKey: 'mid', lastActiveAt: '2026-01-15T00:00:00.000Z' }),
     ])
-    expect(projects.map((p) => p.projectPath)).toEqual(['/new', '/mid', '/old'])
+    expect(projects.map((p) => p.projectKey)).toEqual(['new', 'mid', 'old'])
   })
 })
 
 describe('selectMapSessions', () => {
   it('keeps every session of the requested project and no other', () => {
     const sessions = [
-      session({ sessionId: 'mine', projectPath: '/a' }),
-      session({ sessionId: 'other', projectPath: '/b' }),
-      session({ sessionId: 'also-mine', projectPath: '/a' }),
+      session({ sessionId: 'mine', projectKey: 'a' }),
+      session({ sessionId: 'other', projectKey: 'b' }),
+      session({ sessionId: 'also-mine', projectKey: 'a' }),
     ]
-    expect(selectMapSessions(sessions, '/a').map((s) => s.sessionId)).toEqual(['mine', 'also-mine'])
+    expect(selectMapSessions(sessions, 'a').map((s) => s.sessionId)).toEqual(['mine', 'also-mine'])
   })
 
-  it('caps the result at 25 newest sessions by default', () => {
-    const sessions = Array.from({ length: 40 }, (_, i) =>
-      session({ sessionId: `s${i}`, projectPath: '/a' }),
-    )
-    const selected = selectMapSessions(sessions, '/a')
-    expect(selected).toHaveLength(25)
+  it('returns every session of the project, with no cap, in the order given', () => {
+    const sessions = Array.from({ length: 80 }, (_, i) => session({ sessionId: `s${i}`, projectKey: 'a' }))
+    const selected = selectMapSessions(sessions, 'a')
+    expect(selected).toHaveLength(80)
     expect(selected[0].sessionId).toBe('s0')
-    expect(selected[24].sessionId).toBe('s24')
+    expect(selected[79].sessionId).toBe('s79')
+  })
+
+  it('matches on the directory key, not the working directory path', () => {
+    const sessions = [
+      session({ sessionId: 'win', projectKey: 'D--MCLA', projectPath: 'D:\\MCLA' }),
+      session({ sessionId: 'posix', projectKey: '-home-u-MCLA', projectPath: '/home/u/MCLA' }),
+    ]
+    expect(selectMapSessions(sessions, 'D--MCLA').map((s) => s.sessionId)).toEqual(['win'])
   })
 })
 

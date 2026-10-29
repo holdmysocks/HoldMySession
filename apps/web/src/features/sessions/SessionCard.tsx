@@ -29,7 +29,7 @@ export function SessionCard({ session, status }: { session: SessionSummary; stat
     <Link
       to="/sessions/$sessionId"
       params={{ sessionId: session.sessionId }}
-      search={{ project: session.projectPath }}
+      search={{ project: session.projectKey }}
       className={`group block rounded-xl border bg-gray-900/50 p-4 transition-all hover:bg-gray-900 ${STATUS_BORDER[status]} ${STATUS_PULSE[status]}`}
       data-status={status}
     >

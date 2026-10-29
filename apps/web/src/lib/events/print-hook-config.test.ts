@@ -26,6 +26,21 @@ describe('bin/cli.mjs --print-hook-config', () => {
     }
   })
 
+  it('has no matcher on either entry, so Notification fires for every notification type', () => {
+    const snippet = JSON.parse(runCli(['--print-hook-config']).stdout)
+    for (const event of ['Notification', 'Stop']) {
+      const entry = snippet.hooks[event][0]
+      expect(entry).not.toHaveProperty('matcher')
+      expect(entry.hooks[0]).toMatchObject({ type: 'command' })
+    }
+  })
+
+  it('prints only the documented hook keys (event names mapped to arrays of matcher groups)', () => {
+    const snippet = JSON.parse(runCli(['--print-hook-config']).stdout)
+    expect(Object.keys(snippet)).toEqual(['hooks'])
+    expect(Object.keys(snippet.hooks).sort()).toEqual(['Notification', 'Stop'])
+  })
+
   it('uses an absolute path to the hook script', () => {
     const snippet = JSON.parse(runCli(['--print-hook-config']).stdout)
     const command: string = snippet.hooks.Stop[0].hooks[0].command

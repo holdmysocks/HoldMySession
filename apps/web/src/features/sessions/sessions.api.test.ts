@@ -8,6 +8,8 @@ describe('paginateAndFilterSessions', () => {
   ): SessionSummary => ({
     sessionId: `session-${Math.random()}`,
     projectPath: '/path/to/project',
+    projectKey: 'app',
+    forkedFrom: null,
     projectName: 'test-project',
     branch: 'main',
     cwd: '/path/to/project',
@@ -709,6 +711,8 @@ describe('project labels and session names in the list', () => {
   const base: SessionSummary = {
     sessionId: 'aaaaaaaa-0000',
     projectPath: '/Users/me/MCLA',
+    projectKey: 'app',
+    forkedFrom: null,
     projectName: 'MCLA',
     projectDisplayName: 'Mission Control',
     sessionName: 'Wire up the retry queue',

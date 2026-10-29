@@ -18,7 +18,7 @@ vi.mock('../utils/claude-path', () => ({
 
 vi.mock('../parsers/session-parser', () => ({
   parseSummary: vi.fn(),
-  parseOutputTokens: vi.fn().mockResolvedValue(0),
+  parseFullScan: vi.fn().mockResolvedValue({ outputTokens: 0, customTitle: null }),
 }))
 
 vi.mock('./active-detector', () => ({
@@ -36,6 +36,8 @@ function makeSummary(overrides: Partial<SessionSummary> = {}): SessionSummary {
   return {
     sessionId: 'session-abc',
     projectPath: '/Users/user/myproject',
+    projectKey: 'app',
+    forkedFrom: null,
     projectName: 'myproject',
     branch: 'main',
     cwd: '/Users/user/myproject',
@@ -58,8 +60,9 @@ function makeSummary(overrides: Partial<SessionSummary> = {}): SessionSummary {
 function makeProject(overrides: Partial<ProjectInfo> = {}): ProjectInfo {
   return {
     dirName: '-Users-user-myproject',
-    decodedPath: '/Users/user/myproject',
+    projectPath: '/Users/user/myproject',
     projectName: 'myproject',
+    cwdKnown: true,
     sessionFiles: ['session-abc.jsonl'],
     ...overrides,
   }

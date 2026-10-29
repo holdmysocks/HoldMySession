@@ -123,3 +123,56 @@ describe('repoNameFromUrl', () => {
     expect(repoNameFromUrl('   ')).toBeNull()
   })
 })
+
+describe('resolveProjectDisplayName: git layouts', () => {
+  let root: string
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'display-git-'))
+    clearProjectDisplayNameCache()
+  })
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true })
+  })
+
+  const ORIGIN = '[remote "origin"]\n\turl = https://github.com/acme/rusty-mcla.git\n'
+
+  it('reads origin from a .git folder', async () => {
+    const dir = path.join(root, 'plain')
+    fs.mkdirSync(path.join(dir, '.git'), { recursive: true })
+    fs.writeFileSync(path.join(dir, '.git', 'config'), ORIGIN)
+    expect(await resolveProjectDisplayName(dir, 'plain')).toBe('rusty-mcla')
+  })
+
+  it('follows a .git file with a relative gitdir (a worktree or submodule)', async () => {
+    const main = path.join(root, 'main')
+    fs.mkdirSync(path.join(main, '.git', 'worktrees', 'wt'), { recursive: true })
+    fs.writeFileSync(path.join(main, '.git', 'config'), ORIGIN)
+    const wt = path.join(root, 'wt')
+    fs.mkdirSync(wt)
+    // The worktree's own gitdir has no config; the shared config is named by commondir.
+    fs.writeFileSync(path.join(main, '.git', 'worktrees', 'wt', 'commondir'), '../..\n')
+    fs.writeFileSync(path.join(wt, '.git'), 'gitdir: ../main/.git/worktrees/wt\n')
+
+    expect(await resolveProjectDisplayName(wt, 'wt')).toBe('rusty-mcla')
+  })
+
+  it('follows a .git file whose gitdir has its own config (a submodule)', async () => {
+    const sub = path.join(root, 'sub')
+    fs.mkdirSync(sub)
+    const modules = path.join(root, 'super', '.git', 'modules', 'sub')
+    fs.mkdirSync(modules, { recursive: true })
+    fs.writeFileSync(path.join(modules, 'config'), ORIGIN)
+    fs.writeFileSync(path.join(sub, '.git'), `gitdir: ${modules}\n`)
+
+    expect(await resolveProjectDisplayName(sub, 'sub')).toBe('rusty-mcla')
+  })
+
+  it('falls back to the folder name when the .git file points nowhere', async () => {
+    const dir = path.join(root, 'broken')
+    fs.mkdirSync(dir)
+    fs.writeFileSync(path.join(dir, '.git'), 'gitdir: ../does-not-exist\n')
+    expect(await resolveProjectDisplayName(dir, 'broken')).toBe('broken')
+  })
+})

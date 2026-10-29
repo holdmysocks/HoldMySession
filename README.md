@@ -138,18 +138,18 @@ cd apps/web && npm install && npm run build
   -p, --port <number>   Port to listen on (default: 3000)
   --host <hostname>     Host to bind to (default: localhost)
   -o, --open            Open browser after starting
-  --print-hook-config   Print a ~/.claude/settings.json hooks snippet for the Session Map
+  --print-hook-config   Print a settings.json hooks snippet for the Session Map (Notification and Stop)
   -v, --version         Show version number
   -h, --help            Show this help message
 ```
 
-> **Note:** The dashboard runs entirely on localhost and only reads files from `~/.claude`. It never modifies any Claude Code data and never sends data over the network.
+> **Note:** The dashboard runs entirely on localhost and only reads files from the Claude config directory (`CLAUDE_CONFIG_DIR`, default `~/.claude`). It never modifies any Claude Code data and never sends data over the network.
 
 ## Session Map
 
-The **Map** page (`/map`) shows one project's sessions as a graph: each session with its subagents, which sessions are waiting on you, and recent hook notifications. It is read-only.
+The **Map** page (`/map`) shows one project's sessions as a tree: each session, its forks as child nodes, and its subagents as small cards with running or done state. Sessions are coloured by status: needs you (yellow), active (green), completed in the last hour (orange), idle (grey). A side panel lists what is waiting on you and recent hook events. It is read-only.
 
-Notifications need an opt-in hook. Run `claude-dashboard --print-hook-config` and merge the output into `~/.claude/settings.json`. Details, data sources, status and limitations are in [docs/session-map/README.md](docs/session-map/README.md).
+Project and session names come from the transcripts: the project from the recorded working directory, the session from its `/rename` name. Notifications need an opt-in hook. Run `claude-dashboard --print-hook-config` and merge the output into the `hooks` section of `settings.json` in your Claude config directory. The hook records each notification's type and title. Details, data sources, status and limitations are in [docs/session-map/README.md](docs/session-map/README.md).
 
 ## Tech Stack
 
@@ -190,7 +190,7 @@ apps/web/src/
 
 ## How It Works
 
-1. **Scanning** -- The server reads `~/.claude/projects/` to discover all session `.jsonl` files. An mtime-based cache avoids re-parsing unchanged files.
+1. **Scanning** -- The server reads `projects/` in the Claude config directory (`CLAUDE_CONFIG_DIR`, default `~/.claude`) to discover all session `.jsonl` files. Project paths come from each transcript's `cwd`, not from the directory name. An mtime-based cache avoids re-parsing unchanged files.
 2. **Parsing** -- Session files are parsed to extract metadata (project, branch, duration, model), tool calls, agent dispatches, token usage, and errors.
 3. **Server Functions** -- TanStack Start server functions (`createServerFn`) expose parsed data to the client via type-safe RPC. All file I/O stays on the server.
 4. **React Query** -- The UI fetches data through React Query with automatic background refetch for live updates. Active sessions use adaptive polling intervals.

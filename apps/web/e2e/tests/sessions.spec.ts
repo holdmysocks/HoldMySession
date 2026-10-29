@@ -21,8 +21,8 @@ test.describe('Sessions List', () => {
   test('Given sessions exist, When I visit /sessions, Then I see project names from fixtures', async ({
     page,
   }) => {
-    // Dir "-Users-test-projects-my-app" decodes to "/Users/test/projects/my/app" -> basename "app"
-    // Dir "-Users-test-projects-another" decodes to "/Users/test/projects/another" -> basename "another"
+    // The project name comes from the cwd in the transcript ("/Users/test/projects/my-app" -> "my-app",
+    // "/Users/test/projects/another" -> "another"), not from decoding the directory name.
     const content = await page.textContent('main')
     expect(content).toContain('app')
     expect(content).toContain('another')

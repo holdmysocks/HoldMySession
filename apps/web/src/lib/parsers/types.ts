@@ -29,10 +29,19 @@ export interface SessionSummary {
   sourcePlatform?: 'windows' | 'wsl' | 'macos' | 'linux'
   /** Human name for the project: package.json name, git remote repo name, or folder name. */
   projectDisplayName: string
-  /** What the session is about: Claude Code's summary title, else the first user message. */
+  /** Name the user gave the session (`custom-title`), else the summary title, else the first user message. */
   sessionName: string | null
   /** `stop_reason` of the last assistant message in the file tail, or null. */
   lastStopReason: string | null
+  /** Directory name under ~/.claude/projects. An internal key: never decoded into a path. */
+  projectKey: string
+  /** Parent session this one was forked from (from `forkedFrom` in its first records), or null. */
+  forkedFrom: ForkedFrom | null
+}
+
+export interface ForkedFrom {
+  sessionId: string
+  messageUuid: string | null
 }
 
 // --- Session detail (full streaming parse) ---
@@ -211,7 +220,7 @@ export interface HistoryEntry {
  *              agentId still appears in tool_result text and toolUseResult.
  */
 export interface RawJsonlMessage {
-  type: 'user' | 'assistant' | 'system' | 'progress' | 'file-history-snapshot' | 'summary'
+  type: 'user' | 'assistant' | 'system' | 'progress' | 'file-history-snapshot' | 'summary' | 'custom-title'
   uuid?: string
   parentUuid?: string
   sessionId?: string
@@ -221,6 +230,10 @@ export interface RawJsonlMessage {
   version?: string
   /** Session title line written by Claude Code (`type: 'summary'`). */
   summary?: unknown
+  /** Name set with /rename or --name (`type: 'custom-title'`). The newest one wins. */
+  customTitle?: unknown
+  /** Set on every record copied into a fork: the parent session and the original message. */
+  forkedFrom?: { sessionId?: unknown; messageUuid?: unknown }
   /** Set on user lines Claude Code writes for itself (e.g. the caveat before a command). */
   isMeta?: boolean
   message?: {

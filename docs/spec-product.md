@@ -1,6 +1,8 @@
 # Claude Code Session Dashboard
 
 > Observability dashboard for Claude Code execution — visualizes active sessions and running tasks by analyzing `~/.claude`.
+>
+> **Note (2026-10-29):** Session statuses are now needs-you, active, completed and idle (see `docs/session-map/README.md`). Project names come from the transcript `cwd`, not from the directory name. The data directory is `CLAUDE_CONFIG_DIR`, defaulting to `~/.claude`. The rest of this spec is unchanged.
 
 ## Objective
 

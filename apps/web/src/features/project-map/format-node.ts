@@ -10,15 +10,16 @@ export function statusLabel(status: MapNodeStatus): string {
       return 'Completed'
     case 'idle':
       return 'Idle'
+    case 'running':
+      return 'Running'
     case 'done':
       return 'Done'
-    case 'unknown':
-      return 'Unknown'
   }
 }
 
-export function kindLabel(node: Pick<MapNode, 'kind'>): string {
-  return node.kind === 'session' ? 'Session' : 'Subagent'
+export function kindLabel(node: Pick<MapNode, 'kind' | 'isFork'>): string {
+  if (node.kind === 'subagent') return 'Subagent'
+  return node.isFork ? 'Forked session' : 'Session'
 }
 
 /** claude-example-1 -> example-1, claude-example-2-20250101 -> example-2. Matches SessionCard. */

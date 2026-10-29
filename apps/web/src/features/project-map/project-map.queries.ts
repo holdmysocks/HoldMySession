@@ -7,11 +7,11 @@ export const mapProjectsQuery = queryOptions({
   refetchInterval: 30_000,
 })
 
-export function projectMapQuery(projectPath: string) {
+export function projectMapQuery(projectKey: string) {
   return queryOptions({
-    queryKey: ['map', 'project', projectPath],
-    queryFn: () => getProjectMap({ data: { projectPath } }),
-    enabled: projectPath.length > 0,
+    queryKey: ['map', 'project', projectKey],
+    queryFn: () => getProjectMap({ data: { projectKey } }),
+    enabled: projectKey.length > 0,
     refetchInterval: 10_000,
   })
 }

@@ -1,9 +1,11 @@
 import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { scanAllSessionsWithPaths } from '@/lib/scanner/session-scanner'
 import type { SessionSummaryWithPath } from '@/lib/scanner/session-scanner'
 import { parseDetail } from '@/lib/parsers/session-parser'
+import { readSubagentWriteTimes } from '@/lib/parsers/subagent-discovery'
 import type { AgentInvocation, SessionSummary } from '@/lib/parsers/types'
 import { findPendingQuestions } from '@/lib/map/pending-requests'
 import type { PendingQuestion } from '@/lib/map/pending-requests'
@@ -11,12 +13,13 @@ import { buildProjectMap, tokenTotal } from '@/lib/map/project-map'
 import type { MapSessionInput, ProjectMap } from '@/lib/map/project-map'
 import { latestNotificationBySession, readRecentEvents } from '@/lib/events/event-inbox'
 import type { HookEvent } from '@/lib/events/event-inbox'
-import { extractProjectName } from '@/lib/utils/claude-path'
 
-export const MAX_SESSIONS_PER_MAP = 25
 const HOOK_EVENTS_SHOWN = 100
 
 export interface MapProject {
+  /** Directory name under projects/. Addresses the project in the URL. */
+  projectKey: string
+  /** Working directory from the transcripts, shown as the project's path. */
   projectPath: string
   projectDisplayName: string
   sessionCount: number
@@ -38,12 +41,12 @@ export interface CachedSessionDetail extends SessionDetailInput {
 /** Keyed by absolute file path. Server-side only; file paths never reach the client. */
 const detailCache = new Map<string, CachedSessionDetail>()
 
-/** Group sessions into projects, most recently active first. Every session is counted. */
+/** Group sessions into projects by directory, most recently active first. Every session is counted. */
 export function groupMapProjects(sessions: SessionSummary[]): MapProject[] {
-  const byPath = new Map<string, MapProject>()
+  const byKey = new Map<string, MapProject>()
 
   for (const session of sessions) {
-    const existing = byPath.get(session.projectPath)
+    const existing = byKey.get(session.projectKey)
     if (existing) {
       existing.sessionCount += 1
       if (session.isActive) existing.activeCount += 1
@@ -51,7 +54,8 @@ export function groupMapProjects(sessions: SessionSummary[]): MapProject[] {
         existing.lastActiveAt = session.lastActiveAt
       }
     } else {
-      byPath.set(session.projectPath, {
+      byKey.set(session.projectKey, {
+        projectKey: session.projectKey,
         projectPath: session.projectPath,
         projectDisplayName: session.projectDisplayName,
         sessionCount: 1,
@@ -61,18 +65,14 @@ export function groupMapProjects(sessions: SessionSummary[]): MapProject[] {
     }
   }
 
-  return [...byPath.values()].sort(
+  return [...byKey.values()].sort(
     (a, b) => Date.parse(b.lastActiveAt) - Date.parse(a.lastActiveAt),
   )
 }
 
-/** The newest sessions for one project, capped for the map. Input is newest first. */
-export function selectMapSessions<T extends SessionSummary>(
-  sessions: T[],
-  projectPath: string,
-  limit = MAX_SESSIONS_PER_MAP,
-): T[] {
-  return sessions.filter((s) => s.projectPath === projectPath).slice(0, limit)
+/** Every session in one project, in the order given (newest first). No cap: the map shows them all. */
+export function selectMapSessions<T extends SessionSummary>(sessions: T[], projectKey: string): T[] {
+  return sessions.filter((s) => s.projectKey === projectKey)
 }
 
 /**
@@ -104,14 +104,14 @@ export const getMapProjects = createServerFn({ method: 'GET' }).handler(
 )
 
 const projectMapInputSchema = z.object({
-  projectPath: z.string().min(1).max(4096),
+  projectKey: z.string().min(1).max(512),
 })
 
 export const getProjectMap = createServerFn({ method: 'GET' })
   .inputValidator((input: unknown) => projectMapInputSchema.parse(input))
   .handler(async ({ data }): Promise<ProjectMap> => {
     const all = await scanAllSessionsWithPaths()
-    const sessions = selectMapSessions(all, data.projectPath)
+    const sessions = selectMapSessions(all, data.projectKey)
 
     const notifications = latestNotificationBySession(await readRecentEvents())
 
@@ -124,17 +124,21 @@ export const getProjectMap = createServerFn({ method: 'GET' })
         loadSessionDetail(session),
       )
 
+      // Read every time, not cached: a subagent is running while its file keeps growing.
+      const sessionDir = path.join(path.dirname(session.filePath), session.sessionId)
       inputs.push({
         summary: session,
         agents: detail.agents,
+        subagentWriteTimes: await readSubagentWriteTimes(sessionDir),
         pendingQuestions: detail.pendingQuestions,
         lastNotificationAt: notifications.get(session.sessionId) ?? null,
         totalTokens: detail.totalTokens,
       })
     }
 
-    const projectDisplayName = sessions[0]?.projectDisplayName ?? extractProjectName(data.projectPath)
-    return buildProjectMap(data.projectPath, projectDisplayName, inputs)
+    const projectDisplayName = sessions[0]?.projectDisplayName ?? data.projectKey
+    const projectPath = sessions[0]?.projectPath ?? data.projectKey
+    return buildProjectMap(data.projectKey, projectPath, projectDisplayName, inputs)
   })
 
 async function loadSessionDetail(session: SessionSummaryWithPath): Promise<SessionDetailInput> {
