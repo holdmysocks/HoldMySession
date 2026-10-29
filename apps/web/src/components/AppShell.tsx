@@ -17,6 +17,18 @@ const NAV_ITEMS = [
     ),
   },
   {
+    to: '/map',
+    label: 'Map',
+    icon: (
+      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M4.6 4.2L11.4 3M4.6 4.6L11.4 12.6" />
+        <circle cx="3" cy="4.5" r="1.8" fill="currentColor" />
+        <circle cx="13" cy="2.8" r="1.8" fill="currentColor" />
+        <circle cx="13" cy="12.8" r="1.8" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
     to: '/stats',
     label: 'Stats',
     icon: (

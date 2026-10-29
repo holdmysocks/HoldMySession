@@ -40,6 +40,8 @@ Options:
   -p, --port <number>   Port to listen on (default: 3000)
   --host <hostname>     Host to bind to (default: localhost)
   -o, --open            Open browser after starting
+  --print-hook-config   Print a ~/.claude/settings.json hooks snippet (Notification and Stop)
+                        for the Session Map. Prints only; never writes files.
   -v, --version         Show version number
   -h, --help            Show this help message
 `);
@@ -48,6 +50,15 @@ Options:
 
 if (hasFlag('version', 'v')) {
   console.log(pkg.version);
+  process.exit(0);
+}
+
+if (hasFlag('print-hook-config')) {
+  const hookScript = resolve(__dirname, 'claude-dashboard-hook.mjs');
+  const command = hookScript.includes(' ') ? `node "${hookScript}"` : `node ${hookScript}`;
+  const hook = { hooks: [{ type: 'command', command }] };
+  console.error('Add the "hooks" block below to ~/.claude/settings.json (merge it with any existing "hooks").');
+  console.log(JSON.stringify({ hooks: { Notification: [hook], Stop: [hook] } }, null, 2));
   process.exit(0);
 }
 

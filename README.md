@@ -138,11 +138,18 @@ cd apps/web && npm install && npm run build
   -p, --port <number>   Port to listen on (default: 3000)
   --host <hostname>     Host to bind to (default: localhost)
   -o, --open            Open browser after starting
+  --print-hook-config   Print a ~/.claude/settings.json hooks snippet for the Session Map
   -v, --version         Show version number
   -h, --help            Show this help message
 ```
 
 > **Note:** The dashboard runs entirely on localhost and only reads files from `~/.claude`. It never modifies any Claude Code data and never sends data over the network.
+
+## Session Map
+
+The **Map** page (`/map`) shows one project's interactive sessions as a graph: each session with its subagents, which sessions are waiting on you, and recent hook notifications. It is read-only.
+
+Notifications need an opt-in hook. Run `claude-dashboard --print-hook-config` and merge the output into `~/.claude/settings.json`. Details, data sources, status and limitations are in [docs/session-map/README.md](docs/session-map/README.md).
 
 ## Tech Stack
 
