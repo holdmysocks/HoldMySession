@@ -10,7 +10,7 @@ export function NeedsYouPanel({
   nodes: MapNode[]
   onSelect: (nodeId: string) => void
 }) {
-  const { privacyMode, anonymizeBranch } = usePrivacy()
+  const { privacyMode, anonymizeSessionName } = usePrivacy()
   const waiting = nodes.filter((n) => n.kind === 'session' && n.needsYou)
 
   return (
@@ -20,7 +20,7 @@ export function NeedsYouPanel({
       ) : (
         <ul className="space-y-2">
           {waiting.map((node) => {
-            const title = privacyMode ? anonymizeBranch(node.title) : node.title
+            const title = privacyMode ? anonymizeSessionName(node.title) : node.title
             const question = node.pendingQuestions[0]?.questions[0]
             return (
               <li key={node.id}>

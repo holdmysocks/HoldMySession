@@ -15,6 +15,12 @@ import type {
   ContextWindowData,
 } from './types'
 import { discoverSubagentFiles } from './subagent-discovery'
+import {
+  createSessionNameState,
+  observeSessionName,
+  observeSummaryLine,
+  resolveSessionName,
+} from './session-name'
 
 /** Tool names that dispatch a subagent (Task = legacy, Agent = 2.1.68+) */
 const AGENT_DISPATCH_TOOL_NAMES = new Set(['Task', 'Agent'])
@@ -31,6 +37,7 @@ export async function parseSummary(
   sessionId: string,
   projectPath: string,
   projectName: string,
+  projectDisplayName: string,
   fileSizeBytes: number,
 ): Promise<SessionSummary | null> {
   const headLines = await readHeadLines(filePath, HEAD_LINES)
@@ -46,16 +53,8 @@ export async function parseSummary(
 
   if (allLines.length === 0) return null
 
-  // Detect non-interactive (task/subagent) sessions by checking for queue-operation type
-  let isInteractive = true
-  for (const line of allLines) {
-    const raw = safeParse(line)
-    if (raw && (raw as { type: string }).type === 'queue-operation') {
-      isInteractive = false
-      break
-    }
-  }
-
+  // Every top-level .jsonl is listed. Interactive sessions can contain queue-operation
+  // lines too (typing while Claude is busy), so that line type says nothing about the session.
   let startedAt: string | null = null
   let lastActiveAt: string | null = null
   let branch: string | null = null
@@ -100,6 +99,23 @@ export async function parseSummary(
 
   if (!startedAt) return null
 
+  // Name and stop reason come only from the file's start (for the first user message)
+  // and end (for the newest summary and stop reason). A stop reason from the head of a
+  // long file would be stale, so the tail is the only source for it.
+  const nameState = createSessionNameState()
+  for (const line of headLines) {
+    const msg = safeParse(line)
+    if (msg) observeSessionName(nameState, msg)
+  }
+  let lastStopReason: string | null = null
+  for (const line of tailLines) {
+    const msg = safeParse(line)
+    if (!msg) continue
+    observeSummaryLine(nameState, msg)
+    // Overwritten on every assistant line, so a null stop_reason on the newest line stays null.
+    if (msg.type === 'assistant') lastStopReason = msg.message?.stop_reason ?? null
+  }
+
   const durationMs =
     startedAt && lastActiveAt
       ? new Date(lastActiveAt).getTime() - new Date(startedAt).getTime()
@@ -109,6 +125,7 @@ export async function parseSummary(
     sessionId,
     projectPath,
     projectName,
+    projectDisplayName,
     branch,
     cwd,
     startedAt,
@@ -122,7 +139,8 @@ export async function parseSummary(
     model,
     version,
     fileSizeBytes,
-    isInteractive,
+    sessionName: resolveSessionName(nameState),
+    lastStopReason,
   }
 }
 
@@ -136,18 +154,8 @@ export async function parseDetail(
   projectPath: string,
   projectName: string,
 ): Promise<SessionDetail> {
-  // Detect non-interactive sessions by checking head lines for queue-operation
-  const headForDetect = await readHeadLines(filePath, HEAD_LINES)
-  let isInteractive = true
-  for (const line of headForDetect) {
-    const raw = safeParse(line)
-    if (raw && (raw as { type: string }).type === 'queue-operation') {
-      isInteractive = false
-      break
-    }
-  }
-
   const turns: Turn[] = []
+  const nameState = createSessionNameState()
   const toolFrequency: Record<string, number> = {}
   const errors: SessionError[] = []
   const agents: AgentInvocation[] = []
@@ -188,6 +196,7 @@ export async function parseDetail(
     const msg = safeParse(line)
     if (!msg || msg.type === 'file-history-snapshot') continue
 
+    observeSessionName(nameState, msg)
     if (msg.gitBranch && !branch) branch = msg.gitBranch
 
     // Track agent progress messages
@@ -597,7 +606,7 @@ export async function parseDetail(
     projectPath,
     projectName,
     branch,
-    isInteractive,
+    sessionName: resolveSessionName(nameState),
     turns,
     totalTokens,
     tokensByModel,

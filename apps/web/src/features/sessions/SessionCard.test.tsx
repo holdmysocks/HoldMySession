@@ -15,6 +15,9 @@ describe('SessionCard', () => {
     sessionId: 'f656e46e-bfaa-4997-8b69-d2d955ea2bfc',
     projectPath: '/Users/test/projects/my-app',
     projectName: 'my-app',
+    projectDisplayName: 'Checkout Service',
+    sessionName: 'Add retry to the payment client',
+    lastStopReason: null,
     branch: 'feature/test-branch',
     cwd: '/Users/test/projects/my-app',
     startedAt: '2026-02-25T10:00:00.000Z',
@@ -28,13 +31,12 @@ describe('SessionCard', () => {
     model: 'claude-sonnet-4-5-20250929',
     version: '0.4.1',
     fileSizeBytes: 102400,
-    isInteractive: true,
   }
 
   it('renders truncated session ID (first 8 characters)', () => {
     render(
       <PrivacyProvider>
-        <SessionCard session={mockSession} />
+        <SessionCard session={mockSession} status="idle" />
       </PrivacyProvider>
     )
     expect(screen.getByText(mockSession.sessionId.slice(0, 8))).toBeTruthy()
@@ -43,7 +45,7 @@ describe('SessionCard', () => {
   it('renders tool call count when greater than zero', () => {
     render(
       <PrivacyProvider>
-        <SessionCard session={{ ...mockSession, toolCallCount: 15 }} />
+        <SessionCard session={{ ...mockSession, toolCallCount: 15 }} status="idle" />
       </PrivacyProvider>
     )
     expect(screen.getByTitle('Tool calls')).toBeTruthy()
@@ -53,7 +55,7 @@ describe('SessionCard', () => {
   it('does not render tool call count when zero', () => {
     render(
       <PrivacyProvider>
-        <SessionCard session={{ ...mockSession, toolCallCount: 0 }} />
+        <SessionCard session={{ ...mockSession, toolCallCount: 0 }} status="idle" />
       </PrivacyProvider>
     )
     expect(screen.queryByTitle('Tool calls')).toBeNull()
@@ -62,9 +64,61 @@ describe('SessionCard', () => {
   it('does not render the full session ID', () => {
     const { container } = render(
       <PrivacyProvider>
-        <SessionCard session={mockSession} />
+        <SessionCard session={mockSession} status="idle" />
       </PrivacyProvider>
     )
     expect(container.textContent).not.toContain(mockSession.sessionId)
+  })
+  it('shows the project display name as the title and the session name below it', () => {
+    render(
+      <PrivacyProvider>
+        <SessionCard session={mockSession} status="idle" />
+      </PrivacyProvider>
+    )
+    expect(screen.getByRole('heading', { name: 'Checkout Service' })).toBeTruthy()
+    expect(screen.getByText('Add retry to the payment client')).toBeTruthy()
+  })
+
+  it('says Untitled session when there is no session name', () => {
+    render(
+      <PrivacyProvider>
+        <SessionCard session={{ ...mockSession, sessionName: null }} status="idle" />
+      </PrivacyProvider>
+    )
+    expect(screen.getByText('Untitled session')).toBeTruthy()
+  })
+
+  it('puts the status on the border and in the badge, from the same status value', () => {
+    const { container, rerender } = render(
+      <PrivacyProvider>
+        <SessionCard session={mockSession} status="needs-you" />
+      </PrivacyProvider>
+    )
+    const link = container.firstElementChild as HTMLElement
+    expect(link.className).toContain('border-yellow-400')
+    expect(link.className).toContain('status-pulse-needs-you')
+    expect(screen.getByText('Needs you')).toBeTruthy()
+
+    rerender(
+      <PrivacyProvider>
+        <SessionCard session={mockSession} status="active" />
+      </PrivacyProvider>
+    )
+    expect(link.className).toContain('border-green-500')
+    expect(link.className).toContain('status-pulse-active')
+    expect(link.className).not.toContain('status-pulse-needs-you')
+    expect(screen.getByText('Active')).toBeTruthy()
+  })
+
+  it('gives a completed session the brand border with no pulse', () => {
+    const { container } = render(
+      <PrivacyProvider>
+        <SessionCard session={mockSession} status="completed" />
+      </PrivacyProvider>
+    )
+    const link = container.firstElementChild as HTMLElement
+    expect(link.className).toContain('border-brand-500')
+    expect(link.className).not.toContain('status-pulse')
+    expect(screen.getByText('Completed')).toBeTruthy()
   })
 })

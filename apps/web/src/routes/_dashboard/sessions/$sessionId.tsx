@@ -31,7 +31,7 @@ function SessionDetailPage() {
   const { sessionId } = Route.useParams()
   const { project = '' } = Route.useSearch()
 
-  const { privacyMode, anonymizeProjectName, anonymizeBranch } = usePrivacy()
+  const { privacyMode, anonymizeProjectName, anonymizeBranch, anonymizeSessionName } = usePrivacy()
   const isActive = useIsSessionActive(sessionId)
 
   const { data: detail, isLoading, error } = useQuery(
@@ -85,9 +85,14 @@ function SessionDetailPage() {
           </Link>
           <h1 className="mt-1 text-xl font-bold text-gray-100">
             {privacyMode
-              ? anonymizeProjectName(detail.projectName)
-              : detail.projectName}
+              ? anonymizeProjectName(detail.projectDisplayName)
+              : detail.projectDisplayName}
           </h1>
+          {detail.sessionName && (
+            <p className="mt-1 text-sm text-gray-300">
+              {privacyMode ? anonymizeSessionName(detail.sessionName) : detail.sessionName}
+            </p>
+          )}
           <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
             {detail.branch && (
               <span className="font-mono">{anonymizeBranch(detail.branch)}</span>
@@ -110,7 +115,7 @@ function SessionDetailPage() {
             </div>
           )}
           <div className="mt-1">
-            <SessionIdDisplay sessionId={sessionId} interactive={detail.isInteractive} />
+            <SessionIdDisplay sessionId={sessionId} />
           </div>
         </div>
         <div className="flex items-center gap-3">

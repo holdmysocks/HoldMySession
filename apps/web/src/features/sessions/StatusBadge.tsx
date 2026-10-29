@@ -1,20 +1,48 @@
-export function StatusBadge({ isActive }: { isActive: boolean }) {
-  if (isActive) {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-        </span>
-        Active
-      </span>
-    )
-  }
+import type { SessionStatus } from '@/lib/status/session-status'
 
+const BADGE: Record<SessionStatus, { label: string; pill: string; dot: string; ping: boolean }> = {
+  'needs-you': {
+    label: 'Needs you',
+    pill: 'bg-yellow-400/15 text-yellow-300',
+    dot: 'bg-yellow-400',
+    ping: true,
+  },
+  active: {
+    label: 'Active',
+    pill: 'bg-emerald-500/15 text-emerald-400',
+    dot: 'bg-emerald-500',
+    ping: true,
+  },
+  completed: {
+    label: 'Completed',
+    pill: 'bg-brand-500/15 text-brand-300',
+    dot: 'bg-brand-500',
+    ping: false,
+  },
+  idle: {
+    label: 'Idle',
+    pill: 'bg-gray-500/15 text-gray-400',
+    dot: 'bg-gray-500',
+    ping: false,
+  },
+}
+
+/** Status pill. The ping on active and needs-you uses motion-safe, so it stops under reduced motion. */
+export function StatusBadge({ status }: { status: SessionStatus }) {
+  const style = BADGE[status]
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-500/15 px-2.5 py-0.5 text-xs font-medium text-gray-400">
-      <span className="h-2 w-2 rounded-full bg-gray-500" />
-      Completed
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${style.pill}`}
+    >
+      <span className="relative flex h-2 w-2">
+        {style.ping && (
+          <span
+            className={`motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${style.dot}`}
+          />
+        )}
+        <span className={`relative inline-flex h-2 w-2 rounded-full ${style.dot}`} />
+      </span>
+      {style.label}
     </span>
   )
 }

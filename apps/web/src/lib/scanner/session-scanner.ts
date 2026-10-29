@@ -6,6 +6,7 @@ import { scanProjects, scanProjectsFrom } from './project-scanner'
 import { isSessionActive } from './active-detector'
 import { parseSummary, parseOutputTokens } from '../parsers/session-parser'
 import type { SessionSummary } from '../parsers/types'
+import { resolveProjectDisplayName } from './project-display-name'
 
 /** Extended summary that includes the absolute JSONL file path (server-side only). */
 export interface SessionSummaryWithPath extends SessionSummary {
@@ -27,6 +28,7 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
   const summaries: SessionSummaryWithPath[] = []
 
   for (const project of projects) {
+    const projectDisplayName = await resolveProjectDisplayName(project.decodedPath, project.projectName)
     for (const file of project.sessionFiles) {
       const sessionId = extractSessionId(file)
       const filePath = path.join(
@@ -43,7 +45,7 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
       if (cached && cached.mtimeMs === stat.mtimeMs) {
         // Refresh active status even for cached entries
         const active = await isSessionActive(project.dirName, sessionId)
-        summaries.push({ ...cached.summary, isActive: active, filePath })
+        summaries.push({ ...cached.summary, isActive: active, filePath, projectDisplayName })
         continue
       }
 
@@ -53,6 +55,7 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
         sessionId,
         project.decodedPath,
         project.projectName,
+        projectDisplayName,
         stat.size,
       )
 
@@ -106,6 +109,7 @@ export async function scanSessionsFromSource(source: DataSource): Promise<Sessio
   const projectsDirOverride = source.id !== 'primary' ? getProjectsDirFor(source) : undefined
 
   for (const project of projects) {
+    const projectDisplayName = await resolveProjectDisplayName(project.decodedPath, project.projectName)
     for (const file of project.sessionFiles) {
       const sessionId = extractSessionId(file)
       const projectsDir = source.id === 'primary' ? getProjectsDir() : getProjectsDirFor(source)
@@ -120,6 +124,7 @@ export async function scanSessionsFromSource(source: DataSource): Promise<Sessio
         summaries.push({
           ...cached.summary,
           isActive: active,
+          projectDisplayName,
           sourceId: source.id,
           sourceLabel: source.label,
           sourcePlatform: source.platform,
@@ -132,6 +137,7 @@ export async function scanSessionsFromSource(source: DataSource): Promise<Sessio
         sessionId,
         project.decodedPath,
         project.projectName,
+        projectDisplayName,
         stat.size,
       )
 

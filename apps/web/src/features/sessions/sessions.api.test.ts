@@ -22,7 +22,7 @@ describe('paginateAndFilterSessions', () => {
     model: 'claude-opus-4-6',
     version: '1.0.0',
     fileSizeBytes: 1024,
-    isInteractive: true,
+    projectDisplayName: 'Test Project', sessionName: null, lastStopReason: null,
     ...overrides,
   })
 
@@ -662,7 +662,7 @@ describe('paginateAndFilterSessions', () => {
         sortDir: 'desc',
       })
 
-      expect(result.projects).toEqual(['project-a', 'project-b', 'project-c'])
+      expect(result.projects.map((p) => p.name)).toEqual(['project-a', 'project-b', 'project-c'])
     })
 
     it('should include all projects even when filters are applied', async () => {
@@ -683,7 +683,7 @@ describe('paginateAndFilterSessions', () => {
       })
 
       // Projects list should still include all projects
-      expect(result.projects).toEqual(['project-a', 'project-b', 'project-c'])
+      expect(result.projects.map((p) => p.name)).toEqual(['project-a', 'project-b', 'project-c'])
       // But sessions should only include active
       expect(result.sessions).toHaveLength(1)
       expect(result.sessions[0].projectName).toBe('project-a')
@@ -702,5 +702,45 @@ describe('paginateAndFilterSessions', () => {
 
       expect(result.projects).toEqual([])
     })
+  })
+})
+
+describe('project labels and session names in the list', () => {
+  const base: SessionSummary = {
+    sessionId: 'aaaaaaaa-0000',
+    projectPath: '/Users/me/MCLA',
+    projectName: 'MCLA',
+    projectDisplayName: 'Mission Control',
+    sessionName: 'Wire up the retry queue',
+    lastStopReason: null,
+    branch: 'main',
+    cwd: '/Users/me/MCLA',
+    startedAt: '2026-01-01T10:00:00Z',
+    lastActiveAt: '2026-01-01T11:00:00Z',
+    durationMs: 3600000,
+    messageCount: 9,
+    userMessageCount: 4,
+    assistantMessageCount: 5,
+    isActive: false,
+    toolCallCount: 0,
+    model: 'claude-opus-4-6',
+    version: '1.0.0',
+    fileSizeBytes: 1024,
+  }
+
+  const query = { page: 1, pageSize: 10, search: '', status: 'all' as const, project: '', sort: 'lastActive' as const, sortDir: 'desc' as const }
+
+  it('labels each project option with its display name and keeps the folder name as the value', async () => {
+    const result = await paginateAndFilterSessions([base], query)
+    expect(result.projects).toEqual([{ name: 'MCLA', displayName: 'Mission Control' }])
+  })
+
+  it('matches the search against the session name and the display name', async () => {
+    const sessions = [base, { ...base, sessionId: 'bbbbbbbb-0000', sessionName: 'Unrelated', projectName: 'other', projectDisplayName: 'Other' }]
+    const byName = await paginateAndFilterSessions(sessions, { ...query, search: 'retry queue' })
+    expect(byName.sessions.map((s) => s.sessionId)).toEqual(['aaaaaaaa-0000'])
+
+    const byDisplay = await paginateAndFilterSessions(sessions, { ...query, search: 'mission' })
+    expect(byDisplay.sessions.map((s) => s.sessionId)).toEqual(['aaaaaaaa-0000'])
   })
 })

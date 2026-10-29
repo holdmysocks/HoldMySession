@@ -1,19 +1,27 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { SessionSummary } from '@/lib/parsers/types'
+import type { SessionStatus } from '@/lib/status/session-status'
 import { formatDuration, formatRelativeTime, formatBytes } from '@/lib/utils/format'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { SourceBadge } from '@/components/ui/SourceBadge'
+import { STATUS_BORDER, STATUS_PULSE } from '@/components/ui/session-status-style'
 import { StatusBadge } from './StatusBadge'
 import { RunningTimer } from './RunningTimer'
 
-export function SessionCard({ session }: { session: SessionSummary }) {
-  const { privacyMode, anonymizePath, anonymizeProjectName, anonymizeBranch } = usePrivacy()
-  const displayName = privacyMode
-    ? anonymizeProjectName(session.projectName)
-    : session.projectName
+export function SessionCard({ session, status }: { session: SessionSummary; status: SessionStatus }) {
+  const { privacyMode, anonymizePath, anonymizeProjectName, anonymizeBranch, anonymizeSessionName } =
+    usePrivacy()
+  const projectLabel = privacyMode
+    ? anonymizeProjectName(session.projectDisplayName)
+    : session.projectDisplayName
+  const nameLabel = session.sessionName
+    ? privacyMode
+      ? anonymizeSessionName(session.sessionName)
+      : session.sessionName
+    : null
   const displayCwd = session.cwd
-    ? anonymizePath(session.cwd, session.projectName)
+    ? anonymizePath(session.cwd, session.projectDisplayName)
     : null
   const displayBranch = session.branch ? anonymizeBranch(session.branch) : null
 
@@ -22,27 +30,34 @@ export function SessionCard({ session }: { session: SessionSummary }) {
       to="/sessions/$sessionId"
       params={{ sessionId: session.sessionId }}
       search={{ project: session.projectPath }}
-      className="group block rounded-xl border border-gray-800 bg-gray-900/50 p-4 transition-all hover:border-gray-700 hover:bg-gray-900"
+      className={`group block rounded-xl border bg-gray-900/50 p-4 transition-all hover:bg-gray-900 ${STATUS_BORDER[status]} ${STATUS_PULSE[status]}`}
+      data-status={status}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h3 className="truncate text-sm font-semibold text-gray-100">
-              {displayName}
+              {projectLabel}
             </h3>
-            <StatusBadge isActive={session.isActive} />
+            <StatusBadge status={status} />
             {session.sourceLabel && (
               <SourceBadge sourceLabel={session.sourceLabel} platform={session.sourcePlatform} />
             )}
           </div>
 
+          <p
+            className={`mt-1 truncate text-sm ${nameLabel ? 'text-gray-200' : 'italic text-gray-500'}`}
+          >
+            {nameLabel ?? 'Untitled session'}
+          </p>
+
           {displayBranch && (
-            <p className="mt-1 truncate text-xs text-gray-500">
+            <p className="mt-0.5 truncate text-xs text-gray-500">
               <span className="font-mono">{displayBranch}</span>
             </p>
           )}
 
-          <SessionIdCopyRow sessionId={session.sessionId} interactive={session.isInteractive} />
+          <SessionIdCopyRow sessionId={session.sessionId} />
         </div>
 
         <span className="shrink-0 text-xs text-gray-500">
@@ -81,7 +96,7 @@ export function SessionCard({ session }: { session: SessionSummary }) {
   )
 }
 
-function SessionIdCopyRow({ sessionId, interactive }: { sessionId: string; interactive: boolean }) {
+function SessionIdCopyRow({ sessionId }: { sessionId: string }) {
   const [copied, setCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -107,16 +122,14 @@ function SessionIdCopyRow({ sessionId, interactive }: { sessionId: string; inter
       <span className="truncate text-xs text-gray-500 font-mono">
         {sessionId.slice(0, 8)}
       </span>
-      {interactive && (
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="rounded px-1 py-0.5 text-[10px] text-gray-600 opacity-0 transition-opacity hover:bg-gray-800 hover:text-gray-300 group-hover/id:opacity-100 group-hover:opacity-100"
-          title="Copy resume command"
-        >
-          {copied ? 'Copied!' : 'Copy'}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="rounded px-1 py-0.5 text-[10px] text-gray-600 opacity-0 transition-opacity hover:bg-gray-800 hover:text-gray-300 group-hover/id:opacity-100 group-hover:opacity-100"
+        title="Copy resume command"
+      >
+        {copied ? 'Copied!' : 'Copy'}
+      </button>
     </div>
   )
 }

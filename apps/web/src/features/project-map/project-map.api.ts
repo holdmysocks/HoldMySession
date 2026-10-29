@@ -18,7 +18,7 @@ const HOOK_EVENTS_SHOWN = 100
 
 export interface MapProject {
   projectPath: string
-  projectName: string
+  projectDisplayName: string
   sessionCount: number
   activeCount: number
   lastActiveAt: string
@@ -38,15 +38,11 @@ export interface CachedSessionDetail extends SessionDetailInput {
 /** Keyed by absolute file path. Server-side only; file paths never reach the client. */
 const detailCache = new Map<string, CachedSessionDetail>()
 
-/**
- * Group interactive sessions into projects, most recently active first.
- * Non-interactive (headless) sessions are left out, so every listed project has a map.
- */
+/** Group sessions into projects, most recently active first. Every session is counted. */
 export function groupMapProjects(sessions: SessionSummary[]): MapProject[] {
   const byPath = new Map<string, MapProject>()
 
   for (const session of sessions) {
-    if (!session.isInteractive) continue
     const existing = byPath.get(session.projectPath)
     if (existing) {
       existing.sessionCount += 1
@@ -57,7 +53,7 @@ export function groupMapProjects(sessions: SessionSummary[]): MapProject[] {
     } else {
       byPath.set(session.projectPath, {
         projectPath: session.projectPath,
-        projectName: session.projectName,
+        projectDisplayName: session.projectDisplayName,
         sessionCount: 1,
         activeCount: session.isActive ? 1 : 0,
         lastActiveAt: session.lastActiveAt,
@@ -70,15 +66,13 @@ export function groupMapProjects(sessions: SessionSummary[]): MapProject[] {
   )
 }
 
-/** The newest interactive sessions for one project, capped for the map. Input is newest first. */
+/** The newest sessions for one project, capped for the map. Input is newest first. */
 export function selectMapSessions<T extends SessionSummary>(
   sessions: T[],
   projectPath: string,
   limit = MAX_SESSIONS_PER_MAP,
 ): T[] {
-  return sessions
-    .filter((s) => s.isInteractive && s.projectPath === projectPath)
-    .slice(0, limit)
+  return sessions.filter((s) => s.projectPath === projectPath).slice(0, limit)
 }
 
 /**
@@ -139,8 +133,8 @@ export const getProjectMap = createServerFn({ method: 'GET' })
       })
     }
 
-    const projectName = sessions[0]?.projectName ?? extractProjectName(data.projectPath)
-    return buildProjectMap(data.projectPath, projectName, inputs)
+    const projectDisplayName = sessions[0]?.projectDisplayName ?? extractProjectName(data.projectPath)
+    return buildProjectMap(data.projectPath, projectDisplayName, inputs)
   })
 
 async function loadSessionDetail(session: SessionSummaryWithPath): Promise<SessionDetailInput> {

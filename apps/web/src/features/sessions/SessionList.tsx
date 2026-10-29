@@ -6,7 +6,10 @@ import { SessionCard } from './SessionCard'
 import { SessionFilters } from './SessionFilters'
 import { PaginationControls } from './PaginationControls'
 import { usePageSizePreference } from './usePageSizePreference'
+import { useNow } from './useNow'
 import { Route } from '@/routes/_dashboard/sessions/index'
+import { deriveSessionStatus } from '@/lib/status/session-status'
+import type { SessionListItem } from './sessions.api'
 
 export function SessionList() {
   const navigate = useNavigate()
@@ -36,9 +39,10 @@ export function SessionList() {
     paginatedSessionListQuery({ page, pageSize, search, status, project, sort, sortDir }),
   )
   const { data: activeSessions = [] } = useQuery(activeSessionsQuery)
+  const now = useNow()
 
   // Merge active session status from the fast-polling query into current page results
-  const mergedSessions = useMemo(() => {
+  const mergedSessions: SessionListItem[] = useMemo(() => {
     if (!paginatedData) return []
     const activeIds = new Set(activeSessions.map((s) => s.sessionId))
     return paginatedData.sessions.map((s) => ({
@@ -93,7 +97,20 @@ export function SessionList() {
           </div>
         ) : (
           mergedSessions.map((session) => (
-            <SessionCard key={session.sessionId} session={session} />
+            <SessionCard
+              key={session.sessionId}
+              session={session}
+              status={deriveSessionStatus(
+                {
+                  isActive: session.isActive,
+                  lastActiveAt: session.lastActiveAt,
+                  lastStopReason: session.lastStopReason,
+                  lastNotificationAt: session.lastNotificationAt,
+                  hasOpenQuestion: session.hasOpenQuestion,
+                },
+                now,
+              )}
+            />
           ))
         )}
       </div>

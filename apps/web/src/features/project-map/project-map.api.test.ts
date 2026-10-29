@@ -26,7 +26,9 @@ function session(overrides: Partial<SessionSummary> = {}): SessionSummary {
     model: 'claude-example-1',
     version: '2.1.0',
     fileSizeBytes: 1024,
-    isInteractive: true,
+    projectDisplayName: 'App',
+    sessionName: null,
+    lastStopReason: null,
     ...overrides,
   }
 }
@@ -38,22 +40,31 @@ describe('groupMapProjects', () => {
     expect(groupMapProjects([])).toEqual([])
   })
 
-  it('counts interactive sessions and active ones per project', () => {
+  it('counts every session and the active ones per project', () => {
     const projects = groupMapProjects([
       session({ projectPath: '/a', projectName: 'a', isActive: true }),
       session({ projectPath: '/a', projectName: 'a', isActive: false }),
       session({ projectPath: '/b', projectName: 'b', isActive: false }),
     ])
     const a = projects.find((p) => p.projectPath === '/a')
-    expect(a).toMatchObject({ projectName: 'a', sessionCount: 2, activeCount: 1 })
+    expect(a).toMatchObject({ sessionCount: 2, activeCount: 1 })
     expect(projects.find((p) => p.projectPath === '/b')).toMatchObject({ sessionCount: 1, activeCount: 0 })
   })
 
-  it('leaves out non-interactive sessions', () => {
+  it('uses the display name from the sessions of each project', () => {
     const projects = groupMapProjects([
-      session({ projectPath: '/headless', isInteractive: false }),
+      session({ projectPath: '/a', projectName: 'a', projectDisplayName: 'Alpha Service' }),
     ])
-    expect(projects).toEqual([])
+    expect(projects[0]).toMatchObject({ projectPath: '/a', projectDisplayName: 'Alpha Service' })
+  })
+
+  it('counts every session in a project, whatever lines they contain', () => {
+    const projects = groupMapProjects([
+      session({ projectPath: '/mcla', sessionId: 'one' }),
+      session({ projectPath: '/mcla', sessionId: 'two' }),
+      session({ projectPath: '/mcla', sessionId: 'three' }),
+    ])
+    expect(projects).toEqual([expect.objectContaining({ sessionCount: 3 })])
   })
 
   it('takes the latest lastActiveAt across a project\'s sessions', () => {
@@ -76,13 +87,13 @@ describe('groupMapProjects', () => {
 })
 
 describe('selectMapSessions', () => {
-  it('keeps only interactive sessions of the requested project', () => {
+  it('keeps every session of the requested project and no other', () => {
     const sessions = [
       session({ sessionId: 'mine', projectPath: '/a' }),
       session({ sessionId: 'other', projectPath: '/b' }),
-      session({ sessionId: 'headless', projectPath: '/a', isInteractive: false }),
+      session({ sessionId: 'also-mine', projectPath: '/a' }),
     ]
-    expect(selectMapSessions(sessions, '/a').map((s) => s.sessionId)).toEqual(['mine'])
+    expect(selectMapSessions(sessions, '/a').map((s) => s.sessionId)).toEqual(['mine', 'also-mine'])
   })
 
   it('caps the result at 25 newest sessions by default', () => {

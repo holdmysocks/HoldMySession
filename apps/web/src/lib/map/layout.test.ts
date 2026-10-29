@@ -28,7 +28,7 @@ function summary(sessionId: string): SessionSummary {
     model: 'claude-example-1',
     version: '2.1.0',
     fileSizeBytes: 1024,
-    isInteractive: true,
+    projectDisplayName: 'Test Project', sessionName: null, lastStopReason: null,
   }
 }
 

@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { extractProjectName } from '@/lib/utils/claude-path'
 import { parseDetail } from '@/lib/parsers/session-parser'
+import { resolveProjectDisplayName } from '@/lib/scanner/project-display-name'
 import { findSessionFile } from './find-session-file'
 
 export const getSessionDetail = createServerFn({ method: 'GET' })
@@ -12,5 +13,7 @@ export const getSessionDetail = createServerFn({ method: 'GET' })
     }
 
     const projectName = extractProjectName(data.projectPath)
-    return parseDetail(filePath.path, data.sessionId, data.projectPath, projectName)
+    const detail = await parseDetail(filePath.path, data.sessionId, data.projectPath, projectName)
+    const projectDisplayName = await resolveProjectDisplayName(data.projectPath, projectName)
+    return { ...detail, projectDisplayName }
   })

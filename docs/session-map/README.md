@@ -1,6 +1,6 @@
 # Session Map
 
-The Session Map is a read-only view of one project's Claude Code sessions. Each interactive session is a node, its subagents are child nodes joined by dispatch edges, and a side panel lists what is waiting on you and recent hook notifications.
+The Session Map is a read-only view of one project's Claude Code sessions. Each session in the project is a node, its subagents are child nodes joined by dispatch edges, and a side panel lists what is waiting on you and recent hook notifications.
 
 Phase 1 is read-only. It never writes to `~/.claude`. Messaging and linking sessions are Phase 2 (see [Status](#status)).
 
@@ -44,9 +44,10 @@ Everything below is read from `~/.claude` (or `$CLAUDE_HOME`), except the hook l
 | Feature | Read from | Fields used |
 |---|---|---|
 | Project list | `projects/<dir>/*.jsonl` (file names and mtimes), decoded directory name | Project path comes from the directory name. Lossy for paths containing `-`, as in the rest of the app. |
-| Interactive vs headless | First and last 15 lines of each session file | A `queue-operation` line marks a session non-interactive. Non-interactive sessions are not mapped. |
-| Session node: title | `gitBranch` (first line that has one) | Falls back to the first 8 characters of the session id. |
-| Session node: status | Session file mtime plus a lock directory `projects/<dir>/<sessionId>/` | Active when the file was written in the last 2 minutes and the lock directory exists. Otherwise idle. |
+| Sessions listed | Every top-level `projects/<dir>/*.jsonl` | No filter. A `queue-operation` line does not make a session headless: interactive sessions can contain one too. Subagent transcripts live in subfolders and are not listed as sessions. |
+| Project name | `name` in the project's `package.json`, then the `origin` remote's repo name in `.git/config`, then the folder name | Read-only, cached by path. Only absolute decoded paths are looked up. |
+| Session node: title | Latest `summary` line (Claude Code's auto-title), else the first user text message, cut to 80 characters | Falls back to `gitBranch`, then the first 8 characters of the session id. The `summary` line shape is assumed; verify on a real session file. |
+| Session node: status | Session file mtime, a lock directory `projects/<dir>/<sessionId>/`, the last assistant `stop_reason`, hook notifications, and open `AskUserQuestion` calls | See [Session status](#session-status). |
 | Session node: model | First assistant `message.model` | |
 | Session node: duration | First and last `timestamp` | |
 | Session node: tool calls | Count of `tool_use` blocks in assistant messages | |
@@ -71,11 +72,24 @@ Everything below is read from `~/.claude` (or `$CLAUDE_HOME`), except the hook l
 
 The hook is the only writer. The dashboard reads the log and never writes to it.
 
+## Session status
+
+One shared rule set drives the Sessions list cards and the map nodes (`src/lib/status/session-status.ts`). Priority is needs-you, then active, then completed, then idle.
+
+| Status | Border | Look | Rule |
+|---|---|---|---|
+| needs-you | yellow | fast pulse, about 1 s | Session is active and has an open `AskUserQuestion`, or a `Notification` hook event newer than its last write. Waiting questions in an idle session are ignored, since they were abandoned. |
+| active | green | slow pulse, about 2.5 s | Active, per the 2-minute mtime and lock-directory check. |
+| completed | solid Claude orange | none | Not active, last assistant `stop_reason` is `end_turn`, and the last write is within 1 hour. Older sessions are idle. |
+| idle | grey | none | Anything else. |
+
+The pulse is CSS only. With `prefers-reduced-motion: reduce`, the pulse stops and the colour stays.
+
 ## Status
 
 | Feature | Status | Notes |
 |---|---|---|
-| Project map (sessions as nodes) | Built | Newest 25 interactive sessions per project. |
+| Project map (sessions as nodes) | Built | Newest 25 sessions per project. |
 | Subagents as child nodes with dispatch edges | Built | From the parent's dispatch records, with stats from `toolUseResult`. |
 | Child sessions (subagent transcripts as their own nodes) | Not built | Subagent transcripts are used only to enrich the matching subagent node. They are not mapped as separate sessions. |
 | Requests from me (open `AskUserQuestion`) | Built | Shown on the session node, in Needs you, and in the details panel. |
@@ -127,7 +141,7 @@ Work through these in order. Each step is independent enough to ship on its own.
 
 ### Phase 1 (unreleased)
 
-- New **Map** page at `/map` with a per-project map of interactive sessions and their subagents, dispatch edges, a Needs you panel, a recent hook events panel, and a details panel.
+- New **Map** page at `/map` with a per-project map of sessions and their subagents, dispatch edges, a Needs you panel, a recent hook events panel, and a details panel.
 - Open `AskUserQuestion` calls are detected from session transcripts.
 - Opt-in `Notification` and `Stop` hooks write to `~/.claude-dashboard/events.jsonl`. Print the snippet with `claude-dashboard --print-hook-config`.
 - New `--print-hook-config` CLI flag and help text.

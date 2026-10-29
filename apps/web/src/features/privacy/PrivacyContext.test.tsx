@@ -405,3 +405,42 @@ describe('PrivacyContext', () => {
     })
   })
 })
+
+describe('anonymizeSessionName', () => {
+  function SessionNameProbe({ name }: { name: string }) {
+    const { anonymizeSessionName, togglePrivacyMode } = usePrivacy()
+    return (
+      <div>
+        <span data-testid="session-name">{anonymizeSessionName(name)}</span>
+        <button data-testid="toggle" onClick={togglePrivacyMode}>Toggle</button>
+      </div>
+    )
+  }
+
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('returns the raw session name when privacy mode is off', () => {
+    render(
+      <PrivacyProvider>
+        <SessionNameProbe name="Fix the login redirect" />
+      </PrivacyProvider>,
+    )
+    expect(screen.getByTestId('session-name').textContent).toBe('Fix the login redirect')
+  })
+
+  it('replaces the session name with a stable placeholder when privacy mode is on', async () => {
+    const { getByTestId } = render(
+      <PrivacyProvider>
+        <SessionNameProbe name="Fix the login redirect" />
+      </PrivacyProvider>,
+    )
+    getByTestId('toggle').click()
+    await waitFor(() => {
+      expect(getByTestId('session-name').textContent).toBe('session-1')
+    })
+    expect(getByTestId('session-name').textContent).not.toContain('login')
+  })
+})
+

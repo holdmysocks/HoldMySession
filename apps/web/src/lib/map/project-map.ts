@@ -1,16 +1,18 @@
 import type { AgentInvocation, SessionSummary, TokenUsage } from '../parsers/types'
 import type { PendingQuestion } from './pending-requests'
+import { deriveSessionStatus } from '../status/session-status'
+import type { SessionStatus } from '../status/session-status'
 
 /**
- * Pure model for the project map: one node per interactive session, one child
+ * Pure model for the project map: one node per session in the project, one child
  * node per subagent dispatched from that session, and a dispatch edge between
  * them. No filesystem access here, so it is unit-testable.
  */
 
 export type MapNodeKind = 'session' | 'subagent'
 
-/** Session nodes: 'active' (recently written) or 'idle'. Subagent nodes: 'done' or 'unknown'. */
-export type MapNodeStatus = 'active' | 'idle' | 'done' | 'unknown'
+/** Session nodes use the shared session status. Subagent nodes: 'done' or 'unknown'. */
+export type MapNodeStatus = SessionStatus | 'done' | 'unknown'
 
 export interface MapNode {
   id: string
@@ -19,10 +21,14 @@ export interface MapNode {
   sessionId: string
   /** Parent node id, or null for session nodes. */
   parentId: string | null
+  /** Session name for session nodes, agent type for subagent nodes. */
   title: string
+  /** Session nodes: short id and message count. Subagent nodes: the dispatch description. */
   subtitle: string
+  /** Session nodes only. Shown with the subtitle so privacy mode can hide it on the client. */
+  projectDisplayName: string | null
   status: MapNodeStatus
-  /** True when the session is waiting on you: an open question, or a Notification after its last write. */
+  /** True when the session status is needs-you. */
   needsYou: boolean
   model: string | null
   tokens: number
@@ -41,7 +47,7 @@ export interface MapEdge {
 
 export interface ProjectMap {
   projectPath: string
-  projectName: string
+  projectDisplayName: string
   nodes: MapNode[]
   edges: MapEdge[]
 }
@@ -67,19 +73,28 @@ export function tokenTotal(usage: TokenUsage | undefined): number {
   )
 }
 
-export function sessionNeedsYou(input: MapSessionInput): boolean {
-  if (input.pendingQuestions.length > 0) return true
-  if (!input.lastNotificationAt) return false
-  return Date.parse(input.lastNotificationAt) > Date.parse(input.summary.lastActiveAt)
+/** Session status for one map input. The pending question and notification come from the server. */
+export function sessionStatus(input: MapSessionInput, nowMs: number): SessionStatus {
+  return deriveSessionStatus(
+    {
+      isActive: input.summary.isActive,
+      lastActiveAt: input.summary.lastActiveAt,
+      lastStopReason: input.summary.lastStopReason,
+      lastNotificationAt: input.lastNotificationAt,
+      hasOpenQuestion: input.pendingQuestions.length > 0,
+    },
+    nowMs,
+  )
 }
 
-/** Short, stable label for a session: branch if present, else the first 8 chars of its id. */
+/** Session name, else the branch, else the first 8 chars of the id. Names can be long; the canvas cuts them. */
 function sessionTitle(summary: SessionSummary): string {
-  return summary.branch ?? summary.sessionId.slice(0, 8)
+  return summary.sessionName ?? summary.branch ?? summary.sessionId.slice(0, 8)
 }
 
-function sessionNode(input: MapSessionInput): MapNode {
+function sessionNode(input: MapSessionInput, nowMs: number): MapNode {
   const { summary } = input
+  const status = sessionStatus(input, nowMs)
   return {
     id: `session:${summary.sessionId}`,
     kind: 'session',
@@ -87,8 +102,9 @@ function sessionNode(input: MapSessionInput): MapNode {
     parentId: null,
     title: sessionTitle(summary),
     subtitle: `${summary.sessionId.slice(0, 8)} · ${summary.messageCount} msgs`,
-    status: summary.isActive ? 'active' : 'idle',
-    needsYou: sessionNeedsYou(input),
+    projectDisplayName: summary.projectDisplayName,
+    status,
+    needsYou: status === 'needs-you',
     model: summary.model,
     tokens: input.totalTokens,
     durationMs: summary.durationMs,
@@ -108,6 +124,7 @@ function subagentNode(sessionId: string, agent: AgentInvocation, index: number):
     parentId: `session:${sessionId}`,
     title: agent.subagentType || 'agent',
     subtitle: agent.description,
+    projectDisplayName: null,
     status: hasDuration ? 'done' : 'unknown',
     needsYou: false,
     model: agent.model ?? null,
@@ -125,14 +142,15 @@ function subagentNode(sessionId: string, agent: AgentInvocation, index: number):
  */
 export function buildProjectMap(
   projectPath: string,
-  projectName: string,
+  projectDisplayName: string,
   sessions: MapSessionInput[],
+  nowMs: number = Date.now(),
 ): ProjectMap {
   const nodes: MapNode[] = []
   const edges: MapEdge[] = []
 
   for (const input of sessions) {
-    const parent = sessionNode(input)
+    const parent = sessionNode(input, nowMs)
     nodes.push(parent)
 
     input.agents.forEach((agent, index) => {
@@ -142,5 +160,5 @@ export function buildProjectMap(
     })
   }
 
-  return { projectPath, projectName, nodes, edges }
+  return { projectPath, projectDisplayName, nodes, edges }
 }

@@ -31,7 +31,10 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
     [mapQuery.data],
   )
   const selectedNode = nodes.find((n) => n.id === selectedId) ?? null
-  const needsYouCount = nodes.filter((n) => n.kind === 'session' && n.needsYou).length
+  // Counted from the map's own session nodes, so the line matches the borders on screen.
+  const sessionNodes = nodes.filter((n) => n.kind === 'session')
+  const activeCount = sessionNodes.filter((n) => n.status === 'active').length
+  const needsYouCount = sessionNodes.filter((n) => n.status === 'needs-you').length
 
   function handleProjectChange(projectPath: string) {
     setSelectedId(null)
@@ -64,7 +67,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
 
   const displayPath = selectedProject
     ? privacyMode
-      ? anonymizePath(selectedProject.projectPath, selectedProject.projectName)
+      ? anonymizePath(selectedProject.projectPath, selectedProject.projectDisplayName)
       : selectedProject.projectPath
     : ''
 
@@ -82,7 +85,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
           >
             {projects.map((p) => (
               <option key={p.projectPath} value={p.projectPath}>
-                {privacyMode ? anonymizeProjectName(p.projectName) : p.projectName} ({p.sessionCount})
+                {privacyMode ? anonymizeProjectName(p.projectDisplayName) : p.projectDisplayName} ({p.sessionCount})
               </option>
             ))}
           </select>
@@ -91,7 +94,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
           <p className="min-w-0 truncate text-xs text-gray-500">
             <span className="font-mono">{displayPath}</span>
             <span className="mx-2 text-gray-700">|</span>
-            {selectedProject.activeCount} active
+            {activeCount} active
             <span className="mx-2 text-gray-700">|</span>
             {needsYouCount} need you
           </p>
@@ -113,7 +116,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
             <MapCanvas layout={layout} selectedId={selectedId} onSelect={setSelectedId} />
           ) : (
             <p className="py-12 text-center text-sm text-gray-500">
-              This project has no interactive sessions yet.
+              This project has no sessions yet.
             </p>
           )}
         </section>
@@ -133,7 +136,7 @@ function Header() {
     <div>
       <h1 className="text-2xl font-bold text-gray-100">Session Map</h1>
       <p className="mt-1 text-sm text-gray-400">
-        Interactive sessions in a project, with the subagents they dispatched. Read-only.
+        Sessions in a project, with the subagents they dispatched. Read-only.
       </p>
       <p className="mt-2 text-xs text-gray-500">
         Messaging and linking sessions: Phase 2, see docs/session-map/README.md

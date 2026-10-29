@@ -249,7 +249,7 @@ describe('parseStats', () => {
         version: '1.0.0',
         toolCallCount: 0,
         fileSizeBytes: 512,
-        isInteractive: true,
+        projectDisplayName: 'Test Project', sessionName: null, lastStopReason: null,
         filePath: '/proj/new-session.jsonl',
       }
 
@@ -261,7 +261,7 @@ describe('parseStats', () => {
         projectPath: '/proj',
         projectName: 'proj',
         branch: 'main',
-        isInteractive: true,
+        sessionName: null,
         turns: [
           { uuid: 't1', type: 'user', timestamp: new Date().toISOString(), toolCalls: [] },
           { uuid: 't2', type: 'assistant', timestamp: new Date().toISOString(), toolCalls: [] },
@@ -359,7 +359,7 @@ describe('hour bucketing (via computeStatsFromSessions)', () => {
       version: null,
       toolCallCount: 0,
       fileSizeBytes: 256,
-      isInteractive: true,
+      projectDisplayName: 'Test Project', sessionName: null, lastStopReason: null,
       filePath: '/proj/hour-test.jsonl',
     }
 
@@ -400,7 +400,7 @@ describe('hour bucketing (via computeStatsFromSessions)', () => {
       version: null,
       toolCallCount: 0,
       fileSizeBytes: 0,
-      isInteractive: true,
+      projectDisplayName: 'Test Project', sessionName: null, lastStopReason: null,
       filePath: '/proj/no-time.jsonl',
     }
 

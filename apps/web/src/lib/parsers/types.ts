@@ -27,8 +27,12 @@ export interface SessionSummary {
   sourceLabel?: string
   /** Platform of the DataSource this came from */
   sourcePlatform?: 'windows' | 'wsl' | 'macos' | 'linux'
-  /** Whether this is an interactive (human-driven) session vs a task/subagent session */
-  isInteractive: boolean
+  /** Human name for the project: package.json name, git remote repo name, or folder name. */
+  projectDisplayName: string
+  /** What the session is about: Claude Code's summary title, else the first user message. */
+  sessionName: string | null
+  /** `stop_reason` of the last assistant message in the file tail, or null. */
+  lastStopReason: string | null
 }
 
 // --- Session detail (full streaming parse) ---
@@ -115,8 +119,7 @@ export interface SessionDetail {
   projectPath: string
   projectName: string
   branch: string | null
-  /** Whether this is an interactive (human-driven) session vs a task/subagent session */
-  isInteractive: boolean
+  sessionName: string | null
   turns: Turn[]
   totalTokens: TokenUsage
   tokensByModel: Record<string, TokenUsage>
@@ -208,7 +211,7 @@ export interface HistoryEntry {
  *              agentId still appears in tool_result text and toolUseResult.
  */
 export interface RawJsonlMessage {
-  type: 'user' | 'assistant' | 'system' | 'progress' | 'file-history-snapshot'
+  type: 'user' | 'assistant' | 'system' | 'progress' | 'file-history-snapshot' | 'summary'
   uuid?: string
   parentUuid?: string
   sessionId?: string
@@ -216,6 +219,10 @@ export interface RawJsonlMessage {
   cwd?: string
   gitBranch?: string
   version?: string
+  /** Session title line written by Claude Code (`type: 'summary'`). */
+  summary?: unknown
+  /** Set on user lines Claude Code writes for itself (e.g. the caveat before a command). */
+  isMeta?: boolean
   message?: {
     model?: string
     role?: string

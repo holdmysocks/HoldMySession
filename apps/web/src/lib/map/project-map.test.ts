@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { AgentInvocation, SessionSummary } from '../parsers/types'
 import {
   buildProjectMap,
-  sessionNeedsYou,
+  sessionStatus,
   tokenTotal,
   type MapSessionInput,
 } from './project-map'
@@ -26,7 +26,9 @@ function summary(overrides: Partial<SessionSummary> = {}): SessionSummary {
     model: 'claude-example-1',
     version: '2.1.0',
     fileSizeBytes: 2048,
-    isInteractive: true,
+    projectDisplayName: 'Test Project',
+    sessionName: null,
+    lastStopReason: null,
     ...overrides,
   }
 }
@@ -78,57 +80,83 @@ describe('tokenTotal', () => {
   })
 })
 
-describe('sessionNeedsYou', () => {
-  it('is true when a question is open', () => {
-    expect(sessionNeedsYou(input({ pendingQuestions: [question()] }))).toBe(true)
+const NOW = Date.parse('2026-01-01T11:02:00.000Z')
+
+describe('sessionStatus', () => {
+  const active = { isActive: true }
+
+  it('is needs-you when a question is open and the session is active', () => {
+    expect(sessionStatus(input({ summary: summary(active), pendingQuestions: [question()] }), NOW)).toBe('needs-you')
   })
 
-  it('is true when a notification arrived after the last write', () => {
+  it('is needs-you when a notification arrived after the last write and the session is active', () => {
     expect(
-      sessionNeedsYou(input({ lastNotificationAt: '2026-01-01T11:05:00.000Z' })),
-    ).toBe(true)
+      sessionStatus(input({ summary: summary(active), lastNotificationAt: '2026-01-01T11:05:00.000Z' }), NOW),
+    ).toBe('needs-you')
   })
 
-  it('is false when the notification predates the last write', () => {
+  it('ignores an open question when the session is idle, since it was abandoned', () => {
     expect(
-      sessionNeedsYou(input({ lastNotificationAt: '2026-01-01T10:00:00.000Z' })),
-    ).toBe(false)
+      sessionStatus(input({ summary: summary({ lastStopReason: 'tool_use' }), pendingQuestions: [question()] }), NOW),
+    ).toBe('idle')
+  })
+
+  it('is active, not needs-you, when the notification predates the last write', () => {
+    expect(
+      sessionStatus(
+        input({ summary: summary(active), lastNotificationAt: '2026-01-01T10:00:00.000Z' }),
+        NOW,
+      ),
+    ).toBe('active')
   })
 
   it('compares timestamps as instants, not strings', () => {
     // Same instant written with different offsets: not newer, so not needing you.
-    const s = summary({ lastActiveAt: '2026-01-01T11:00:00.000Z' })
+    const s = summary({ ...active, lastActiveAt: '2026-01-01T11:00:00.000Z' })
     expect(
-      sessionNeedsYou(input({ summary: s, lastNotificationAt: '2026-01-01T12:00:00+01:00' })),
-    ).toBe(false)
+      sessionStatus(input({ summary: s, lastNotificationAt: '2026-01-01T12:00:00+01:00' }), NOW),
+    ).toBe('active')
   })
 
-  it('is false with no question and no notification', () => {
-    expect(sessionNeedsYou(input())).toBe(false)
+  it('is active with no question and no notification', () => {
+    expect(sessionStatus(input({ summary: summary(active) }), NOW)).toBe('active')
   })
 })
 
 describe('buildProjectMap', () => {
   it('returns an empty map for no sessions', () => {
     const map = buildProjectMap('/work/app', 'app', [])
-    expect(map).toEqual({ projectPath: '/work/app', projectName: 'app', nodes: [], edges: [] })
+    expect(map).toEqual({ projectPath: '/work/app', projectDisplayName: 'app', nodes: [], edges: [] })
   })
 
-  it('creates one session node per session with title from the branch', () => {
-    const map = buildProjectMap('/work/app', 'app', [input()])
+  it('titles a session node with its session name and carries the project display name', () => {
+    const map = buildProjectMap('/work/app', 'app', [
+      input({ summary: summary({ sessionName: 'Fix the router', projectDisplayName: 'My App' }) }),
+    ])
     expect(map.nodes).toHaveLength(1)
     const [node] = map.nodes
     expect(node.kind).toBe('session')
     expect(node.parentId).toBeNull()
-    expect(node.title).toBe('feature/map')
+    expect(node.title).toBe('Fix the router')
     expect(node.subtitle).toBe('abcdef12 · 12 msgs')
+    expect(node.projectDisplayName).toBe('My App')
     expect(node.tokens).toBe(1000)
     expect(node.toolCalls).toBe(4)
   })
 
-  it('falls back to the first 8 characters of the id when there is no branch', () => {
-    const map = buildProjectMap('/work/app', 'app', [input({ summary: summary({ branch: null }) })])
-    expect(map.nodes[0].title).toBe('abcdef12')
+  it('falls back to the branch, then the first 8 characters of the id, when there is no name', () => {
+    const withBranch = buildProjectMap('/work/app', 'app', [input()])
+    expect(withBranch.nodes[0].title).toBe('feature/map')
+
+    const noBranch = buildProjectMap('/work/app', 'app', [
+      input({ summary: summary({ branch: null }) }),
+    ])
+    expect(noBranch.nodes[0].title).toBe('abcdef12')
+  })
+
+  it('leaves the project display name off subagent nodes', () => {
+    const map = buildProjectMap('/work/app', 'app', [input({ agents: [agent({ agentId: 'x' })] })])
+    expect(map.nodes[1].projectDisplayName).toBeNull()
   })
 
   it('marks active sessions active and others idle', () => {
@@ -205,9 +233,18 @@ describe('buildProjectMap', () => {
   })
 
   it('carries pending questions and needsYou onto the session node only', () => {
-    const map = buildProjectMap('/work/app', 'app', [
-      input({ pendingQuestions: [question()], agents: [agent({ agentId: 'c' })] }),
-    ])
+    const map = buildProjectMap(
+      '/work/app',
+      'app',
+      [
+        input({
+          summary: summary({ isActive: true }),
+          pendingQuestions: [question()],
+          agents: [agent({ agentId: 'c' })],
+        }),
+      ],
+      NOW,
+    )
     const [session, child] = map.nodes
     expect(session.needsYou).toBe(true)
     expect(session.pendingQuestions).toHaveLength(1)

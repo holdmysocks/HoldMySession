@@ -147,7 +147,7 @@ cd apps/web && npm install && npm run build
 
 ## Session Map
 
-The **Map** page (`/map`) shows one project's interactive sessions as a graph: each session with its subagents, which sessions are waiting on you, and recent hook notifications. It is read-only.
+The **Map** page (`/map`) shows one project's sessions as a graph: each session with its subagents, which sessions are waiting on you, and recent hook notifications. It is read-only.
 
 Notifications need an opt-in hook. Run `claude-dashboard --print-hook-config` and merge the output into `~/.claude/settings.json`. Details, data sources, status and limitations are in [docs/session-map/README.md](docs/session-map/README.md).
 

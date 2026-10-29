@@ -10,8 +10,18 @@ interface MapCanvasProps {
   onSelect: (nodeId: string) => void
 }
 
-const STATUS_CLASSES: Record<MapNodeStatus, { stroke: string; dot: string }> = {
-  active: { stroke: 'stroke-green-500', dot: 'fill-green-400' },
+/**
+ * Border and dot colour per status. `halo` is the pulsing outline drawn behind the node;
+ * its animation lives in app.css and is switched off for prefers-reduced-motion.
+ */
+const STATUS_CLASSES: Record<MapNodeStatus, { stroke: string; dot: string; halo?: string }> = {
+  'needs-you': {
+    stroke: 'stroke-yellow-400',
+    dot: 'fill-yellow-400',
+    halo: 'stroke-yellow-400 status-halo-needs-you',
+  },
+  active: { stroke: 'stroke-green-500', dot: 'fill-green-400', halo: 'stroke-green-500 status-halo-active' },
+  completed: { stroke: 'stroke-brand-500', dot: 'fill-brand-500' },
   idle: { stroke: 'stroke-gray-600', dot: 'fill-gray-500' },
   done: { stroke: 'stroke-blue-500', dot: 'fill-blue-400' },
   unknown: { stroke: 'stroke-gray-600', dot: 'fill-gray-500' },
@@ -19,8 +29,6 @@ const STATUS_CLASSES: Record<MapNodeStatus, { stroke: string; dot: string }> = {
 
 /** Inline SVG rendering of a laid-out project map. Nodes are focusable; Enter or Space selects. */
 export function MapCanvas({ layout, selectedId, onSelect }: MapCanvasProps) {
-  const { privacyMode, anonymizeBranch } = usePrivacy()
-
   return (
     <svg
       role="group"
@@ -33,18 +41,9 @@ export function MapCanvas({ layout, selectedId, onSelect }: MapCanvasProps) {
       {layout.edges.map((edge) => (
         <DispatchEdge key={edge.id} edge={edge} />
       ))}
-      {layout.nodes.map((node) => {
-        const title = node.kind === 'session' && privacyMode ? anonymizeBranch(node.title) : node.title
-        return (
-          <NodeView
-            key={node.id}
-            node={node}
-            title={title}
-            selected={node.id === selectedId}
-            onSelect={onSelect}
-          />
-        )
-      })}
+      {layout.nodes.map((node) => (
+        <NodeView key={node.id} node={node} selected={node.id === selectedId} onSelect={onSelect} />
+      ))}
     </svg>
   )
 }
@@ -55,15 +54,26 @@ function DispatchEdge({ edge }: { edge: PositionedEdge }) {
 
 interface NodeViewProps {
   node: PositionedNode
-  title: string
   selected: boolean
   onSelect: (nodeId: string) => void
 }
 
-function NodeView({ node, title, selected, onSelect }: NodeViewProps) {
+function NodeView({ node, selected, onSelect }: NodeViewProps) {
+  const { privacyMode, anonymizeSessionName, anonymizeProjectName } = usePrivacy()
   const isSession = node.kind === 'session'
   const classes = STATUS_CLASSES[node.status]
-  const subtitle = truncateLabel(node.subtitle, isSession ? 32 : 30)
+
+  const title = isSession && privacyMode ? anonymizeSessionName(node.title) : node.title
+  const projectLabel =
+    isSession && node.projectDisplayName
+      ? privacyMode
+        ? anonymizeProjectName(node.projectDisplayName)
+        : node.projectDisplayName
+      : null
+  const subtitle = truncateLabel(
+    projectLabel ? `${projectLabel} · ${node.subtitle}` : node.subtitle,
+    isSession ? 40 : 30,
+  )
   const model = isSession ? shortModelName(node.model) : null
   const label = [
     isSession ? 'Session' : 'Subagent',
@@ -93,7 +103,7 @@ function NodeView({ node, title, selected, onSelect }: NodeViewProps) {
       className="group cursor-pointer outline-none"
     >
       <title>{label}</title>
-      {node.needsYou && (
+      {classes.halo && (
         <rect
           x={-4}
           y={-4}
@@ -102,7 +112,7 @@ function NodeView({ node, title, selected, onSelect }: NodeViewProps) {
           rx={16}
           fill="none"
           strokeWidth={2}
-          className="stroke-brand-500"
+          className={classes.halo}
         />
       )}
       <rect
@@ -114,7 +124,7 @@ function NodeView({ node, title, selected, onSelect }: NodeViewProps) {
       />
       <circle cx={16} cy={isSession ? 27 : 24} r={4} className={classes.dot} />
       <text x={28} y={isSession ? 32 : 28} className="fill-gray-100 text-[13px] font-semibold">
-        {truncateLabel(title, isSession ? 26 : 24)}
+        {truncateLabel(title, isSession ? 30 : 24)}
       </text>
       <text x={28} y={isSession ? 50 : 46} className="fill-gray-500 text-[11px]">
         {subtitle}

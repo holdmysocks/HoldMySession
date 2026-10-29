@@ -22,7 +22,7 @@ describe('project-analytics', () => {
     model: 'claude-opus-4-6',
     version: '1.0.0',
     fileSizeBytes: 1024,
-    isInteractive: true,
+    projectDisplayName: 'Test Project', sessionName: null, lastStopReason: null,
     ...overrides,
   })
 

@@ -3,7 +3,9 @@ import { kindLabel, shortModelName, statusLabel, truncateLabel } from './format-
 
 describe('statusLabel', () => {
   it('labels every status', () => {
+    expect(statusLabel('needs-you')).toBe('Needs you')
     expect(statusLabel('active')).toBe('Active')
+    expect(statusLabel('completed')).toBe('Completed')
     expect(statusLabel('idle')).toBe('Idle')
     expect(statusLabel('done')).toBe('Done')
     expect(statusLabel('unknown')).toBe('Unknown')

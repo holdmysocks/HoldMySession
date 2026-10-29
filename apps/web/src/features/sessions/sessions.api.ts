@@ -1,7 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { scanAllSessions, getActiveSessions } from '@/lib/scanner/session-scanner'
+import { scanAllSessions, scanAllSessionsWithPaths, getActiveSessions } from '@/lib/scanner/session-scanner'
 import type { SessionSummary } from '@/lib/parsers/types'
+import { findPendingQuestions } from '@/lib/map/pending-requests'
+import { latestNotificationBySession, readRecentEvents } from '@/lib/events/event-inbox'
 
 export const getSessionList = createServerFn({ method: 'GET' }).handler(
   async () => {
@@ -27,39 +29,61 @@ const paginatedSessionsInputSchema = z.object({
 
 type PaginatedSessionsInput = z.infer<typeof paginatedSessionsInputSchema>
 
-export interface PaginatedSessionsResult {
-  sessions: SessionSummary[]
+/** What the server adds to each listed session so the client can derive its status. */
+export interface SessionStatusSignals {
+  /** Latest Notification hook event for the session, ISO timestamp, or null. */
+  lastNotificationAt: string | null
+  /** True only for active sessions with an unanswered AskUserQuestion. */
+  hasOpenQuestion: boolean
+}
+
+export type SessionListItem = SessionSummary & SessionStatusSignals
+
+export interface ProjectFilterOption {
+  /** Folder name. The `project` filter matches on this. */
+  name: string
+  displayName: string
+}
+
+export interface PaginatedSessionsResult<T extends SessionSummary = SessionSummary> {
+  sessions: T[]
   totalCount: number
   totalPages: number
   page: number
   pageSize: number
-  projects: string[]
+  projects: ProjectFilterOption[]
 }
 
 /**
  * Pure business logic for paginating and filtering sessions.
  * Exported for testing purposes.
  */
-export async function paginateAndFilterSessions(
-  allSessions: SessionSummary[],
+export async function paginateAndFilterSessions<T extends SessionSummary>(
+  allSessions: T[],
   input: PaginatedSessionsInput,
-): Promise<PaginatedSessionsResult> {
+): Promise<PaginatedSessionsResult<T>> {
   const { page, pageSize, search, status, project, sort = 'lastActive', sortDir = 'desc' } = input
 
-  // Extract distinct project names from full unfiltered set
-  const projects = Array.from(
-    new Set(allSessions.map((s) => s.projectName)),
-  ).sort()
+  // Distinct projects from the full unfiltered set, labelled by display name
+  const projectLabels = new Map<string, string>()
+  for (const s of allSessions) {
+    if (!projectLabels.has(s.projectName)) projectLabels.set(s.projectName, s.projectDisplayName)
+  }
+  const projects = Array.from(projectLabels, ([name, displayName]) => ({ name, displayName })).sort(
+    (a, b) => a.displayName.localeCompare(b.displayName) || a.name.localeCompare(b.name),
+  )
 
   // Apply filters
   let filtered = allSessions
 
-  // Search filter: case-insensitive substring on projectName/branch/sessionId/cwd
+  // Search filter: case-insensitive substring on names, branch, id and cwd
   if (search) {
     const q = search.toLowerCase()
     filtered = filtered.filter(
       (s) =>
         s.projectName.toLowerCase().includes(q) ||
+        s.projectDisplayName.toLowerCase().includes(q) ||
+        s.sessionName?.toLowerCase().includes(q) ||
         s.branch?.toLowerCase().includes(q) ||
         s.sessionId.toLowerCase().includes(q) ||
         s.cwd?.toLowerCase().includes(q),
@@ -121,7 +145,19 @@ export async function paginateAndFilterSessions(
 
 export const getPaginatedSessions = createServerFn({ method: 'GET' })
   .inputValidator((input: unknown) => paginatedSessionsInputSchema.parse(input))
-  .handler(async ({ data }): Promise<PaginatedSessionsResult> => {
-    const allSessions = await scanAllSessions()
-    return paginateAndFilterSessions(allSessions, data)
+  .handler(async ({ data }): Promise<PaginatedSessionsResult<SessionListItem>> => {
+    const allSessions = await scanAllSessionsWithPaths()
+    const page = await paginateAndFilterSessions(allSessions, data)
+
+    // Signals are computed for the page only. The file scan for open questions runs for active sessions.
+    const notifications = latestNotificationBySession(await readRecentEvents())
+    const sessions = await Promise.all(
+      page.sessions.map(async ({ filePath, ...summary }): Promise<SessionListItem> => ({
+        ...summary,
+        lastNotificationAt: notifications.get(summary.sessionId) ?? null,
+        hasOpenQuestion: summary.isActive && (await findPendingQuestions(filePath)).length > 0,
+      })),
+    )
+
+    return { ...page, sessions }
   })

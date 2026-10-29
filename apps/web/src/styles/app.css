@@ -47,3 +47,54 @@ body {
   color: var(--color-gray-100);
   transition: background-color 150ms ease, color 150ms ease;
 }
+
+/*
+ * Session status pulse. Colours come from the Tailwind border and stroke classes.
+ * These classes only add motion, and reduced-motion users keep the colour without it.
+ */
+@keyframes status-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(var(--status-glow) / 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgb(var(--status-glow) / 0);
+  }
+}
+
+@keyframes status-halo {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.status-pulse-needs-you {
+  --status-glow: 250 204 21;
+  animation: status-glow 1s ease-in-out infinite;
+}
+
+.status-pulse-active {
+  --status-glow: 34 197 94;
+  animation: status-glow 2.5s ease-in-out infinite;
+}
+
+.status-halo-needs-you {
+  animation: status-halo 1s ease-in-out infinite;
+}
+
+.status-halo-active {
+  animation: status-halo 2.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-pulse-needs-you,
+  .status-pulse-active,
+  .status-halo-needs-you,
+  .status-halo-active {
+    animation: none;
+  }
+}

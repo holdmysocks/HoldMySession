@@ -24,7 +24,9 @@ function summary(sessionId: string, overrides: Partial<SessionSummary> = {}): Se
     model: 'claude-example-1',
     version: '2.1.0',
     fileSizeBytes: 100,
-    isInteractive: true,
+    projectDisplayName: 'My App',
+    sessionName: 'Fix the map labels',
+    lastStopReason: null,
     ...overrides,
   }
 }
@@ -61,7 +63,7 @@ describe('MapCanvas', () => {
       totalTokens: 500,
     },
     {
-      summary: summary('bbbbbbbb-2222'),
+      summary: summary('bbbbbbbb-2222', { isActive: true }),
       agents: [],
       pendingQuestions: [
         { toolUseId: 'q', timestamp: '2026-01-01T10:00:00Z', questions: [{ header: 'H', question: 'Q?' }] },
@@ -80,11 +82,13 @@ describe('MapCanvas', () => {
     }
   })
 
-  it('labels session and subagent nodes with kind, title, status and needs-you', () => {
+  it('labels session and subagent nodes with kind, session name, status and needs-you', () => {
     renderCanvas(layout)
-    expect(screen.getByRole('button', { name: 'Session, feature/map, Active' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Session, Fix the map labels, Active' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Subagent, Explore, Done' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Session, feature/map, Idle, needs you' })).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'Session, Fix the map labels, Needs you, needs you' }),
+    ).toBeTruthy()
   })
 
   it('selects a node on click', () => {
@@ -95,13 +99,13 @@ describe('MapCanvas', () => {
 
   it('selects a node on Enter', () => {
     const onSelect = renderCanvas(layout)
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Session, feature/map, Active' }), { key: 'Enter' })
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Session, Fix the map labels, Active' }), { key: 'Enter' })
     expect(onSelect).toHaveBeenCalledWith(layout.nodes[0].id)
   })
 
   it('selects a node on Space and ignores other keys', () => {
     const onSelect = renderCanvas(layout)
-    const node = screen.getByRole('button', { name: 'Session, feature/map, Active' })
+    const node = screen.getByRole('button', { name: 'Session, Fix the map labels, Active' })
     fireEvent.keyDown(node, { key: 'a' })
     expect(onSelect).not.toHaveBeenCalled()
     fireEvent.keyDown(node, { key: ' ' })
@@ -111,13 +115,74 @@ describe('MapCanvas', () => {
   it('marks the selected node with aria-pressed', () => {
     const selectedId = layout.nodes[0].id
     renderCanvas(layout, vi.fn(), selectedId)
-    expect(screen.getByRole('button', { name: 'Session, feature/map, Active' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Session, Fix the map labels, Active' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByRole('button', { name: 'Subagent, Explore, Done' }).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('shows the session model and subtitle text', () => {
+  it('shows the project display name, short id and message count in the subtitle', () => {
     renderCanvas(layout)
+    expect(screen.getByText('My App · aaaaaaaa · 4 msgs')).toBeTruthy()
     expect(screen.getAllByText('example-1').length).toBeGreaterThan(0)
-    expect(screen.getByText('aaaaaaaa · 4 msgs')).toBeTruthy()
+  })
+
+  it('shows the branch as the title when the session has no name', () => {
+    const plain = buildLayout([
+      { summary: summary('cccccccc-3333', { sessionName: null }), agents: [], pendingQuestions: [], lastNotificationAt: null, totalTokens: 0 },
+    ])
+    renderCanvas(plain)
+    expect(screen.getByRole('button', { name: 'Session, feature/map, Idle' })).toBeTruthy()
+  })
+})
+
+describe('MapCanvas status styling', () => {
+  function renderWith(status: { isActive: boolean; lastStopReason: string | null; pending?: boolean }) {
+    const [node] = buildLayout([
+      {
+        summary: summary('dddddddd-4444', {
+          isActive: status.isActive,
+          lastStopReason: status.lastStopReason,
+          lastActiveAt: new Date().toISOString(),
+        }),
+        agents: [],
+        pendingQuestions: status.pending
+          ? [{ toolUseId: 'q', timestamp: new Date().toISOString(), questions: [] }]
+          : [],
+        lastNotificationAt: null,
+        totalTokens: 0,
+      },
+    ]).nodes
+    const single = { ...buildLayout([]), nodes: [node], width: 260, height: 84 }
+    const { container } = render(
+      <PrivacyProvider>
+        <MapCanvas layout={single} selectedId={null} onSelect={vi.fn()} />
+      </PrivacyProvider>,
+    )
+    const body = container.querySelector('rect[rx="12"]')!
+    const halo = container.querySelector('rect[rx="16"]')
+    return { body: body.getAttribute('class') ?? '', halo: halo?.getAttribute('class') ?? null }
+  }
+
+  it('gives a needs-you session a yellow border and a fast halo', () => {
+    const { body, halo } = renderWith({ isActive: true, lastStopReason: null, pending: true })
+    expect(body).toContain('stroke-yellow-400')
+    expect(halo).toContain('status-halo-needs-you')
+  })
+
+  it('gives an active session a green border and a slow halo', () => {
+    const { body, halo } = renderWith({ isActive: true, lastStopReason: null })
+    expect(body).toContain('stroke-green-500')
+    expect(halo).toContain('status-halo-active')
+  })
+
+  it('gives a completed session a solid brand border and no halo', () => {
+    const { body, halo } = renderWith({ isActive: false, lastStopReason: 'end_turn' })
+    expect(body).toContain('stroke-brand-500')
+    expect(halo).toBeNull()
+  })
+
+  it('gives an idle session a grey border and no halo', () => {
+    const { body, halo } = renderWith({ isActive: false, lastStopReason: 'tool_use' })
+    expect(body).toContain('stroke-gray-600')
+    expect(halo).toBeNull()
   })
 })

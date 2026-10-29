@@ -2,8 +2,12 @@ import type { MapNode, MapNodeStatus } from '@/lib/map/project-map'
 
 export function statusLabel(status: MapNodeStatus): string {
   switch (status) {
+    case 'needs-you':
+      return 'Needs you'
     case 'active':
       return 'Active'
+    case 'completed':
+      return 'Completed'
     case 'idle':
       return 'Idle'
     case 'done':

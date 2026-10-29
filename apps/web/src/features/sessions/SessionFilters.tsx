@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Route } from '@/routes/_dashboard/sessions/index'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
+import type { ProjectFilterOption } from './sessions.api'
 
 const SORT_OPTIONS = ['lastActive', 'started', 'duration', 'messages'] as const
 type SortOption = typeof SORT_OPTIONS[number]
 
 interface SessionFiltersProps {
-  projects: string[]
+  projects: ProjectFilterOption[]
   activeCount: number
 }
 
@@ -123,8 +124,8 @@ export function SessionFilters({ projects, activeCount }: SessionFiltersProps) {
         >
           <option value="">All projects</option>
           {projects.map((p) => (
-            <option key={p} value={p}>
-              {privacyMode ? anonymizeProjectName(p) : p}
+            <option key={p.name} value={p.name}>
+              {privacyMode ? anonymizeProjectName(p.displayName) : p.displayName}
             </option>
           ))}
         </select>

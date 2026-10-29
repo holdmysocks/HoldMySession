@@ -25,6 +25,7 @@ interface PrivacyContextValue {
   anonymizePath: (path: string, projectName?: string) => string
   anonymizeProjectName: (name: string) => string
   anonymizeBranch: (branch: string) => string
+  anonymizeSessionName: (name: string) => string
 }
 
 const PrivacyContext = createContext<PrivacyContextValue | null>(null)
@@ -43,6 +44,10 @@ export function PrivacyProvider({ children }: { children: ReactNode }) {
   const branchNameMapRef = useRef<Map<string, string>>(new Map())
   const nextBranchIndexRef = useRef(1)
 
+  // Session names are often the first prompt, so they are hidden like branches
+  const sessionNameMapRef = useRef<Map<string, string>>(new Map())
+  const nextSessionNameIndexRef = useRef(1)
+
   const togglePrivacyMode = useCallback(() => {
     setPrivacyMode((prev) => {
       const next = !prev
@@ -56,6 +61,8 @@ export function PrivacyProvider({ children }: { children: ReactNode }) {
       nextIndexRef.current = 1
       branchNameMapRef.current = new Map()
       nextBranchIndexRef.current = 1
+      sessionNameMapRef.current = new Map()
+      nextSessionNameIndexRef.current = 1
       return next
     })
   }, [])
@@ -98,6 +105,19 @@ export function PrivacyProvider({ children }: { children: ReactNode }) {
     [privacyMode],
   )
 
+  const anonymizeSessionName = useCallback(
+    (name: string): string => {
+      if (!privacyMode) return name
+      const existing = sessionNameMapRef.current.get(name)
+      if (existing) return existing
+      const anonymized = `session-${nextSessionNameIndexRef.current}`
+      nextSessionNameIndexRef.current += 1
+      sessionNameMapRef.current.set(name, anonymized)
+      return anonymized
+    },
+    [privacyMode],
+  )
+
   return (
     <PrivacyContext.Provider
       value={{
@@ -106,6 +126,7 @@ export function PrivacyProvider({ children }: { children: ReactNode }) {
         anonymizePath: anonymizePathFn,
         anonymizeProjectName,
         anonymizeBranch,
+        anonymizeSessionName,
       }}
     >
       {children}

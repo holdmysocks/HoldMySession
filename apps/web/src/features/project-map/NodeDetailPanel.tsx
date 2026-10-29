@@ -12,7 +12,7 @@ export function NodeDetailPanel({
   node: MapNode | null
   projectPath: string
 }) {
-  const { privacyMode, anonymizeBranch } = usePrivacy()
+  const { privacyMode, anonymizeSessionName, anonymizeProjectName } = usePrivacy()
 
   if (!node) {
     return (
@@ -23,7 +23,13 @@ export function NodeDetailPanel({
   }
 
   const isSession = node.kind === 'session'
-  const heading = isSession && privacyMode ? anonymizeBranch(node.title) : node.title
+  const heading = isSession && privacyMode ? anonymizeSessionName(node.title) : node.title
+  const project =
+    isSession && node.projectDisplayName
+      ? privacyMode
+        ? anonymizeProjectName(node.projectDisplayName)
+        : node.projectDisplayName
+      : null
   const model = shortModelName(node.model)
 
   return (
@@ -31,6 +37,7 @@ export function NodeDetailPanel({
       <div>
         <p className="text-xs uppercase tracking-wide text-gray-500">{kindLabel(node)}</p>
         <p className="mt-0.5 truncate text-sm font-semibold text-gray-100">{heading}</p>
+        {project && <p className="mt-0.5 truncate text-xs text-gray-400">{project}</p>}
         <p className="mt-0.5 text-xs text-gray-400">
           {statusLabel(node.status)}
           {node.needsYou && <span className="text-brand-300"> · needs you</span>}

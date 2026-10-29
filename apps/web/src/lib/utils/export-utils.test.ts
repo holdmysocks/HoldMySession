@@ -396,7 +396,7 @@ function createMockSessionDetail(overrides: Partial<SessionDetail> = {}): Sessio
     projectPath: '/path/to/project',
     projectName: 'test-project',
     branch: 'main',
-    isInteractive: true,
+    sessionName: null,
     turns: [],
     totalTokens: {
       inputTokens: 0,
