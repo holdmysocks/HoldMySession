@@ -1,16 +1,21 @@
 # Update-SessionMap.ps1
-# Pulls the latest session map branch, reinstalls, rebuilds and starts the dashboard.
+# Pulls the latest session map branch, installs dependencies if needed, rebuilds and starts the dashboard.
 # Lives in the repo root, so it runs from wherever the repo is cloned.
 #
 # Run from PowerShell in the repo folder:
 #   powershell -ExecutionPolicy Bypass -File .\Update-SessionMap.ps1
 #   powershell -ExecutionPolicy Bypass -File .\Update-SessionMap.ps1 -SkipTests
+#   powershell -ExecutionPolicy Bypass -File .\Update-SessionMap.ps1 -ForceInstall
+#
+# Dependencies are reinstalled only when apps\web\package-lock.json differs from the hash
+# recorded after the last successful npm ci, or when node_modules has no record at all.
 
 param(
     [string]$RepoPath = $PSScriptRoot,
     [string]$Branch = 'feature/session-map-phase1',
     [int]$Port = 3000,
-    [switch]$SkipTests
+    [switch]$SkipTests,
+    [switch]$ForceInstall
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,33 +32,71 @@ function Invoke-Checked {
     }
 }
 
-if (-not (Test-Path (Join-Path $RepoPath '.git'))) {
-    throw "No git repository at '$RepoPath'. Run this script from the root of a holdmysession clone."
+function Get-LockHash {
+    param([string]$LockPath)
+    (Get-FileHash -Algorithm SHA256 -LiteralPath $LockPath).Hash
 }
 
-Set-Location $RepoPath
-
-Invoke-Checked "Fetching from origin" { git fetch origin }
-Invoke-Checked "Switching to $Branch" { git checkout $Branch }
-Invoke-Checked "Pulling latest $Branch" { git pull --ff-only origin $Branch }
-
-Set-Location (Join-Path $RepoPath 'apps\web')
-
-Invoke-Checked "Installing dependencies" { npm ci }
-Invoke-Checked "Typecheck" { npm run typecheck }
-if (-not $SkipTests) {
-    Invoke-Checked "Running tests" { npx vitest run }
+function Get-InstallStampPath {
+    param([string]$WebDir)
+    Join-Path $WebDir 'node_modules\.install-stamp'
 }
-Invoke-Checked "Building" { npm run build }
 
-$url = "http://localhost:$Port/map"
-Write-Host "==> Starting dashboard at $url (Ctrl+C to stop)" -ForegroundColor Green
+function Test-DependenciesCurrent {
+    param([string]$WebDir)
+    $lockPath = Join-Path $WebDir 'package-lock.json'
+    $stampPath = Get-InstallStampPath -WebDir $WebDir
+    if (-not (Test-Path -LiteralPath $lockPath) -or -not (Test-Path -LiteralPath $stampPath)) {
+        return $false
+    }
+    $recorded = (Get-Content -LiteralPath $stampPath -Raw).Trim()
+    return $recorded -eq (Get-LockHash -LockPath $lockPath)
+}
 
-# Open the Map page once the server has had a moment to start.
-Start-Job -ScriptBlock {
-    param($u)
-    Start-Sleep -Seconds 4
-    Start-Process $u
-} -ArgumentList $url | Out-Null
+function Write-InstallStamp {
+    param([string]$WebDir)
+    $lockPath = Join-Path $WebDir 'package-lock.json'
+    Set-Content -LiteralPath (Get-InstallStampPath -WebDir $WebDir) -Value (Get-LockHash -LockPath $lockPath) -NoNewline
+}
 
-npm start -- --port $Port
+# Dot-sourcing this file (as the tests do) loads the functions without running the update.
+if ($MyInvocation.InvocationName -ne '.') {
+    if (-not (Test-Path (Join-Path $RepoPath '.git'))) {
+        throw "No git repository at '$RepoPath'. Run this script from the root of a holdmysession clone."
+    }
+
+    Set-Location $RepoPath
+
+    Invoke-Checked "Fetching from origin" { git fetch origin }
+    Invoke-Checked "Switching to $Branch" { git checkout $Branch }
+    Invoke-Checked "Pulling latest $Branch" { git pull --ff-only origin $Branch }
+
+    $webDir = Join-Path $RepoPath 'apps\web'
+    Set-Location $webDir
+
+    if ($ForceInstall -or -not (Test-DependenciesCurrent -WebDir $webDir)) {
+        Invoke-Checked "Installing dependencies" { npm ci }
+        Write-InstallStamp -WebDir $webDir
+    }
+    else {
+        Write-Host "==> Dependencies match package-lock.json, skipping npm ci" -ForegroundColor DarkGray
+    }
+
+    Invoke-Checked "Typecheck" { npm run typecheck }
+    if (-not $SkipTests) {
+        Invoke-Checked "Running tests" { npx vitest run }
+    }
+    Invoke-Checked "Building" { npm run build }
+
+    $url = "http://localhost:$Port/map"
+    Write-Host "==> Starting dashboard at $url (Ctrl+C to stop)" -ForegroundColor Green
+
+    # Open the Map page once the server has had a moment to start.
+    Start-Job -ScriptBlock {
+        param($u)
+        Start-Sleep -Seconds 4
+        Start-Process $u
+    } -ArgumentList $url | Out-Null
+
+    npm start -- --port $Port
+}
