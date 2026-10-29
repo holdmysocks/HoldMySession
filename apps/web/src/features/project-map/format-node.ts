@@ -12,9 +12,12 @@ export function statusLabel(status: MapNodeStatus): string {
       return 'Idle'
     case 'running':
       return 'Running'
-    case 'done':
-      return 'Done'
   }
+}
+
+/** "1 expired subagent hidden", "3 expired subagents hidden". Used by the map label and info line. */
+export function expiredSubagentsLabel(count: number): string {
+  return `${count} expired subagent${count === 1 ? '' : 's'} hidden`
 }
 
 export function kindLabel(node: Pick<MapNode, 'kind' | 'isFork'>): string {

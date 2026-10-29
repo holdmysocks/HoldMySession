@@ -7,6 +7,7 @@ import { MapCanvas } from './MapCanvas'
 import { NeedsYouPanel } from './NeedsYouPanel'
 import { NodeDetailPanel } from './NodeDetailPanel'
 import { HookEventsPanel } from './HookEventsPanel'
+import { expiredSubagentsLabel } from './format-node'
 
 interface ProjectMapPageProps {
   /** Project key (directory name), from the URL. */
@@ -36,6 +37,10 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   const sessionNodes = nodes.filter((n) => n.kind === 'session')
   const activeCount = sessionNodes.filter((n) => n.status === 'active').length
   const needsYouCount = sessionNodes.filter((n) => n.status === 'needs-you').length
+  // Expired subagents are not drawn, so their count comes from the session nodes' chips.
+  const expiredSubagentTotal = sessionNodes.reduce((sum, n) => sum + n.expiredSubagentCount, 0)
+  // Sessions with no project are left out of the map and counted by the server.
+  const hiddenNoProjectCount = mapQuery.data?.hiddenNoProjectCount ?? 0
 
   function handleProjectChange(projectKey: string) {
     setSelectedId(null)
@@ -98,6 +103,10 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
             {activeCount} active
             <span className="mx-2 text-gray-700">|</span>
             {needsYouCount} need you
+            <span className="mx-2 text-gray-700">|</span>
+            {hiddenNoProjectCount} hidden (no project)
+            <span className="mx-2 text-gray-700">|</span>
+            {expiredSubagentsLabel(expiredSubagentTotal)}
           </p>
         )}
       </div>

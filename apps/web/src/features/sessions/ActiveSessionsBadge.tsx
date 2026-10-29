@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { activeSessionsQuery } from './sessions.queries'
+import { filterVisibleSessions } from '@/lib/map/session-visibility'
 
 export function ActiveSessionsBadge() {
   const { data: activeSessions } = useQuery(activeSessionsQuery)
-  const count = activeSessions?.length ?? 0
+  // Counts the same sessions the Sessions list shows: sessions with no project are left out.
+  const count = filterVisibleSessions(activeSessions ?? []).length
 
   if (count === 0) return null
 

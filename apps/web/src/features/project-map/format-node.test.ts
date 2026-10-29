@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { kindLabel, shortModelName, statusLabel, truncateLabel } from './format-node'
+import { expiredSubagentsLabel, kindLabel, shortModelName, statusLabel, truncateLabel } from './format-node'
+
+describe('expiredSubagentsLabel', () => {
+  it('uses the singular for one and the plural otherwise', () => {
+    expect(expiredSubagentsLabel(1)).toBe('1 expired subagent hidden')
+    expect(expiredSubagentsLabel(0)).toBe('0 expired subagents hidden')
+    expect(expiredSubagentsLabel(3)).toBe('3 expired subagents hidden')
+  })
+})
 
 describe('statusLabel', () => {
   it('labels every status', () => {
@@ -8,7 +16,6 @@ describe('statusLabel', () => {
     expect(statusLabel('completed')).toBe('Completed')
     expect(statusLabel('idle')).toBe('Idle')
     expect(statusLabel('running')).toBe('Running')
-    expect(statusLabel('done')).toBe('Done')
   })
 })
 

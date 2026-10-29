@@ -52,49 +52,107 @@ body {
  * Session status pulse. Colours come from the Tailwind border and stroke classes.
  * These classes only add motion, and reduced-motion users keep the colour without it.
  */
-@keyframes status-glow {
+/*
+ * Timing: needs-you pulses every 1.2 s, active every 2.4 s. Completed and idle do not pulse.
+ * Cards glow with box-shadow. The map draws a halo rect behind each node and scales it, so
+ * the halo uses transform. The needs-you border also brightens at the peak of its pulse.
+ */
+@keyframes status-glow-needs-you {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgb(var(--status-glow) / 0.55);
+    box-shadow: 0 0 0 0 rgb(250 204 21 / 0);
+    border-color: #facc15;
   }
   50% {
-    box-shadow: 0 0 0 5px rgb(var(--status-glow) / 0);
+    box-shadow: 0 0 0 14px rgb(250 204 21 / 0.9);
+    border-color: #fef08a;
   }
 }
 
-@keyframes status-halo {
+@keyframes status-glow-active {
   0%,
   100% {
-    opacity: 0.3;
+    box-shadow: 0 0 0 0 rgb(34 197 94 / 0);
   }
   50% {
-    opacity: 1;
+    box-shadow: 0 0 0 10px rgb(34 197 94 / 0.7);
+  }
+}
+
+@keyframes status-halo-needs-you {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes status-halo-active {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.08);
+  }
+}
+
+/* The map node's own border brightens with the halo. The stroke is the SVG border. */
+@keyframes status-edge-needs-you {
+  0%,
+  100% {
+    stroke: #facc15;
+  }
+  50% {
+    stroke: #fef08a;
   }
 }
 
 .status-pulse-needs-you {
-  --status-glow: 250 204 21;
-  animation: status-glow 1s ease-in-out infinite;
+  animation: status-glow-needs-you 1.2s ease-in-out infinite;
 }
 
 .status-pulse-active {
-  --status-glow: 34 197 94;
-  animation: status-glow 2.5s ease-in-out infinite;
+  animation: status-glow-active 2.4s ease-in-out infinite;
 }
 
 .status-halo-needs-you {
-  animation: status-halo 1s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: status-halo-needs-you 1.2s ease-in-out infinite;
 }
 
 .status-halo-active {
-  animation: status-halo 2.5s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: status-halo-active 2.4s ease-in-out infinite;
 }
 
+.status-edge-needs-you {
+  animation: status-edge-needs-you 1.2s ease-in-out infinite;
+}
+
+/*
+ * Reduced motion: no pulse at all. The halo is hidden, because a static halo would look like
+ * a solid ring. The status colour stays on the border.
+ */
 @media (prefers-reduced-motion: reduce) {
   .status-pulse-needs-you,
   .status-pulse-active,
   .status-halo-needs-you,
-  .status-halo-active {
+  .status-halo-active,
+  .status-edge-needs-you {
     animation: none;
+  }
+
+  .status-halo-needs-you,
+  .status-halo-active {
+    opacity: 0;
   }
 }

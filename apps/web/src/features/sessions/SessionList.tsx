@@ -9,6 +9,7 @@ import { usePageSizePreference } from './usePageSizePreference'
 import { useNow } from './useNow'
 import { Route } from '@/routes/_dashboard/sessions/index'
 import { deriveSessionStatus } from '@/lib/status/session-status'
+import { filterVisibleSessions } from '@/lib/map/session-visibility'
 import type { SessionListItem } from './sessions.api'
 
 export function SessionList() {
@@ -82,11 +83,15 @@ export function SessionList() {
   const totalCount = paginatedData?.totalCount ?? 0
   const totalPages = paginatedData?.totalPages ?? 1
   const projects = paginatedData?.projects ?? []
-  const activeCount = activeSessions.length
+  // Same rule as the page: sessions with no project are not counted as active here either.
+  const activeCount = filterVisibleSessions(activeSessions).length
+  const hiddenNoProjectCount = paginatedData?.hiddenNoProjectCount ?? 0
 
   return (
     <div>
       <SessionFilters projects={projects} activeCount={activeCount} />
+
+      <p className="mt-3 text-xs text-gray-500">{hiddenNoProjectCount} hidden (no project)</p>
 
       <div className="mt-4 space-y-2">
         {mergedSessions.length === 0 ? (

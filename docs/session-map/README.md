@@ -32,9 +32,22 @@ The dashboard reads the Claude config directory on Windows, which is `%USERPROFI
 
 - **Session nodes.** The project name is the primary label. The session name is the second line. Branch, short id, and message count are small text, with the model at the bottom.
 - **Fork nodes.** A fork of a session in the same project hangs off that session, joined by a dashed edge. The node says "Forked session" in the details panel.
-- **Subagent cards.** Small cards (180 by 44) under the session or fork that dispatched them. The label is the subagent type, then its description.
+- **Subagent cards.** Small cards (180 by 44) under the session or fork that dispatched them. The label is the subagent type, then its description. Only running subagents are drawn (see the subagent rule under Status).
+- **Expired subagents.** A subagent quiet for more than 5 minutes is not drawn and takes no space. Its session node shows a small **+N** chip with the count, and the page info line gives the project total.
 - **Layout.** Each depth is a column: top-level sessions, then their forks and subagents, then forks of forks. A parent is centred on its children. Nothing overlaps.
-- **Every session in the project is shown.** There is no cap.
+- **Every session in the project is shown, except sessions with no project.** There is no cap. See [Sessions with no project](#sessions-with-no-project).
+
+### Sessions with no project
+
+A session has a project when its transcript records a working directory (`cwd`) that is not blank. A session without one is hidden from:
+
+- the map, including its subagents,
+- the Sessions list: the page, the totals, the Active filter count and the sidebar badge,
+- the project dropdown on the map, so a directory that holds only such sessions does not appear.
+
+The map info line and the Sessions page each show the count, as **N hidden (no project)**. The rule is one pure function, `src/lib/map/session-visibility.ts`.
+
+**Stats and project analytics do not use this rule.** They still count every session, including those with no project. This is deliberate: the change is scoped to the map and the Sessions list.
 
 ### Project naming
 
@@ -68,21 +81,23 @@ Continuations (a session started because the previous one ran out of context) ar
 
 One rule set drives the Sessions list and the map (`src/lib/status/session-status.ts`). Priority is needs-you, then active, then completed, then idle.
 
-| Status | Border and dot | Motion | Rule |
+Every status border is 2 px wide on session cards and on map session nodes.
+
+| Status | Border (2 px) | Motion | Rule |
 |---|---|---|---|
-| Needs you | yellow | fast pulse, about 1 s | The session is active and has an open `AskUserQuestion`, or a Notification hook event is newer than its last write. An open question in an idle session is ignored, since it was abandoned. |
-| Active | green | slow pulse, about 2.5 s | Active: the transcript was written in the last 2 minutes, and the session's folder exists (see limitations). |
-| Completed | Claude orange | none | Not active, the last assistant `stop_reason` is `end_turn`, and the last write was within the **last hour**. |
+| Needs you | yellow `#facc15` | fast pulse, 1.2 s. The glow grows to about 14 px at 0.9 alpha, and the border brightens at the peak. | The session is active and has an open `AskUserQuestion`, or a Notification hook event is newer than its last write. An open question in an idle session is ignored, since it was abandoned. |
+| Active | green | slow pulse, 2.4 s. The glow grows to about 10 px at 0.7 alpha. | Active: the transcript was written in the last 2 minutes, and the session's folder exists (see limitations). |
+| Completed | Claude orange `#d97757`, solid | none | Not active, the last assistant `stop_reason` is `end_turn`, and the last write was within the **last hour**. |
 | Idle | grey | none | Anything else. Including completed sessions older than an hour. |
 
-**Subagent cards** use a separate, simpler rule:
+**Subagent cards** use a separate, simpler rule. Their border is 1.5 px wide.
 
 | State | Border | Motion | Rule |
 |---|---|---|---|
-| Running | green | slow pulse | The subagent's transcript was written in the last 2 minutes. |
-| Done | blue | none | Anything else, including a subagent with no transcript file. |
+| Running | green | slow pulse, as for active | The subagent's transcript was written in the last **5 minutes** (`SUBAGENT_CACHE_WINDOW_MS`). |
+| Expired | not drawn | none | Anything else, including a subagent with no transcript file or no `agentId`. It is counted on the session's **+N** chip. |
 
-The pulse is CSS only. With `prefers-reduced-motion: reduce`, the pulse stops and the colour stays.
+**How the pulse is drawn.** Session cards glow with a `box-shadow` on their border. Map nodes have a halo rect behind them that fades in and scales from 1 to 1.08 around its centre. Both are CSS keyframes, with no JavaScript timers. With `prefers-reduced-motion: reduce`, the pulse stops, the halo is hidden, and the status colour and border stay.
 
 ### Subagent details
 
@@ -120,7 +135,9 @@ The hook is the only writer of this file. It always exits 0 and swallows errors,
 | Fork links (child of the parent session) | Built | From `forkedFrom` in the first 50 lines. Same project only. |
 | Split-out forks shown at top level | Built | A session without `forkedFrom` is top level. How the desktop app records a split is not visible (open question). |
 | Continuations linked to their predecessor | Not built, by design | No structural link in the transcript. |
-| Subagents as small cards with running or done state | Built | Running is judged from the subagent transcript's mtime. |
+| Subagents as small cards, running only | Built | Running means the subagent transcript was written in the last 5 minutes. Expired subagents are counted on the session's +N chip. |
+| Sessions with no project hidden | Built | Map and Sessions list. Stats and project analytics still count them. |
+| Archived sessions hidden | Not built | Archive state is not in the transcripts, and no other source was found. See Known limitations. |
 | Subagent transcripts as their own sessions | Not built | Used only to judge running state. |
 | Project name from package.json, git, or folder | Built | From the transcripts' `cwd`. Windows paths read only on Windows. |
 | Session name from `custom-title`, summary, first prompt | Built | Newest `custom-title` wins. |
@@ -144,7 +161,8 @@ The hook is the only writer of this file. It always exits 0 and swallows errors,
 - **Message counts come from the first and last 15 lines** of each file, so a long session shows a count that is too low. This predates Phase 1 and is not fixed here. The sessions list and the map both show it.
 - **Permission prompts were not found in the transcript.** Only the Notification hook reveals them. Without the hook, a session waiting on one looks idle.
 - **An unanswered `AskUserQuestion` can belong to an abandoned session.** It is ignored once the session is idle, but an active session with a stale question still shows as needs-you.
-- **Subagents quiet for more than 2 minutes show as done** while they are still working, because running is judged from the transcript's last write.
+- **Subagents quiet for more than 5 minutes are not drawn**, even if they are still working. Running is judged from the transcript's last write, so a subagent that goes silent for longer than the window counts as expired until it writes again. The session's +N chip still counts it.
+- **Open question: archived sessions are not hidden.** The desktop app's "Archived" tab is not visible in the transcripts. The docs say archiving moves a session to that tab, but not how it is stored. The installed CLI (2.1.312) has no archive marker in the transcript records, and the only "archived" status found is for cloud sessions, which are not local transcripts. We have not built a workaround and have not invented a source. **Next step:** find where the desktop app keeps archive state on Windows (for example under `%APPDATA%\Claude`), then read that store and check how an archived session appears in it. Only then decide whether the map can hide archived sessions.
 - **The map reads only the primary data source.** On Windows, WSL sessions are listed on the Sessions page but not on the map.
 - **Scale.** The first map load parses every session in the project in full, one at a time. Later loads reuse the cache, but active sessions are parsed on every poll (every 10 seconds). A project with hundreds of long sessions will load slowly the first time.
 - **A Windows path can only be read on Windows.** On a Linux server, a Windows `cwd` is shown as recorded, and the name falls back to the last segment of the path.
@@ -174,6 +192,14 @@ Steps 1 and 2 are maintenance and should run after each Claude Code upgrade. Ste
 9. **WSL on the map.** Carry the data source through `scanProjectsFrom` and the map server function, and key projects by source as well as directory.
 
 ## Changelog
+
+### Phase 1 follow-up: map display (2026-10-29)
+
+- **Pulse.** Needs-you pulses every 1.2 s with a 14 px glow and a brighter border at the peak. Active pulses every 2.4 s with a 10 px glow. Both are CSS keyframes. The map draws the glow as a halo rect behind each node.
+- **Borders.** Status borders are 2 px on session cards and map session nodes, and 1.5 px on subagent cards. Colours are unchanged.
+- **Subagent expiry.** A subagent is running for 5 minutes after its last write (was 2). Expired subagents are not drawn. A **+N** chip on the session node counts them, and the info line shows the project total.
+- **No-project sessions.** Sessions with no working directory are hidden from the map, the project dropdown and the Sessions list, and their count is shown. Stats and project analytics are unchanged.
+- **Archived sessions.** Not hidden. Archive state is not in the transcripts, so this is an open question (see Known limitations).
 
 ### Phase 1 follow-up (2026-10-29)
 

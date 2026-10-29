@@ -60,7 +60,7 @@ describe('MapCanvas', () => {
     {
       summary: summary('aaaaaaaa-1111', { isActive: true }),
       agents: [agent],
-      subagentWriteTimes: new Map(),
+      subagentWriteTimes: new Map([['agent-1', Date.now()]]),
       pendingQuestions: [],
       lastNotificationAt: null,
       totalTokens: 500,
@@ -89,7 +89,7 @@ describe('MapCanvas', () => {
   it('labels session and subagent nodes with kind, session name, status and needs-you', () => {
     renderCanvas(layout)
     expect(screen.getByRole('button', { name: 'Session, My App, Fix the map labels, Active' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Subagent, Explore, Done' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Subagent, Explore, Running' })).toBeTruthy()
     expect(
       screen.getByRole('button', { name: 'Session, My App, Fix the map labels, Needs you, needs you' }),
     ).toBeTruthy()
@@ -97,7 +97,7 @@ describe('MapCanvas', () => {
 
   it('selects a node on click', () => {
     const onSelect = renderCanvas(layout)
-    fireEvent.click(screen.getByRole('button', { name: 'Subagent, Explore, Done' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Subagent, Explore, Running' }))
     expect(onSelect).toHaveBeenCalledWith(layout.nodes.find((n) => n.kind === 'subagent')!.id)
   })
 
@@ -121,7 +121,7 @@ describe('MapCanvas', () => {
     const selectedId = layout.nodes.find((n) => n.kind === 'session')!.id
     renderCanvas(layout, vi.fn(), selectedId)
     expect(screen.getByRole('button', { name: 'Session, My App, Fix the map labels, Active' }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('button', { name: 'Subagent, Explore, Done' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: 'Subagent, Explore, Running' }).getAttribute('aria-pressed')).toBe('false')
   })
 
   it('shows the project name first, then the session name, branch, short id and message count', () => {
@@ -155,6 +155,82 @@ describe('MapCanvas', () => {
     renderCanvas(forked)
     expect(screen.getByRole('button', { name: 'Subagent, Explore, Running' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Forked session, My App/ })).toBeTruthy()
+  })
+})
+
+describe('MapCanvas borders and expired subagents', () => {
+  function input(
+    sessionId: string,
+    agents: AgentInvocation[],
+    writeTimes: Array<[string, number]> = [],
+    overrides: Partial<SessionSummary> = {},
+  ): MapSessionInput {
+    return {
+      summary: summary(sessionId, overrides),
+      agents,
+      subagentWriteTimes: new Map(writeTimes),
+      pendingQuestions: [],
+      lastNotificationAt: null,
+      totalTokens: 0,
+    }
+  }
+
+  function renderInputs(inputs: MapSessionInput[]) {
+    const layout = buildLayout(inputs)
+    const { container } = render(
+      <PrivacyProvider>
+        <MapCanvas layout={layout} selectedId={null} onSelect={vi.fn()} />
+      </PrivacyProvider>,
+    )
+    return container
+  }
+
+  it('draws session borders 2px wide and subagent borders 1.5px wide', () => {
+    const container = renderInputs([input('aaaaaaaa-1111', [agent], [['agent-1', Date.now()]])])
+    const bodies = Array.from(container.querySelectorAll('rect[rx="12"]'))
+    expect(bodies.map((b) => b.getAttribute('stroke-width'))).toEqual(['2', '1.5'])
+  })
+
+  it('draws a thicker border for a selected node', () => {
+    const layout = buildLayout([input('aaaaaaaa-1111', [])])
+    const { container } = render(
+      <PrivacyProvider>
+        <MapCanvas layout={layout} selectedId={layout.nodes[0].id} onSelect={vi.fn()} />
+      </PrivacyProvider>,
+    )
+    expect(container.querySelector('rect[rx="12"]')!.getAttribute('stroke-width')).toBe('3')
+  })
+
+  it('shows a +N chip for the expired subagents of a session, and says so in its label', () => {
+    const container = renderInputs([
+      input('aaaaaaaa-1111', [agent, { ...agent, agentId: 'agent-2' }]),
+    ])
+    expect(screen.getByText('+2')).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'Session, My App, Fix the map labels, Idle, 2 expired subagents hidden' }),
+    ).toBeTruthy()
+    // The chip is decoration. The label above carries the same information.
+    expect(container.querySelector('[aria-hidden="true"]')!.textContent).toBe('+2')
+  })
+
+  it('shows no chip when every subagent is running', () => {
+    renderInputs([input('aaaaaaaa-1111', [agent], [['agent-1', Date.now()]])])
+    expect(screen.queryByText(/^\+\d+$/)).toBeNull()
+  })
+
+  it('draws a session whose subagents have all expired as one node, with no child cards', () => {
+    const container = renderInputs([input('aaaaaaaa-1111', [agent])])
+    expect(container.querySelectorAll('rect[rx="12"]')).toHaveLength(1)
+    expect(screen.getByText('+1')).toBeTruthy()
+  })
+
+  it('brightens the border of a needs-you session', () => {
+    const container = renderInputs([input('aaaaaaaa-1111', [], [], { isActive: true })])
+    const pendingInput = input('bbbbbbbb-2222', [], [], { isActive: true })
+    pendingInput.pendingQuestions = [{ toolUseId: 'q', timestamp: '2026-01-01T10:00:00Z', questions: [] }]
+    const needsYou = renderInputs([pendingInput])
+    expect(container.querySelector('rect[rx="12"]')!.getAttribute('class')).not.toContain('status-edge-needs-you')
+    expect(needsYou.querySelector('rect[rx="12"]')!.getAttribute('class')).toContain('status-edge-needs-you')
   })
 })
 

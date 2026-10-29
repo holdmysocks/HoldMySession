@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { deriveSessionStatus, COMPLETED_WINDOW_MS, type SessionStatusInput } from './session-status'
+import {
+  deriveSessionStatus,
+  COMPLETED_WINDOW_MS,
+  SUBAGENT_CACHE_WINDOW_MS,
+  type SessionStatusInput,
+} from './session-status'
 
 const LAST_WRITE = '2026-01-01T11:00:00.000Z'
 const LAST_WRITE_MS = Date.parse(LAST_WRITE)
@@ -18,6 +23,12 @@ function input(overrides: Partial<SessionStatusInput> = {}): SessionStatusInput 
 describe('COMPLETED_WINDOW_MS', () => {
   it('is 1 hour', () => {
     expect(COMPLETED_WINDOW_MS).toBe(3_600_000)
+  })
+})
+
+describe('SUBAGENT_CACHE_WINDOW_MS', () => {
+  it('is 5 minutes, the subagent cache expiry', () => {
+    expect(SUBAGENT_CACHE_WINDOW_MS).toBe(5 * 60_000)
   })
 })
 

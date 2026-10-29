@@ -152,10 +152,12 @@ Internal, verified in 2.1.312:
 
 What the dashboard does:
 
-- A subagent is a small card under its session (or fork) node.
-- It is **running** when its transcript file was written in the last 2 minutes, otherwise **done**.
-- If its transcript is missing, it is shown as done.
-- A subagent with no `agentId` cannot be matched to a file. It is shown as done.
+- A running subagent is a small card under its session (or fork) node.
+- It is **running** when its transcript file was written in the last **5 minutes** (`SUBAGENT_CACHE_WINDOW_MS` in `src/lib/status/session-status.ts`). Otherwise it is **expired**. An expired subagent is not drawn. Its session node shows a count instead.
+- If its transcript is missing, it is expired.
+- A subagent with no `agentId` cannot be matched to a file, so it is expired.
+
+The 5-minute window is a display rule chosen for the dashboard. It is not documented by Claude Code. It is not the same as the prompt-cache lifetime, and it is not the 2-minute window used for active sessions.
 
 Hook input also includes `agent_transcript_path` for `SubagentStop` (Internal, verified in 2.1.312). The dashboard does not use it.
 
@@ -222,3 +224,4 @@ The official `sessions/` directory would give a direct signal, but its file form
 - Does the active-session folder requirement hide real active sessions? Needs measuring on real data.
 - Where is the `sessions/` per-process file format documented, if anywhere?
 - Which `summary` writer exists? The reader is confirmed; the writer was not found in 2.1.312.
+- **Archived sessions: not found.** The docs say archiving moves a session to the desktop app's "Archived" tab. They do not say how that state is stored. The 2.1.312 CLI has no archive marker in the transcript records. The only "archived" status found is for cloud sessions, which are not local transcripts. The dashboard therefore cannot hide archived sessions. Next step: find where the desktop app stores archive state on Windows (for example under `%APPDATA%\Claude`), then read that store and check how an archived session is recorded there. Do not add a file-based workaround before that.

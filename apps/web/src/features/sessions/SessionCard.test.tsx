@@ -112,6 +112,20 @@ describe('SessionCard', () => {
     expect(screen.getByText('Active')).toBeTruthy()
   })
 
+  it('draws every status border 2px wide, so the status reads at a glance', () => {
+    for (const status of ['needs-you', 'active', 'completed', 'idle'] as const) {
+      const { container, unmount } = render(
+        <PrivacyProvider>
+          <SessionCard session={mockSession} status={status} />
+        </PrivacyProvider>
+      )
+      const link = container.firstElementChild as HTMLElement
+      expect(link.className).toContain('border-2')
+      expect(link.className.split(' ')).not.toContain('border')
+      unmount()
+    }
+  })
+
   it('gives a completed session the brand border with no pulse', () => {
     const { container } = render(
       <PrivacyProvider>

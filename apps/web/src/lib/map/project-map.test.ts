@@ -2,13 +2,15 @@ import { describe, it, expect } from 'vitest'
 import type { AgentInvocation, SessionSummary } from '../parsers/types'
 import {
   buildProjectMap,
+  expiredSubagentCount,
   forkParents,
-  SUBAGENT_RUNNING_WINDOW_MS,
+  isSubagentRunning,
   sessionStatus,
   tokenTotal,
   type MapSessionInput,
 } from './project-map'
 import type { PendingQuestion } from './pending-requests'
+import { SUBAGENT_CACHE_WINDOW_MS } from '../status/session-status'
 
 const NOW = Date.parse('2026-01-01T12:00:00.000Z')
 
@@ -70,9 +72,25 @@ function agent(overrides: Partial<AgentInvocation> = {}): AgentInvocation {
   }
 }
 
+/** Write times for subagents that were written 30 seconds before NOW, so they are running. */
+function live(...agentIds: string[]): Map<string, number> {
+  return new Map(agentIds.map((id) => [id, NOW - 30_000]))
+}
+
 function build(sessions: MapSessionInput[], nowMs = NOW) {
   return buildProjectMap('D--work-app', 'D:\\work\\app', 'Test Project', sessions, nowMs)
 }
+
+describe('isSubagentRunning', () => {
+  it('is true inside the 5-minute window and false after it', () => {
+    expect(isSubagentRunning(NOW - SUBAGENT_CACHE_WINDOW_MS, NOW)).toBe(true)
+    expect(isSubagentRunning(NOW - SUBAGENT_CACHE_WINDOW_MS - 1, NOW)).toBe(false)
+  })
+
+  it('is false when there is no write time', () => {
+    expect(isSubagentRunning(undefined, NOW)).toBe(false)
+  })
+})
 
 describe('tokenTotal', () => {
   it('returns 0 when usage is missing', () => {
@@ -129,7 +147,7 @@ describe('buildProjectMap: sessions', () => {
   })
 
   it('leaves the project display name and branch off subagent nodes', () => {
-    const map = build([input({ agents: [agent({ agentId: 'x' })] })])
+    const map = build([input({ agents: [agent({ agentId: 'x' })], subagentWriteTimes: live('x') })])
     expect(map.nodes[1].projectDisplayName).toBeNull()
     expect(map.nodes[1].branch).toBeNull()
   })
@@ -157,8 +175,13 @@ describe('buildProjectMap: sessions', () => {
 })
 
 describe('buildProjectMap: subagents', () => {
-  it('adds a subagent child and dispatch edge for each agent', () => {
-    const map = build([input({ agents: [agent({ agentId: 'x1' }), agent({ agentId: 'x2', durationMs: 500 })] })])
+  it('adds a subagent child and dispatch edge for each running agent', () => {
+    const map = build([
+      input({
+        agents: [agent({ agentId: 'x1' }), agent({ agentId: 'x2', durationMs: 500 })],
+        subagentWriteTimes: live('x1', 'x2'),
+      }),
+    ])
     const children = map.nodes.filter((n) => n.kind === 'subagent')
     expect(children).toHaveLength(2)
     expect(children.every((c) => c.parentId === map.nodes[0].id)).toBe(true)
@@ -167,23 +190,33 @@ describe('buildProjectMap: subagents', () => {
     expect(map.edges.map((e) => e.to)).toEqual(children.map((c) => c.id))
   })
 
-  it('is running when its transcript was written inside the window, done otherwise', () => {
+  it('draws only subagents written inside the 5-minute window, and counts the rest', () => {
     const map = build([
       input({
         agents: [agent({ agentId: 'live' }), agent({ agentId: 'old' })],
         subagentWriteTimes: new Map([
           ['live', NOW - 30_000],
-          ['old', NOW - SUBAGENT_RUNNING_WINDOW_MS - 1_000],
+          ['old', NOW - SUBAGENT_CACHE_WINDOW_MS - 1_000],
         ]),
       }),
     ])
-    const statuses = map.nodes.filter((n) => n.kind === 'subagent').map((n) => n.status)
-    expect(statuses).toEqual(['running', 'done'])
+    const children = map.nodes.filter((n) => n.kind === 'subagent')
+    expect(children.map((n) => n.status)).toEqual(['running'])
+    expect(children[0].id).toBe('agent:abcdef12-0000-0000-0000-000000000000:live')
+    expect(map.nodes[0].expiredSubagentCount).toBe(1)
+    expect(map.edges).toHaveLength(1)
   })
 
-  it('is done when there is no transcript for it', () => {
-    const map = build([input({ agents: [agent({ agentId: 'gone', durationMs: undefined })] })])
-    expect(map.nodes[1].status).toBe('done')
+  it('leaves out a subagent with no transcript, and counts it as expired', () => {
+    const map = build([input({ agents: [agent({ agentId: 'gone' })] })])
+    expect(map.nodes.filter((n) => n.kind === 'subagent')).toHaveLength(0)
+    expect(map.nodes[0].expiredSubagentCount).toBe(1)
+  })
+
+  it('leaves out a subagent with no agentId, and counts it as expired', () => {
+    const map = build([input({ agents: [agent({ agentId: undefined })] })])
+    expect(map.nodes.filter((n) => n.kind === 'subagent')).toHaveLength(0)
+    expect(map.nodes[0].expiredSubagentCount).toBe(1)
   })
 
   it('falls back to summing agent token usage when totalTokens is absent', () => {
@@ -195,6 +228,7 @@ describe('buildProjectMap: subagents', () => {
             tokens: { inputTokens: 5, outputTokens: 7, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
           }),
         ],
+        subagentWriteTimes: live('tok'),
       }),
     ])
     expect(map.nodes.find((n) => n.kind === 'subagent')?.tokens).toBe(12)
@@ -210,13 +244,16 @@ describe('buildProjectMap: subagents', () => {
             tokens: { inputTokens: 5, outputTokens: 7, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
           }),
         ],
+        subagentWriteTimes: live('tot'),
       }),
     ])
     expect(map.nodes.find((n) => n.kind === 'subagent')?.tokens).toBe(99)
   })
 
   it('uses the agent id to keep child node ids unique', () => {
-    const map = build([input({ agents: [agent({ agentId: 'one' }), agent({ agentId: 'two' })] })])
+    const map = build([
+      input({ agents: [agent({ agentId: 'one' }), agent({ agentId: 'two' })], subagentWriteTimes: live('one', 'two') }),
+    ])
     const ids = map.nodes.map((n) => n.id)
     expect(new Set(ids).size).toBe(ids.length)
   })
@@ -228,6 +265,7 @@ describe('buildProjectMap: subagents', () => {
           summary: summary({ isActive: true }),
           pendingQuestions: [question()],
           agents: [agent({ agentId: 'c' })],
+          subagentWriteTimes: live('c'),
         }),
       ],
       NOW,
@@ -237,6 +275,67 @@ describe('buildProjectMap: subagents', () => {
     expect(session.pendingQuestions).toHaveLength(1)
     expect(child.needsYou).toBe(false)
     expect(child.pendingQuestions).toEqual([])
+  })
+})
+
+describe('expiredSubagentCount', () => {
+  it('counts every subagent that is not running, including ones with no transcript', () => {
+    const session = input({
+      agents: [agent({ agentId: 'run' }), agent({ agentId: 'stale' }), agent({ agentId: 'none' })],
+      subagentWriteTimes: new Map([
+        ['run', NOW],
+        ['stale', NOW - SUBAGENT_CACHE_WINDOW_MS - 1],
+      ]),
+    })
+    expect(expiredSubagentCount(session, NOW)).toBe(2)
+  })
+
+  it('is 0 when every subagent is running', () => {
+    const session = input({ agents: [agent({ agentId: 'a' })], subagentWriteTimes: live('a') })
+    expect(expiredSubagentCount(session, NOW)).toBe(0)
+  })
+})
+
+describe('buildProjectMap: expired subagents', () => {
+  it('shows a session with only expired subagents as a node with no children', () => {
+    const map = build([
+      input({
+        agents: [agent({ agentId: 'e1' }), agent({ agentId: 'e2' })],
+        subagentWriteTimes: new Map([
+          ['e1', NOW - SUBAGENT_CACHE_WINDOW_MS - 60_000],
+          ['e2', NOW - SUBAGENT_CACHE_WINDOW_MS - 60_000],
+        ]),
+      }),
+    ])
+    expect(map.nodes).toHaveLength(1)
+    expect(map.nodes[0].kind).toBe('session')
+    expect(map.nodes[0].expiredSubagentCount).toBe(2)
+    expect(map.edges).toEqual([])
+  })
+
+  it('reports 0 expired on a session with no subagents', () => {
+    const map = build([input()])
+    expect(map.nodes[0].expiredSubagentCount).toBe(0)
+  })
+
+  it('counts expired subagents per session, not across the project', () => {
+    const map = build([
+      input({ summary: summary({ sessionId: 'a0000000' }), agents: [agent({ agentId: 'x' })] }),
+      input({
+        summary: summary({ sessionId: 'b0000000' }),
+        agents: [agent({ agentId: 'y' }), agent({ agentId: 'z' })],
+        subagentWriteTimes: live('y'),
+      }),
+    ])
+    const counts = map.nodes.filter((n) => n.kind === 'session').map((n) => n.expiredSubagentCount)
+    expect(counts).toEqual([1, 1])
+  })
+
+  it('removes expired subagents from the model, so they cannot take layout space', () => {
+    const withExpired = build([input({ agents: [agent({ agentId: 'gone' })] })])
+    const withoutAgents = build([input()])
+    expect(withExpired.nodes.map((n) => n.id)).toEqual(withoutAgents.nodes.map((n) => n.id))
+    expect(withExpired.edges).toEqual(withoutAgents.edges)
   })
 })
 
@@ -289,6 +388,7 @@ describe('buildProjectMap: forks', () => {
     const withAgent = input({
       summary: summary({ sessionId: 'fork-1', forkedFrom: { sessionId: 'parent-1', messageUuid: null } }),
       agents: [agent({ agentId: 'z' })],
+      subagentWriteTimes: live('z'),
     })
     const map = build([parent, withAgent])
     const child = map.nodes.find((n) => n.kind === 'subagent')!

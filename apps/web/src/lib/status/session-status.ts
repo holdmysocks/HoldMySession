@@ -10,6 +10,13 @@
  */
 export const COMPLETED_WINDOW_MS = 60 * 60_000
 
+/**
+ * How long a subagent's transcript stays "running" after its last write. Subagent caches
+ * expire after 5 minutes, so a subagent quiet for longer is treated as expired: the map
+ * does not draw it and only counts it. Sessions use COMPLETED_WINDOW_MS instead.
+ */
+export const SUBAGENT_CACHE_WINDOW_MS = 5 * 60_000
+
 export type SessionStatus = 'needs-you' | 'active' | 'completed' | 'idle'
 
 export interface SessionStatusInput {

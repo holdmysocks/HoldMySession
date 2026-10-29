@@ -1,6 +1,6 @@
 import type { AgentInvocation, SessionSummary, TokenUsage } from '../parsers/types'
 import type { PendingQuestion } from './pending-requests'
-import { deriveSessionStatus } from '../status/session-status'
+import { deriveSessionStatus, SUBAGENT_CACHE_WINDOW_MS } from '../status/session-status'
 import type { SessionStatus } from '../status/session-status'
 
 /**
@@ -8,18 +8,18 @@ import type { SessionStatus } from '../status/session-status'
  * tree: a fork is a child of the session it was forked from, and each subagent is a child
  * of the session (or fork) that dispatched it. No filesystem access here, so it is
  * unit-testable.
+ *
+ * Only running subagents become nodes. An expired subagent (see SUBAGENT_CACHE_WINDOW_MS)
+ * is not a node. It is counted on its session node instead, so it takes no layout space.
  */
 
 export type MapNodeKind = 'session' | 'subagent'
 
 /**
- * Session nodes use the shared session status. Subagent nodes are 'running' while their
- * transcript was written in the last SUBAGENT_RUNNING_WINDOW_MS, otherwise 'done'.
+ * Session nodes use the shared session status. Subagent nodes are always 'running', because
+ * expired subagents are not added to the map.
  */
-export type MapNodeStatus = SessionStatus | 'running' | 'done'
-
-/** A subagent transcript written this recently counts as running. Same window as the active detector. */
-export const SUBAGENT_RUNNING_WINDOW_MS = 2 * 60_000
+export type MapNodeStatus = SessionStatus | 'running'
 
 export interface MapNode {
   id: string
@@ -41,6 +41,11 @@ export interface MapNode {
   status: MapNodeStatus
   /** True when the session status is needs-you. */
   needsYou: boolean
+  /**
+   * Session nodes only: subagents this session dispatched whose cache has expired. They are
+   * not drawn, and the map shows this count as a chip instead. 0 for subagent nodes.
+   */
+  expiredSubagentCount: number
   model: string | null
   tokens: number
   durationMs: number | null
@@ -140,7 +145,12 @@ function sessionSubtitle(summary: SessionSummary): string {
   return `${summary.sessionId.slice(0, 8)} · ${summary.messageCount} msgs`
 }
 
-function sessionNode(input: MapSessionInput, parentId: string | null, nowMs: number): MapNode {
+function sessionNode(
+  input: MapSessionInput,
+  parentId: string | null,
+  nowMs: number,
+  expiredSubagentCount: number,
+): MapNode {
   const { summary } = input
   const status = sessionStatus(input, nowMs)
   return {
@@ -155,6 +165,7 @@ function sessionNode(input: MapSessionInput, parentId: string | null, nowMs: num
     isFork: parentId !== null,
     status,
     needsYou: status === 'needs-you',
+    expiredSubagentCount,
     model: summary.model,
     tokens: input.totalTokens,
     durationMs: summary.durationMs,
@@ -164,18 +175,25 @@ function sessionNode(input: MapSessionInput, parentId: string | null, nowMs: num
   }
 }
 
-function subagentStatus(writtenAt: number | undefined, nowMs: number): MapNodeStatus {
-  if (writtenAt !== undefined && nowMs - writtenAt <= SUBAGENT_RUNNING_WINDOW_MS) return 'running'
-  return 'done'
+/**
+ * A subagent is running when its transcript was written inside SUBAGENT_CACHE_WINDOW_MS.
+ * No transcript (no agentId, or the file is gone) means it cannot be shown as running.
+ */
+export function isSubagentRunning(writtenAt: number | undefined, nowMs: number): boolean {
+  return writtenAt !== undefined && nowMs - writtenAt <= SUBAGENT_CACHE_WINDOW_MS
 }
 
-function subagentNode(
-  sessionId: string,
-  agent: AgentInvocation,
-  index: number,
-  writtenAt: number | undefined,
-  nowMs: number,
-): MapNode {
+function subagentWriteTime(input: MapSessionInput, agent: AgentInvocation): number | undefined {
+  return agent.agentId ? input.subagentWriteTimes.get(agent.agentId) : undefined
+}
+
+/** How many of this session's subagents have expired and so are not drawn. */
+export function expiredSubagentCount(input: MapSessionInput, nowMs: number): number {
+  return input.agents.filter((agent) => !isSubagentRunning(subagentWriteTime(input, agent), nowMs))
+    .length
+}
+
+function subagentNode(sessionId: string, agent: AgentInvocation, index: number): MapNode {
   const key = agent.agentId ?? agent.toolUseId ?? String(index)
   return {
     id: `agent:${sessionId}:${key}`,
@@ -187,8 +205,9 @@ function subagentNode(
     branch: null,
     projectDisplayName: null,
     isFork: false,
-    status: subagentStatus(writtenAt, nowMs),
+    status: 'running',
     needsYou: false,
+    expiredSubagentCount: 0,
     model: agent.model ?? null,
     tokens: agent.totalTokens ?? tokenTotal(agent.tokens),
     durationMs: agent.durationMs ?? null,
@@ -201,6 +220,7 @@ function subagentNode(
 /**
  * Build the map for one project. Input order is kept: pass sessions newest first, and
  * agents in the order they were dispatched. Every session in the input becomes a node.
+ * Expired subagents are left out and counted on their session node.
  */
 export function buildProjectMap(
   projectKey: string,
@@ -217,7 +237,7 @@ export function buildProjectMap(
     const sid = input.summary.sessionId
     const parentSid = parentOf.get(sid)
     const parentId = parentSid ? `session:${parentSid}` : null
-    const node = sessionNode(input, parentId, nowMs)
+    const node = sessionNode(input, parentId, nowMs, expiredSubagentCount(input, nowMs))
     nodes.push(node)
     if (parentId) {
       edges.push({ id: `edge:${node.id}`, from: parentId, to: node.id, kind: 'fork' })
@@ -228,8 +248,8 @@ export function buildProjectMap(
     const sid = input.summary.sessionId
     const parent = `session:${sid}`
     input.agents.forEach((agent, index) => {
-      const writtenAt = agent.agentId ? input.subagentWriteTimes.get(agent.agentId) : undefined
-      const child = subagentNode(sid, agent, index, writtenAt, nowMs)
+      if (!isSubagentRunning(subagentWriteTime(input, agent), nowMs)) return
+      const child = subagentNode(sid, agent, index)
       nodes.push(child)
       edges.push({ id: `edge:${child.id}`, from: parent, to: child.id, kind: 'dispatch' })
     })

@@ -13,6 +13,7 @@ import { buildProjectMap, tokenTotal } from '@/lib/map/project-map'
 import type { MapSessionInput, ProjectMap } from '@/lib/map/project-map'
 import { latestNotificationBySession, readRecentEvents } from '@/lib/events/event-inbox'
 import type { HookEvent } from '@/lib/events/event-inbox'
+import { filterHiddenSessions, filterVisibleSessions } from '@/lib/map/session-visibility'
 
 const HOOK_EVENTS_SHOWN = 100
 
@@ -96,12 +97,18 @@ export async function resolveSessionDetail(
   return detail
 }
 
+/** The project dropdown lists only projects with at least one session that has a working directory. */
 export const getMapProjects = createServerFn({ method: 'GET' }).handler(
   async (): Promise<MapProject[]> => {
     const sessions = await scanAllSessionsWithPaths()
-    return groupMapProjects(sessions)
+    return groupMapProjects(filterVisibleSessions(sessions))
   },
 )
+
+/** The map for one project, plus how many of its sessions were left out for having no project. */
+export interface ProjectMapResponse extends ProjectMap {
+  hiddenNoProjectCount: number
+}
 
 const projectMapInputSchema = z.object({
   projectKey: z.string().min(1).max(512),
@@ -109,9 +116,12 @@ const projectMapInputSchema = z.object({
 
 export const getProjectMap = createServerFn({ method: 'GET' })
   .inputValidator((input: unknown) => projectMapInputSchema.parse(input))
-  .handler(async ({ data }): Promise<ProjectMap> => {
+  .handler(async ({ data }): Promise<ProjectMapResponse> => {
     const all = await scanAllSessionsWithPaths()
-    const sessions = selectMapSessions(all, data.projectKey)
+    const inProject = selectMapSessions(all, data.projectKey)
+    // Sessions with no project are not drawn, and their subagents go with them.
+    const sessions = filterVisibleSessions(inProject)
+    const hiddenNoProjectCount = filterHiddenSessions(inProject).length
 
     const notifications = latestNotificationBySession(await readRecentEvents())
 
@@ -138,7 +148,10 @@ export const getProjectMap = createServerFn({ method: 'GET' })
 
     const projectDisplayName = sessions[0]?.projectDisplayName ?? data.projectKey
     const projectPath = sessions[0]?.projectPath ?? data.projectKey
-    return buildProjectMap(data.projectKey, projectPath, projectDisplayName, inputs)
+    return {
+      ...buildProjectMap(data.projectKey, projectPath, projectDisplayName, inputs),
+      hiddenNoProjectCount,
+    }
   })
 
 async function loadSessionDetail(session: SessionSummaryWithPath): Promise<SessionDetailInput> {

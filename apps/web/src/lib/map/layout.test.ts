@@ -47,11 +47,25 @@ function agents(count: number, sessionId: string): AgentInvocation[] {
   }))
 }
 
-function input(sessionId: string, childCount: number, forkOf?: string): MapSessionInput {
+/**
+ * A session with `childCount` subagents. Running ones were written just now, expired ones an
+ * hour ago, so only the running ones are drawn.
+ */
+function input(
+  sessionId: string,
+  childCount: number,
+  forkOf?: string,
+  expiredCount = 0,
+): MapSessionInput {
+  const all = agents(childCount + expiredCount, sessionId)
+  const now = Date.now()
+  const writeTimes = new Map(
+    all.map((a, i) => [a.agentId!, i < childCount ? now : now - 60 * 60_000]),
+  )
   return {
     summary: summary(sessionId, forkOf),
-    agents: agents(childCount, sessionId),
-    subagentWriteTimes: new Map(),
+    agents: all,
+    subagentWriteTimes: writeTimes,
     pendingQuestions: [],
     lastNotificationAt: null,
     totalTokens: 0,
@@ -76,6 +90,41 @@ function expectNoOverlaps(nodes: Array<{ x: number; y: number; width: number; he
     }
   }
 }
+
+describe('layoutProjectMap: expired subagents', () => {
+  // Geometry only. The session node also carries its expired count, which differs by design.
+  const geometry = (layout: ReturnType<typeof layoutProjectMap>) =>
+    layout.nodes.map((n) => ({ id: n.id, x: n.x, y: n.y, width: n.width, height: n.height }))
+
+  it('lays a session with only expired subagents out exactly like a session with none', () => {
+    const expiredOnly = layoutProjectMap(mapOf([input('s0', 0, undefined, 3)]))
+    const childless = layoutProjectMap(mapOf([input('s0', 0)]))
+    expect(geometry(expiredOnly)).toEqual(geometry(childless))
+    expect(expiredOnly.height).toBe(childless.height)
+    expect(expiredOnly.width).toBe(childless.width)
+  })
+
+  it('lays out running subagents the same whether or not expired ones sit beside them', () => {
+    const mixed = layoutProjectMap(mapOf([input('s0', 2, undefined, 3)]))
+    const running = layoutProjectMap(mapOf([input('s0', 2)]))
+    expect(geometry(mixed)).toEqual(geometry(running))
+    expect(mixed.height).toBe(running.height)
+  })
+
+  it('leaves no gap between top-level blocks when a session has only expired subagents', () => {
+    const layout = layoutProjectMap(mapOf([input('s0', 0, undefined, 4), input('s1', 0)]))
+    const sessions = layout.nodes.filter((n) => n.kind === 'session')
+    expect(sessions[0].y).toBe(0)
+    expect(sessions[1].y).toBe(SESSION_HEIGHT + 24)
+    expect(layout.height).toBe(SESSION_HEIGHT * 2 + 24)
+  })
+
+  it('draws no node or edge for an expired subagent', () => {
+    const layout = layoutProjectMap(mapOf([input('s0', 0, undefined, 2)]))
+    expect(layout.nodes.map((n) => n.kind)).toEqual(['session'])
+    expect(layout.edges).toEqual([])
+  })
+})
 
 describe('layoutProjectMap', () => {
   it('returns zero size for an empty map', () => {

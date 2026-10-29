@@ -30,7 +30,7 @@ export function SessionCard({ session, status }: { session: SessionSummary; stat
       to="/sessions/$sessionId"
       params={{ sessionId: session.sessionId }}
       search={{ project: session.projectKey }}
-      className={`group block rounded-xl border bg-gray-900/50 p-4 transition-all hover:bg-gray-900 ${STATUS_BORDER[status]} ${STATUS_PULSE[status]}`}
+      className={`group block rounded-xl border-2 bg-gray-900/50 p-4 transition-all hover:bg-gray-900 ${STATUS_BORDER[status]} ${STATUS_PULSE[status]}`}
       data-status={status}
     >
       <div className="flex items-start justify-between gap-3">
