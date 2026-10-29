@@ -3,6 +3,7 @@ import {
   MAX_SESSION_NAME_LENGTH,
   createSessionNameState,
   observeSessionName,
+  observeTitleLine,
   resolveSessionName,
   truncateSessionName,
 } from './session-name'
@@ -16,6 +17,10 @@ function user(text: string | Array<{ type: string; text?: string }>, extra: Part
 
 function summaryLine(text: unknown): RawJsonlMessage {
   return { type: 'summary', summary: text } as RawJsonlMessage
+}
+
+function customTitleLine(text: unknown): RawJsonlMessage {
+  return { type: 'custom-title', customTitle: text, sessionId: 's' } as unknown as RawJsonlMessage
 }
 
 function nameFrom(...lines: RawJsonlMessage[]): string | null {
@@ -101,5 +106,34 @@ describe('truncateSessionName', () => {
     const name = nameFrom(user('x'.repeat(200)))!
     expect(name.length).toBe(MAX_SESSION_NAME_LENGTH)
     expect(name.endsWith('…')).toBe(true)
+  })
+})
+
+describe('custom-title (the name set with /rename or --name)', () => {
+  it('wins over the summary and the first user message', () => {
+    expect(
+      nameFrom(user('Refactor the parser'), summaryLine('Parser refactor'), customTitleLine('rusty-mcla work')),
+    ).toBe('rusty-mcla work')
+  })
+
+  it('uses the last custom-title when there are several (a later /rename)', () => {
+    expect(nameFrom(customTitleLine('first'), user('hello'), customTitleLine('second'))).toBe('second')
+  })
+
+  it('ignores a custom-title with an empty or non-string value', () => {
+    expect(nameFrom(customTitleLine('   '), summaryLine('Summary'))).toBe('Summary')
+    expect(nameFrom(customTitleLine(42), user('Hello'))).toBe('Hello')
+  })
+
+  it('is kept by observeTitleLine, which the tail of a file uses', () => {
+    const state = createSessionNameState()
+    observeTitleLine(state, customTitleLine('from the tail'))
+    expect(resolveSessionName(state)).toBe('from the tail')
+  })
+
+  it('truncates a long custom title to the same limit as other names', () => {
+    const long = 'x'.repeat(200)
+    const out = nameFrom(customTitleLine(long))!
+    expect(out.length).toBe(MAX_SESSION_NAME_LENGTH)
   })
 })

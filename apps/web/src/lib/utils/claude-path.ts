@@ -2,10 +2,14 @@ import * as path from 'node:path'
 import * as os from 'node:os'
 import * as fs from 'node:fs/promises'
 
+/**
+ * The Claude config directory. Precedence: CLAUDE_CONFIG_DIR (what Claude Code reads),
+ * then CLAUDE_HOME (the dashboard's older name, kept as an alias), then ~/.claude.
+ * On Windows, os.homedir() is the user profile, so this is %USERPROFILE%\.claude.
+ */
 function resolveClaudeDir(): string {
-  if (process.env.CLAUDE_HOME) {
-    return path.resolve(process.env.CLAUDE_HOME)
-  }
+  const fromEnv = process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDE_HOME
+  if (fromEnv) return path.resolve(fromEnv)
   return path.join(os.homedir(), '.claude')
 }
 
@@ -40,27 +44,13 @@ export function getHistoryPathFor(source: DataSource): string {
 }
 
 /**
- * Decode a project directory name back to a filesystem path.
- * ~/.claude/projects stores dirs like "-Users-username-Documents-GitHub-foo"
- * which maps to "/Users/username/Documents/GitHub/foo"
+ * Last segment of a project path, for display. Splits on both "/" and "\\" so a Windows
+ * path ("D:\\work\\rusty-mcla") gives "rusty-mcla" even when the server runs on Linux.
+ * Returns "" for a path with no segments (for example "/").
  */
-export function decodeProjectDirName(dirName: string): string {
-  // Replace leading dash with / and all other dashes with /
-  const decoded = dirName.replace(/^-/, '/').replace(/-/g, '/')
-  // Detect Windows drive letter: /C/Users/... → C:/Users/...
-  const windowsDrive = decoded.match(/^\/([A-Z])\/(.*)$/)
-  if (windowsDrive) {
-    return `${windowsDrive[1]}:/${windowsDrive[2]}`
-  }
-  return decoded
-}
-
-/**
- * Extract a short project name from a decoded path.
- * "/Users/username/Documents/GitHub/myproject" -> "myproject"
- */
-export function extractProjectName(decodedPath: string): string {
-  return path.basename(decodedPath)
+export function projectNameFromPath(projectPath: string): string {
+  const segments = projectPath.split(/[\\/]+/).filter(Boolean)
+  return segments[segments.length - 1] ?? ''
 }
 
 /**

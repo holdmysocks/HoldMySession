@@ -14,6 +14,8 @@ describe('SessionCard', () => {
   const mockSession: SessionSummary = {
     sessionId: 'f656e46e-bfaa-4997-8b69-d2d955ea2bfc',
     projectPath: '/Users/test/projects/my-app',
+    projectKey: 'app',
+    forkedFrom: null,
     projectName: 'my-app',
     projectDisplayName: 'Checkout Service',
     sessionName: 'Add retry to the payment client',

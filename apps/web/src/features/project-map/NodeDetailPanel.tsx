@@ -7,10 +7,10 @@ import { kindLabel, shortModelName, statusLabel } from './format-node'
 
 export function NodeDetailPanel({
   node,
-  projectPath,
+  projectKey,
 }: {
   node: MapNode | null
-  projectPath: string
+  projectKey: string
 }) {
   const { privacyMode, anonymizeSessionName, anonymizeProjectName } = usePrivacy()
 
@@ -38,6 +38,9 @@ export function NodeDetailPanel({
         <p className="text-xs uppercase tracking-wide text-gray-500">{kindLabel(node)}</p>
         <p className="mt-0.5 truncate text-sm font-semibold text-gray-100">{heading}</p>
         {project && <p className="mt-0.5 truncate text-xs text-gray-400">{project}</p>}
+        {!isSession && node.subtitle && (
+          <p className="mt-0.5 line-clamp-2 text-xs text-gray-400">{node.subtitle}</p>
+        )}
         <p className="mt-0.5 text-xs text-gray-400">
           {statusLabel(node.status)}
           {node.needsYou && <span className="text-brand-300"> · needs you</span>}
@@ -80,7 +83,7 @@ export function NodeDetailPanel({
         <Link
           to="/sessions/$sessionId"
           params={{ sessionId: node.sessionId }}
-          search={{ project: projectPath }}
+          search={{ project: projectKey }}
           className="mt-4 inline-block text-sm text-brand-300 hover:underline"
         >
           Open session

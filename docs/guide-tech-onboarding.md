@@ -271,7 +271,7 @@ createServerFn({ method: 'GET' })
 **How we use it:**
 - E2E tests in `apps/web/e2e/tests/*.spec.ts`
 - Fixture data in `apps/web/e2e/fixtures/.claude/`
-- `CLAUDE_HOME` env var points to fixtures during tests
+- `CLAUDE_HOME` env var points to fixtures during tests (an alias of `CLAUDE_CONFIG_DIR`, which takes precedence)
 - Runs on `localhost:3001`
 
 **Key files:**
@@ -338,7 +338,7 @@ features/
 Every feature follows this flow:
 
 ```
-~/.claude/** (filesystem)
+Claude config dir (filesystem: `CLAUDE_CONFIG_DIR`, else `CLAUDE_HOME`, else `~/.claude`)
     ↓
 Scanner (lib/scanner/) — finds and reads session files
     ↓
@@ -354,8 +354,11 @@ Component (*.tsx) — useQuery() consumes data
 ### Two-Tier Parsing
 
 For performance, session data is parsed at two levels:
-- **Tier 1 (head/tail):** First 15 + last 15 lines of JSONL — used for session list (fast)
-- **Tier 2 (full parse):** Entire JSONL file streamed — used for session detail view (complete)
+- **Tier 1 (head/tail):** First 15 + last 15 lines of JSONL — used for session list and message counts (fast)
+- **Head scan:** First 50 lines — `cwd`, `forkedFrom` and the first name records. The project name and fork links come from here.
+- **Tier 2 (full parse):** Entire JSONL file streamed — used for session detail view and for the newest `custom-title` (complete). The map parses every session this way on first load, cached by mtime.
+
+The head and tail counts are a known gap: message counts from them are too low for long sessions (see `docs/session-map/README.md`).
 
 ### Real-Time Updates
 
@@ -370,13 +373,14 @@ No WebSockets — uses React Query polling:
 
 ### Filesystem Scanner
 
-Reads `~/.claude` directory structure to find sessions and projects. Never writes to `~/.claude`.
+Reads the Claude config directory (`CLAUDE_CONFIG_DIR`, else `CLAUDE_HOME`, else `~/.claude`) to find sessions and projects. Never writes to it. Project directory names are not decoded: the real path comes from the `cwd` in the transcripts (see `docs/guide-claude-data-mapping.md`).
 
 **Key files:**
 - `lib/scanner/session-scanner.ts` — session discovery with mtime cache
 - `lib/scanner/project-scanner.ts` — project directory scanning
 - `lib/scanner/active-detector.ts` — detects active sessions
-- `lib/utils/claude-path.ts` — path utilities, `CLAUDE_HOME` env var support
+- `lib/utils/claude-path.ts` — path utilities, `CLAUDE_CONFIG_DIR` and `CLAUDE_HOME` env var support
+- `lib/scanner/project-display-name.ts` — project name from `package.json` or the git `origin` remote, following `.git` files and worktrees
 
 ### JSONL Parsers
 
@@ -384,6 +388,8 @@ Claude stores session data as JSONL (JSON Lines). Custom parsers extract structu
 
 **Key files:**
 - `lib/parsers/session-parser.ts` — head/tail and full streaming parsers
+- `lib/parsers/session-head.ts` — first-50-line scan for `cwd` and `forkedFrom`
+- `lib/parsers/session-name.ts` — session name precedence (`custom-title`, summary, first prompt)
 - `lib/parsers/stats-parser.ts` — aggregated stats
 - `lib/parsers/history-parser.ts` — history file parser
 - `lib/parsers/types.ts` — Zod schemas + TypeScript types
@@ -409,8 +415,8 @@ npx claude-session-dashboard --port 8080 --open  # Custom port + open browser
 ```
 
 **CLI entry point:** `apps/web/bin/cli.mjs`
-- Flags: `--port`, `--host`, `--open`, `--version`, `--help`
-- Pre-flight check: warns if `~/.claude` not found
+- Flags: `--port`, `--host`, `--open`, `--print-hook-config`, `--version`, `--help`
+- Pre-flight check: warns if the Claude config directory is not found (same precedence as above)
 
 ### Docker
 
@@ -457,7 +463,9 @@ docker compose up                     # Run via Docker Compose
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `CLAUDE_HOME` | Override `~/.claude` directory path | `~/.claude` |
+| `CLAUDE_CONFIG_DIR` | Claude config directory (holds `projects/`) | `~/.claude` |
+| `CLAUDE_HOME` | Older alias of `CLAUDE_CONFIG_DIR`; used when that is unset | `~/.claude` |
+| `CLAUDE_DASHBOARD_HOME` | Folder for the hook event log (`events.jsonl`); the cache and settings stay in `~/.claude-dashboard` | `~/.claude-dashboard` |
 | `NODE_ENV` | Runtime environment | `development` |
 
 ---

@@ -15,7 +15,7 @@ export function HookEventsPanel({ events }: { events: HookEvent[] | undefined })
           <p>No hook events yet.</p>
           <p>
             Run <code className="font-mono text-xs text-gray-300">claude-dashboard --print-hook-config</code> to
-            get a snippet for <code className="font-mono text-xs text-gray-300">~/.claude/settings.json</code>.
+            get a snippet for <code className="font-mono text-xs text-gray-300">settings.json</code> in your Claude config directory.
           </p>
         </div>
       ) : (
@@ -37,6 +37,9 @@ export function HookEventsPanel({ events }: { events: HookEvent[] | undefined })
                     }
                   >
                     {event.event}
+                    {event.notificationType && (
+                      <span className="font-normal text-gray-500"> · {event.notificationType}</span>
+                    )}
                   </span>
                   <span className="shrink-0 text-gray-500" title={event.ts}>
                     {Number.isNaN(Date.parse(event.ts)) ? event.ts : formatRelativeTime(event.ts)}

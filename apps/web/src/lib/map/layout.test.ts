@@ -6,14 +6,15 @@ import {
   SESSION_HEIGHT,
   SESSION_WIDTH,
   SUBAGENT_HEIGHT,
-  SUBAGENT_X,
   SUBAGENT_WIDTH,
+  SUBAGENT_X,
 } from './layout'
 
-function summary(sessionId: string): SessionSummary {
+function summary(sessionId: string, forkOf?: string): SessionSummary {
   return {
     sessionId,
     projectPath: '/work/app',
+    projectKey: '-work-app',
     projectName: 'app',
     branch: 'main',
     cwd: '/work/app',
@@ -28,7 +29,10 @@ function summary(sessionId: string): SessionSummary {
     model: 'claude-example-1',
     version: '2.1.0',
     fileSizeBytes: 1024,
-    projectDisplayName: 'Test Project', sessionName: null, lastStopReason: null,
+    projectDisplayName: 'Test Project',
+    sessionName: null,
+    lastStopReason: null,
+    forkedFrom: forkOf ? { sessionId: forkOf, messageUuid: null } : null,
   }
 }
 
@@ -43,19 +47,19 @@ function agents(count: number, sessionId: string): AgentInvocation[] {
   }))
 }
 
-function input(sessionId: string, childCount: number): MapSessionInput {
+function input(sessionId: string, childCount: number, forkOf?: string): MapSessionInput {
   return {
-    summary: summary(sessionId),
+    summary: summary(sessionId, forkOf),
     agents: agents(childCount, sessionId),
+    subagentWriteTimes: new Map(),
     pendingQuestions: [],
     lastNotificationAt: null,
     totalTokens: 0,
   }
 }
 
-function mapOf(counts: number[]): ProjectMap {
-  const sessions = counts.map((count, i) => input(`s${i}`, count))
-  return buildProjectMap('/work/app', 'app', sessions)
+function mapOf(sessions: MapSessionInput[]): ProjectMap {
+  return buildProjectMap('-work-app', '/work/app', 'app', sessions)
 }
 
 function overlaps(
@@ -63,6 +67,14 @@ function overlaps(
   b: { x: number; y: number; width: number; height: number },
 ): boolean {
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+}
+
+function expectNoOverlaps(nodes: Array<{ x: number; y: number; width: number; height: number }>) {
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      expect(overlaps(nodes[i], nodes[j])).toBe(false)
+    }
+  }
 }
 
 describe('layoutProjectMap', () => {
@@ -75,8 +87,7 @@ describe('layoutProjectMap', () => {
   })
 
   it('places a childless session as a single block of session height', () => {
-    const layout = layoutProjectMap(mapOf([0]))
-    expect(layout.nodes).toHaveLength(1)
+    const layout = layoutProjectMap(mapOf([input('s0', 0)]))
     const [session] = layout.nodes
     expect(session.x).toBe(0)
     expect(session.y).toBe(0)
@@ -85,8 +96,8 @@ describe('layoutProjectMap', () => {
     expect(layout.height).toBe(SESSION_HEIGHT)
   })
 
-  it('uses the session column for session nodes and the subagent column for children', () => {
-    const layout = layoutProjectMap(mapOf([2]))
+  it('puts subagent cards in the child column as smaller cards', () => {
+    const layout = layoutProjectMap(mapOf([input('s0', 2)]))
     const children = layout.nodes.filter((n) => n.kind === 'subagent')
     expect(children).toHaveLength(2)
     for (const child of children) {
@@ -96,84 +107,86 @@ describe('layoutProjectMap', () => {
     }
   })
 
-  it('stacks children 66px apart and sizes the block to fit them', () => {
-    const layout = layoutProjectMap(mapOf([3]))
+  it('stacks subagent cards 54px apart and sizes the block to fit them', () => {
+    const layout = layoutProjectMap(mapOf([input('s0', 3)]))
     const children = layout.nodes.filter((n) => n.kind === 'subagent')
-    expect(children.map((c) => c.y)).toEqual([0, 66, 132])
-    // 3 * 66 - 10 = 188, taller than the session node
-    expect(layout.height).toBe(188)
+    // card 44 + gap 10
+    expect(children.map((c) => c.y)).toEqual([0, 54, 108])
+    // 3 * 54 - 10 = 152, taller than the session node
+    expect(layout.height).toBe(152)
   })
 
   it('centres the session node vertically in its block', () => {
-    const layout = layoutProjectMap(mapOf([3]))
+    const layout = layoutProjectMap(mapOf([input('s0', 3)]))
     const session = layout.nodes.find((n) => n.kind === 'session')!
-    // (188 - 84) / 2 = 52
-    expect(session.y).toBe(52)
+    // (152 - 84) / 2 = 34
+    expect(session.y).toBe(34)
   })
 
-  it('keeps blocks separated by a 24px gap', () => {
-    const layout = layoutProjectMap(mapOf([0, 1]))
+  it('keeps top-level blocks separated by a 24px gap', () => {
+    const layout = layoutProjectMap(mapOf([input('s0', 0), input('s1', 0)]))
     const sessions = layout.nodes.filter((n) => n.kind === 'session')
     expect(sessions[0].y).toBe(0)
-    // first block is 84 tall, then a 24px gap
     expect(sessions[1].y).toBe(SESSION_HEIGHT + 24)
-    // second block is 84 tall (one child: max(84, 56) = 84), total 84 + 24 + 84
-    expect(layout.height).toBe(SESSION_HEIGHT + 24 + SESSION_HEIGHT)
+    expect(layout.height).toBe(SESSION_HEIGHT * 2 + 24)
   })
 
-  it('never overlaps two nodes', () => {
-    const layout = layoutProjectMap(mapOf([0, 4, 1, 12, 2]))
-    for (let i = 0; i < layout.nodes.length; i++) {
-      for (let j = i + 1; j < layout.nodes.length; j++) {
-        expect(overlaps(layout.nodes[i], layout.nodes[j])).toBe(false)
-      }
-    }
+  it('places a fork in the column after its parent, centred on its own block', () => {
+    const layout = layoutProjectMap(mapOf([input('parent', 0), input('fork', 0, 'parent')]))
+    const parent = layout.nodes.find((n) => n.sessionId === 'parent')!
+    const fork = layout.nodes.find((n) => n.sessionId === 'fork')!
+    expect(parent.x).toBe(0)
+    expect(fork.x).toBe(SUBAGENT_X)
+    expect(fork.width).toBe(SESSION_WIDTH)
+    expect(fork.y).toBe(0)
   })
 
-  it('places every child inside its parent block', () => {
-    const map = mapOf([5, 2, 9])
-    const layout = layoutProjectMap(map)
-    expect(layout.nodes).toHaveLength(map.nodes.length)
-
-    let blockTop = 0
-    for (const session of layout.nodes.filter((n) => n.kind === 'session')) {
-      const children = layout.nodes.filter((n) => n.parentId === session.id)
-      const block = Math.max(SESSION_HEIGHT, children.length * 66 - 10)
-      const blockBottom = blockTop + block
-
-      expect(session.y).toBeGreaterThanOrEqual(blockTop)
-      expect(session.y + session.height).toBeLessThanOrEqual(blockBottom)
-      for (const child of children) {
-        expect(child.y).toBeGreaterThanOrEqual(blockTop)
-        expect(child.y + child.height).toBeLessThanOrEqual(blockBottom)
-      }
-      blockTop = blockBottom + 24
-    }
-  })
-
-  it('emits one edge per subagent, each a cubic bezier path', () => {
-    const map = mapOf([2, 3])
-    const layout = layoutProjectMap(map)
-    expect(layout.edges).toHaveLength(map.edges.length)
-    expect(layout.edges).toHaveLength(5)
+  it('draws a fork edge and a dispatch edge with the right kinds', () => {
+    const layout = layoutProjectMap(mapOf([input('parent', 1), input('fork', 1, 'parent')]))
+    expect(layout.edges.filter((e) => e.kind === 'fork')).toHaveLength(1)
+    expect(layout.edges.filter((e) => e.kind === 'dispatch')).toHaveLength(2)
     for (const edge of layout.edges) {
-      expect(edge.d).toMatch(/^M [\d.-]+ [\d.-]+ C /)
+      expect(edge.d.startsWith('M ')).toBe(true)
     }
   })
 
-  it('starts each edge at the session right edge and ends at the subagent left edge', () => {
-    const layout = layoutProjectMap(mapOf([1]))
-    const [edge] = layout.edges
-    const session = layout.nodes.find((n) => n.kind === 'session')!
-    const child = layout.nodes.find((n) => n.kind === 'subagent')!
-    const startX = session.x + session.width
-    const startY = session.y + session.height / 2
-    const endX = child.x
-    const endY = child.y + child.height / 2
-    expect(edge.d).toBe(`M ${startX} ${startY} C ${(startX + endX) / 2} ${startY}, ${(startX + endX) / 2} ${endY}, ${endX} ${endY}`)
+  it('nests a fork of a fork one column further right', () => {
+    const layout = layoutProjectMap(
+      mapOf([input('a', 0), input('b', 0, 'a'), input('c', 0, 'b')]),
+    )
+    const x = (id: string) => layout.nodes.find((n) => n.sessionId === id)!.x
+    expect(x('a')).toBe(0)
+    expect(x('b')).toBe(SUBAGENT_X)
+    expect(x('c')).toBe(SUBAGENT_X + SESSION_WIDTH + 60)
   })
 
-  it('reports width 560 for a non-empty map', () => {
-    expect(layoutProjectMap(mapOf([1])).width).toBe(560)
+  it('places a fork before its parent sibling blocks, without overlap, with subagents in between', () => {
+    const layout = layoutProjectMap(
+      mapOf([
+        input('parent', 2),
+        input('fork', 3, 'parent'),
+        input('grand', 1, 'fork'),
+        input('other', 2),
+      ]),
+    )
+    expectNoOverlaps(layout.nodes)
+    for (const node of layout.nodes) {
+      expect(node.y).toBeGreaterThanOrEqual(0)
+      expect(node.y + node.height).toBeLessThanOrEqual(layout.height)
+      expect(node.x + node.width).toBeLessThanOrEqual(layout.width)
+    }
+  })
+
+  it('keeps a fork and its parent non-overlapping even when the parent has many children', () => {
+    const layout = layoutProjectMap(
+      mapOf([input('p', 5), input('f1', 4, 'p'), input('f2', 0, 'p'), input('ff', 2, 'f1')]),
+    )
+    expectNoOverlaps(layout.nodes)
+    expect(layout.nodes).toHaveLength(4 + 5 + 4 + 2)
+  })
+
+  it('reports a canvas width that covers the deepest column', () => {
+    const layout = layoutProjectMap(mapOf([input('a', 0), input('b', 0, 'a'), input('c', 0, 'b')]))
+    expect(layout.width).toBe(SUBAGENT_X + SESSION_WIDTH + 60 + SESSION_WIDTH)
   })
 })

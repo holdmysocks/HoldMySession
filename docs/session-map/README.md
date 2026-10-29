@@ -1,8 +1,8 @@
 # Session Map
 
-The Session Map is a read-only view of one project's Claude Code sessions. Each session in the project is a node, its subagents are child nodes joined by dispatch edges, and a side panel lists what is waiting on you and recent hook notifications.
+The Session Map is a read-only view of one project's Claude Code sessions. Each session in the project is a node. A **fork** of a session is a child node of that session. A **subagent** the session (or fork) dispatched is a small child card. A side panel lists what is waiting on you and recent hook events. The map never writes to `~/.claude`.
 
-Phase 1 is read-only. It never writes to `~/.claude`. Messaging and linking sessions are Phase 2 (see [Status](#status)).
+Field-level detail for every file the map reads is in [docs/guide-claude-data-mapping.md](../guide-claude-data-mapping.md). It also says which parts are documented and which are internal to Claude Code.
 
 ## Running it
 
@@ -13,131 +13,181 @@ cd apps/web
 npm run build && npm start
 ```
 
-Open `http://localhost:3000/map`, or pick a project from the **Map** entry in the sidebar.
+Open `http://localhost:3000/map`, or pick a project from the **Map** entry in the sidebar. The project selector shows each project's name and session count.
 
-Options are the same as the dashboard: `--port`, `--host`, `--open`. Run `claude-dashboard --help` for the list.
+Options: `-p, --port <number>` (default 3000), `--host <hostname>` (default localhost), and `-o, --open`. Run `claude-dashboard --help` for the full list.
 
-## Turning on notifications
+## Setup on Windows
 
-Notifications come from Claude Code hooks, which you opt into. The dashboard does not install anything.
+The dashboard reads the Claude config directory on Windows, which is `%USERPROFILE%\.claude` (for example `C:\Users\<you>\.claude`). Nothing needs configuring for that.
 
-1. Print the snippet:
+1. **Run it.** Install from npm (`npm install -g claude-session-dashboard`, then `claude-dashboard`), or from a clone. From a clone, `Update-SessionMap.ps1` in the repo root pulls the session map branch, installs dependencies when the lock file changed, rebuilds and starts the dashboard. Run it from PowerShell in the repo folder: `powershell -ExecutionPolicy Bypass -File .\Update-SessionMap.ps1`. Use `-SkipTests` to skip the test run, `-ForceInstall` to reinstall dependencies, and `-Port` to change the port (default 3000).
+2. **Custom config dir (optional).** Set `CLAUDE_CONFIG_DIR` to the folder that holds `projects\`. `CLAUDE_HOME` is accepted as an older alias.
+3. **Notifications (optional).** Run `claude-dashboard --print-hook-config`. Merge the `hooks` block into `%USERPROFILE%\.claude\settings.json`. The printed command points at the hook script's absolute path, quoted if the path has spaces.
+4. **WSL.** When the dashboard runs on Windows, WSL distributions with a `.claude` folder under `\\wsl$` are listed as extra data sources. They appear in the Sessions list. **They do not appear on the map** (see limitations).
 
-   ```bash
-   claude-dashboard --print-hook-config
-   ```
+**Not verified:** the hook command on Windows. We do not know whether Claude Code on Windows runs the hook through `cmd`, PowerShell or Git Bash. The hook script itself is tested on Linux only. Check that a Notification event lands in `%USERPROFILE%\.claude-dashboard\events.jsonl` after you trigger one.
 
-   It prints JSON with `Notification` and `Stop` hooks. It only prints; it never writes files. A note on stderr says where it goes.
+## What the map shows
 
-2. Merge the `hooks` block into `~/.claude/settings.json`. If the file already has a `hooks` key, merge the two `Notification` and `Stop` arrays rather than replacing the object.
+- **Session nodes.** The project name is the primary label. The session name is the second line. Branch, short id, and message count are small text, with the model at the bottom.
+- **Fork nodes.** A fork of a session in the same project hangs off that session, joined by a dashed edge. The node says "Forked session" in the details panel.
+- **Subagent cards.** Small cards (180 by 44) under the session or fork that dispatched them. The label is the subagent type, then its description.
+- **Layout.** Each depth is a column: top-level sessions, then their forks and subagents, then forks of forks. A parent is centred on its children. Nothing overlaps.
+- **Every session in the project is shown.** There is no cap.
 
-3. Restart any running Claude Code session before relying on notifications, so it loads the new hook configuration. Sessions started after the change will record events.
+### Project naming
 
-**The path is absolute.** The snippet points at `bin/claude-dashboard-hook.mjs` inside the install directory it was printed from. If you run the dashboard from a checkout and later move or delete it, the hook breaks silently. A global install (`npm install -g claude-session-dashboard`) is recommended, and then re-run `--print-hook-config` from that install.
+The project's name comes from its working directory as recorded in the transcripts (the `cwd` field), not from the directory name. Claude Code names the directory by replacing every non-alphanumeric character with `-`, which cannot be reversed. For example, `D:\MCLA` becomes `D--MCLA`.
 
-The hook is designed never to block Claude Code. It always exits 0, and any error is swallowed.
+The name is picked in this order:
 
-## Data sources
+1. `name` in the project's `package.json`.
+2. The `origin` remote's repository name, read from the git config. Worktrees and submodules are followed.
+3. The last segment of the working directory.
 
-Everything below is read from `~/.claude` (or `$CLAUDE_HOME`), except the hook log.
+If no transcript has a `cwd`, the directory name is shown as the project path and name. It is not a real path in that case.
 
-| Feature | Read from | Fields used |
-|---|---|---|
-| Project list | `projects/<dir>/*.jsonl` (file names and mtimes), decoded directory name | Project path comes from the directory name. Lossy for paths containing `-`, as in the rest of the app. |
-| Sessions listed | Every top-level `projects/<dir>/*.jsonl` | No filter. A `queue-operation` line does not make a session headless: interactive sessions can contain one too. Subagent transcripts live in subfolders and are not listed as sessions. |
-| Project name | `name` in the project's `package.json`, then the `origin` remote's repo name in `.git/config`, then the folder name | Read-only, cached by path. Only absolute decoded paths are looked up. |
-| Session node: title | Latest `summary` line (Claude Code's auto-title), else the first user text message, cut to 80 characters | Falls back to `gitBranch`, then the first 8 characters of the session id. The `summary` line shape is assumed; verify on a real session file. |
-| Session node: status | Session file mtime, a lock directory `projects/<dir>/<sessionId>/`, the last assistant `stop_reason`, hook notifications, and open `AskUserQuestion` calls | See [Session status](#session-status). |
-| Session node: model | First assistant `message.model` | |
-| Session node: duration | First and last `timestamp` | |
-| Session node: tool calls | Count of `tool_use` blocks in assistant messages | |
-| Session node: tokens | `message.usage` (input, output, cache read, cache creation) | Summed over the session, and includes its subagents (the parser folds them in). |
-| Subagent node | `tool_use` blocks named `Agent` or `Task` (`input.subagent_type`, `description`) | Dispatch record in the parent session. |
-| Subagent stats | `toolUseResult` on the matching `tool_result` (`totalTokens`, `totalToolUseCount`, `totalDurationMs`, `agentId`) | Subagent transcripts in `<sessionId>/subagents/agent-*.jsonl` (or `agents/`) fill in model and token detail when they can be matched by `agentId`. |
-| Orphan subagent | A subagent transcript that matches no dispatch record | Shown as `unknown`. |
-| Requests from me | `tool_use` named `AskUserQuestion` with no `tool_result` for the same id | Header and question text. Oldest first. |
-| Notifications | `~/.claude-dashboard/events.jsonl` (written by the hook) | Latest `Notification` per session. |
+### Session naming
 
-### What the hook writes
+The session's name is picked in this order:
 
-`bin/claude-dashboard-hook.mjs` appends one JSON object per line to `events.jsonl`, for `Notification` and `Stop` events only:
+1. The newest `custom-title` in the transcript. This is what `/rename` and `--name` set. The whole file is read once per change, so a rename in the middle of a long session is found.
+2. Claude Code's `summary` text.
+3. The first real user message, cut to 80 characters.
 
-```json
-{"ts":"2026-10-29T10:03:00.000Z","event":"Notification","sessionId":"<id>","cwd":"/path/to/project","message":"Claude needs your permission to use Bash"}
-```
+A session with none of these shows "Untitled session". The branch is never used as the name.
 
-- `ts` is the time the hook ran, as an ISO 8601 string.
-- `cwd` and `message` are `null` when the payload does not provide them.
-- The log lives in `~/.claude-dashboard/` by default. Set `CLAUDE_DASHBOARD_HOME` to change it. The dashboard and the hook must agree on this value (it is read from the same environment).
+### Fork links
 
-The hook is the only writer. The dashboard reads the log and never writes to it.
+A session is linked to a parent when its first 50 lines carry `forkedFrom.sessionId` and that parent is in the same project. Links are drawn from the parent, not the other way round. A fork whose parent is not in the project is shown at the top level, unlinked.
 
-## Session status
+Continuations (a session started because the previous one ran out of context) are not linked to anything, even though their first message says so. They are top-level sessions.
 
-One shared rule set drives the Sessions list cards and the map nodes (`src/lib/status/session-status.ts`). Priority is needs-you, then active, then completed, then idle.
+### Status
 
-| Status | Border | Look | Rule |
+One rule set drives the Sessions list and the map (`src/lib/status/session-status.ts`). Priority is needs-you, then active, then completed, then idle.
+
+| Status | Border and dot | Motion | Rule |
 |---|---|---|---|
-| needs-you | yellow | fast pulse, about 1 s | Session is active and has an open `AskUserQuestion`, or a `Notification` hook event newer than its last write. Waiting questions in an idle session are ignored, since they were abandoned. |
-| active | green | slow pulse, about 2.5 s | Active, per the 2-minute mtime and lock-directory check. |
-| completed | solid Claude orange | none | Not active, last assistant `stop_reason` is `end_turn`, and the last write is within 1 hour. Older sessions are idle. |
-| idle | grey | none | Anything else. |
+| Needs you | yellow | fast pulse, about 1 s | The session is active and has an open `AskUserQuestion`, or a Notification hook event is newer than its last write. An open question in an idle session is ignored, since it was abandoned. |
+| Active | green | slow pulse, about 2.5 s | Active: the transcript was written in the last 2 minutes, and the session's folder exists (see limitations). |
+| Completed | Claude orange | none | Not active, the last assistant `stop_reason` is `end_turn`, and the last write was within the **last hour**. |
+| Idle | grey | none | Anything else. Including completed sessions older than an hour. |
+
+**Subagent cards** use a separate, simpler rule:
+
+| State | Border | Motion | Rule |
+|---|---|---|---|
+| Running | green | slow pulse | The subagent's transcript was written in the last 2 minutes. |
+| Done | blue | none | Anything else, including a subagent with no transcript file. |
 
 The pulse is CSS only. With `prefers-reduced-motion: reduce`, the pulse stops and the colour stays.
 
-## Status
+### Subagent details
+
+The side panel shows tokens, duration, tool calls, model and the dispatch time. Session tokens include the subagents. Subagent cards are not sessions, so they are not listed in the Sessions list.
+
+### Hook events
+
+`bin/claude-dashboard-hook.mjs` appends one line per `Notification` or `Stop` event to `~/.claude-dashboard/events.jsonl` (or `$CLAUDE_DASHBOARD_HOME/events.jsonl`):
+
+```json
+{"ts":"2026-10-29T10:03:00.000Z","event":"Notification","sessionId":"<id>","cwd":"/path/to/project","message":"Claude needs your permission to use Bash","notificationType":"permission_prompt","title":null}
+```
+
+| Field | From the hook input | Notes |
+|---|---|---|
+| `ts` | (hook run time) | ISO 8601. |
+| `event` | `hook_event_name` | Only `Notification` and `Stop` are recorded. |
+| `sessionId` | `session_id` | Required. Events without it are dropped. |
+| `cwd` | `cwd` | `null` when absent. |
+| `message` | `message` | `null` when absent or not a string. |
+| `notificationType` | `notification_type` | New. `null` for `Stop`, or when absent. The Notification types are `permission_prompt`, `idle_prompt`, `auth_success`, `elicitation_dialog` and others (see the data mapping guide). |
+| `title` | `title` | New. Optional in Claude Code's input. `null` when absent. |
+
+The hook is the only writer of this file. It always exits 0 and swallows errors, so it never blocks Claude Code.
+
+**The snippet has no matcher.** A `Notification` entry with no matcher fires for every notification type, and the Stop entry has no matcher, since `Stop` does not support one. Use `notificationType` in the events panel to tell them apart.
+
+**The path is absolute.** The snippet points at `bin/claude-dashboard-hook.mjs` in the install it was printed from. If you move or delete that install, the hook breaks silently. A global install is recommended. Re-run `--print-hook-config` after installing.
+
+## Status of features
 
 | Feature | Status | Notes |
 |---|---|---|
-| Project map (sessions as nodes) | Built | Newest 25 sessions per project. |
-| Subagents as child nodes with dispatch edges | Built | From the parent's dispatch records, with stats from `toolUseResult`. |
-| Child sessions (subagent transcripts as their own nodes) | Not built | Subagent transcripts are used only to enrich the matching subagent node. They are not mapped as separate sessions. |
-| Requests from me (open `AskUserQuestion`) | Built | Shown on the session node, in Needs you, and in the details panel. |
-| Permission prompts | Built, opt-in | Only through the `Notification` hook. They are not in the transcript. |
-| Notifications (recent hook events) | Built, opt-in | Recent events panel; a session needs you when a `Notification` is newer than its last write. |
-| Sending messages to a session | Not built (Phase 2) | Planned: a Stop-hook inbox, plus a headless `claude --resume <id> -p "..."` fallback for idle sessions. |
-| Linking two sessions | Not built (Phase 2) | Session-to-session links cannot be inferred from the data yet. |
-| Stats: tokens | Built | Per session, including subagents. Per subagent, its own total. |
-| Stats: duration | Built | Session: first to last timestamp. Subagent: `totalDurationMs`. |
-| Stats: tool calls | Built | Per session and per subagent where available. |
-| Stats: model | Built | Session: first assistant model. Subagent: transcript model, else dispatch model. |
-| Stats: cost | Not built on the map | Available per session on the session detail page. |
+| Map of every session in a project | Built | No cap. Every session is parsed on the first load and cached by file mtime. |
+| Fork links (child of the parent session) | Built | From `forkedFrom` in the first 50 lines. Same project only. |
+| Split-out forks shown at top level | Built | A session without `forkedFrom` is top level. How the desktop app records a split is not visible (open question). |
+| Continuations linked to their predecessor | Not built, by design | No structural link in the transcript. |
+| Subagents as small cards with running or done state | Built | Running is judged from the subagent transcript's mtime. |
+| Subagent transcripts as their own sessions | Not built | Used only to judge running state. |
+| Project name from package.json, git, or folder | Built | From the transcripts' `cwd`. Windows paths read only on Windows. |
+| Session name from `custom-title`, summary, first prompt | Built | Newest `custom-title` wins. |
+| Running sessions from `~/.claude/sessions/` | Not built | The file format was not found in the 2.1.312 bundle. The mtime heuristic is kept. |
+| Config dir from `CLAUDE_CONFIG_DIR` | Built | `CLAUDE_HOME` is a legacy alias. |
+| Notifications with type and title | Built, opt-in | Through the Notification hook. Permission prompts are not in the transcript. |
+| Needs-you panel | Built | Open questions and Notification hook events. |
+| Recent hook events panel | Built, opt-in | Last 100 events. |
+| Windows setup | Documented, not tested on a Windows host | Path logic is unit-tested with Windows-style strings. |
+| WSL sources on the map | Not built | Sessions list only. |
+| Sending messages to a session | Not built (Phase 2) | Planned: a Stop-hook inbox, plus headless resume for idle sessions. |
+| Linking sessions beyond forks | Not built (Phase 2) | Forks are the only relation the map draws. |
+| Stats: tokens, duration, tool calls, model | Built | Per session, including subagents. |
+| Cost per node on the map | Not built | `features/cost-estimation` has the calculator. The map does not use it yet. |
 
 ## Known limitations
 
-- **Permission prompts are not in the transcript.** Only a `Notification` hook reveals them, so without the hook, a session waiting on a permission prompt looks idle.
-- **An unanswered `AskUserQuestion` can belong to an abandoned session.** A question with no answer is shown as open even if the session was closed. Check the session's status before acting.
-- **Maps are capped at 25 sessions** per project, newest first.
-- **The events log is unbounded and is read whole** on each request. Only the last 500 events (for notifications) and last 100 (for the panel) are used, but the whole file is read. Rotation is not implemented.
-- **The subagent cache can go stale while the parent is idle.** Cached session detail is keyed by the parent file's mtime. A subagent transcript that changes while its parent is idle does not invalidate the cache until the parent is written.
-- **Orphan subagents show as `unknown`.** These are subagent transcripts that cannot be matched to a dispatch, usually because the parent's dispatch record is missing or was written in a format the parser does not read.
-- **Session-to-session links cannot be inferred yet.** The map shows dispatch edges only, from a session to its own subagents.
-- **Project paths come from directory names,** which are lossy when a path contains `-`. This is the same limitation as the rest of the dashboard.
-- **Hook payload field names are unverified against every Claude Code version.** The hook reads `hook_event_name`, `session_id`, `cwd` and `message`, as we understand the hooks documentation. Verify them against your installed Claude Code before relying on notifications, and update `bin/claude-dashboard-hook.mjs` if they differ.
+- **Open question: the desktop app's "split to top level".** If the app records a split in the transcript, we have not found it. Forks split this way are linked by `forkedFrom`, because the transcript still carries it. The map shows the link.
+- **Open question: active sessions need a folder.** The active check (`src/lib/scanner/active-detector.ts`) requires a folder named after the session id next to the transcript. A session with no such folder can never show as active, including a fork. We have not measured how often this happens on real data.
+- **Transcripts are an internal format.** Claude Code does not document the JSONL record shapes. The fields the map reads are listed in the data mapping guide, marked by how sure we are. Upgrades can break them. Check that guide's upgrade checklist after each Claude Code upgrade.
+- **Message counts come from the first and last 15 lines** of each file, so a long session shows a count that is too low. This predates Phase 1 and is not fixed here. The sessions list and the map both show it.
+- **Permission prompts were not found in the transcript.** Only the Notification hook reveals them. Without the hook, a session waiting on one looks idle.
+- **An unanswered `AskUserQuestion` can belong to an abandoned session.** It is ignored once the session is idle, but an active session with a stale question still shows as needs-you.
+- **Subagents quiet for more than 2 minutes show as done** while they are still working, because running is judged from the transcript's last write.
+- **The map reads only the primary data source.** On Windows, WSL sessions are listed on the Sessions page but not on the map.
+- **Scale.** The first map load parses every session in the project in full, one at a time. Later loads reuse the cache, but active sessions are parsed on every poll (every 10 seconds). A project with hundreds of long sessions will load slowly the first time.
+- **A Windows path can only be read on Windows.** On a Linux server, a Windows `cwd` is shown as recorded, and the name falls back to the last segment of the path.
+- **The `events.jsonl` log is read whole** on each request, and the events panel shows the newest 100. Rotation is not implemented.
+- **Hook payload fields.** The fields are confirmed in the 2.1.312 bundle (see the data mapping guide), but Claude Code may change them. Check the events file after an upgrade.
 
 ## Upgrade path
 
-Work through these in order. Each step is independent enough to ship on its own.
+Steps 1 and 2 are maintenance and should run after each Claude Code upgrade. Steps 3 to 9 are options, not decisions. Each needs a design decision before any work starts, and they are independent of each other.
 
-1. **Verify the hook payload** (small, do first). Run a session with the snippet installed, inspect what the `Notification` and `Stop` hooks receive, and adjust field names in `bin/claude-dashboard-hook.mjs` (`payload.hook_event_name`, `payload.session_id`, `payload.cwd`, `payload.message`). The tests in `src/lib/events/hook-script.test.ts` pipe a payload into the script, so update the fixtures to match.
+1. **Re-check the transcript format after an upgrade.** Follow the checklist in [the data mapping guide](../guide-claude-data-mapping.md#upgrade-checklist-run-after-each-claude-code-upgrade). Update `src/lib/parsers/session-head.ts` and `session-parser.ts` if a field moves.
 
-2. **Stop-hook inbox (Phase 2a).** A message written by the dashboard goes into an inbox file under `~/.claude-dashboard/`, and a Stop hook delivers it to the running session when Claude finishes a turn. Changes:
-   - `bin/claude-dashboard-hook.mjs`: on `Stop`, read the session's pending inbox entries and return them to Claude Code in the hook's documented output format. Confirm that format against the installed version first.
-   - `src/lib/events/` (or a new `src/lib/inbox/`): inbox schema and append/read helpers. Keep writes under `~/.claude-dashboard/`, never `~/.claude`.
-   - `src/features/project-map/`: a composer on the node details panel, with a server function that appends to the inbox. Keep it in its own slice (for example `src/features/session-messages/`).
-   - Consider this a design decision: which Claude Code hook output shape delivers a message, and how a message to an idle session is handled. Review this with an architect before implementing.
+2. **Measure the active-folder rule.** Count how many real sessions are written in the last 2 minutes but have no folder. If the number is large, look for another signal, such as the `sessions/` directory once its format is confirmed.
 
-3. **Headless resume for idle sessions (Phase 2b).** For sessions that are not running, the dashboard runs `claude --resume <id> -p "<message>"`. Changes: a server function that spawns that process with `execFile` (never a shell string), a per-session lock so two messages do not run at once, and a clear UI state while it runs. This needs careful handling of concurrency, timeouts and output, and of the case where the user has the session open in a terminal. Suited to a more capable agent or a careful reviewer.
+3. **Option: Stop-hook inbox (Phase 2).** A message written by the dashboard goes into an inbox under `~/.claude-dashboard/`, and a Stop hook delivers it when Claude finishes a turn. Changes: `bin/claude-dashboard-hook.mjs` (returns pending messages in the hook's output format, confirmed for the installed version first), an inbox module under `src/lib/`, and a composer in `src/features/project-map/`. Which hook output shape delivers a message, and how a message reaches an idle session, is a design decision. Review it with an architect before implementing.
 
-4. **Session linking (Phase 2c).** Store links under `~/.claude-dashboard/`, never `~/.claude`. Add a `link` edge kind to `MapEdge` in `src/lib/map/project-map.ts`, and have `layoutProjectMap` draw it. Decide the link model first (one-way or two-way, and what a link means for the inbox). This is a data-model decision: architect first, then implement.
+4. **Option: headless resume for idle sessions (Phase 2).** `claude --resume <id> -p "<message>"` for sessions that are not running. Spawn with `execFile`, never a shell string. Add a per-session lock, a timeout, and a clear UI state while it runs. Handle the case where the session is open in a terminal.
 
-5. **Cost per node.** Add `tokensByModel` to `MapNode` in `src/lib/map/project-map.ts`, then reuse `src/features/cost-estimation/cost-calculator.ts` in the details panel. Small and mechanical.
+5. **Option: session links beyond forks (Phase 2).** Store links under `~/.claude-dashboard/`, never `~/.claude`. Add a link kind to `MapEdge` in `src/lib/map/project-map.ts`, and have `src/lib/map/layout.ts` draw it. Decide the link model first.
 
-6. **Cache correctness.** Include the subagent directory's mtime in the cache key in `src/features/project-map/project-map.api.ts`, so subagent changes invalidate the parent's cache. Add a test for `resolveSessionDetail` with a changed subagent mtime.
+6. **Cost per node.** Add per-model token totals to `MapNode`, then reuse `src/features/cost-estimation/cost-calculator.ts` in the details panel.
 
-7. **Scale.** Lift the 25-session cap with pagination or virtualised rows. Add rotation or an index for `events.jsonl`. Both are mechanical and suit a smaller agent.
+7. **Cache correctness.** Include the subagent directory's mtime in the cache key in `src/features/project-map/project-map.api.ts`, so a subagent change invalidates its parent's cached detail. Subagent write times are already read on each request, so only the cached detail needs this.
+
+8. **Scale.** Measure the first load on a project with hundreds of sessions. If it is too slow, add pagination or virtualised rows, and stream parses in parallel with a limit.
+
+9. **WSL on the map.** Carry the data source through `scanProjectsFrom` and the map server function, and key projects by source as well as directory.
 
 ## Changelog
+
+### Phase 1 follow-up (2026-10-29)
+
+Fixes for problems a Windows user reported with real data.
+
+- **Project name.** The directory name is no longer decoded. The project's path and name come from the transcripts' `cwd`. The name then comes from `package.json`, the git `origin` remote (following `.git` files and worktrees), or the folder name. Hyphenated and dotted folder names keep their characters.
+- **Session name.** Uses the newest `custom-title` (set by `/rename` or `--name`), then the summary, then the first prompt. Branch names are no longer used as titles.
+- **Forks.** Forks show as child nodes of the session they were forked from. Forks whose parent is not in the project, and sessions split to the top level, are not linked.
+- **Subagents.** Smaller cards, linked to their dispatching session or fork, with running and done states.
+- **Every session.** The map no longer stops at 25 sessions per project.
+- **Layout.** A tree layout, with one column per depth.
+- **Hook.** Records `notificationType` and `title`. The printed snippet has no matchers.
+- **Config dir.** `CLAUDE_CONFIG_DIR` is read first. `CLAUDE_HOME` is kept as an alias. The CLI pre-flight check and the app info page use the same resolution.
+- **Docs.** The data mapping guide was rewritten and verified against Claude Code 2.1.312.
 
 ### Phase 1 (unreleased)
 

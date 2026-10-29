@@ -1,20 +1,26 @@
 import type { MapEdge, MapNode, ProjectMap } from './project-map'
 
 /**
- * Pure grid layout for the project map. Each session owns a vertical block; its
- * subagents stack inside that block in a second column, and dispatch edges join
- * the two. Coordinates are in SVG user units, so the canvas can use a viewBox.
+ * Pure tree layout for the project map. Each depth is a column: top-level sessions in the
+ * first column, their forks and subagents in the second, forks of forks in the third, and
+ * so on. A parent is centred on the block of its children, and every block is stacked
+ * without overlap. Coordinates are in SVG user units, so the canvas can use a viewBox.
  */
 
 export const SESSION_WIDTH = 260
 export const SESSION_HEIGHT = 84
-export const SUBAGENT_X = 320
-export const SUBAGENT_WIDTH = 240
-export const SUBAGENT_HEIGHT = 56
+export const SUBAGENT_WIDTH = 180
+export const SUBAGENT_HEIGHT = 44
 export const SUBAGENT_GAP = 10
-const SUBAGENT_PITCH = SUBAGENT_HEIGHT + SUBAGENT_GAP
+/** Gap between the right edge of one column and the left edge of the next. */
+const COLUMN_GAP = 60
+/** Gap between sibling blocks under the same parent. */
+const SIBLING_GAP = 10
+/** Gap between top-level session blocks. */
 const BLOCK_GAP = 24
-const CANVAS_WIDTH = SUBAGENT_X + SUBAGENT_WIDTH
+
+/** x of the first child column: a session column plus the gap. Subagent cards start here. */
+export const SUBAGENT_X = SESSION_WIDTH + COLUMN_GAP
 
 export interface PositionedNode extends MapNode {
   x: number
@@ -24,7 +30,7 @@ export interface PositionedNode extends MapNode {
 }
 
 export interface PositionedEdge extends MapEdge {
-  /** SVG path data for a cubic bezier from the session's right edge to the subagent's left edge. */
+  /** SVG path data for a cubic bezier from the parent's right edge to the child's left edge. */
   d: string
 }
 
@@ -35,9 +41,17 @@ export interface ProjectLayout {
   height: number
 }
 
-function blockHeight(childCount: number): number {
-  if (childCount === 0) return SESSION_HEIGHT
-  return Math.max(SESSION_HEIGHT, childCount * SUBAGENT_PITCH - SUBAGENT_GAP)
+function nodeWidth(node: MapNode): number {
+  return node.kind === 'session' ? SESSION_WIDTH : SUBAGENT_WIDTH
+}
+
+function nodeHeight(node: MapNode): number {
+  return node.kind === 'session' ? SESSION_HEIGHT : SUBAGENT_HEIGHT
+}
+
+/** Forks before subagent cards under the same parent. Otherwise input order is kept. */
+function siblingRank(node: MapNode): number {
+  return node.kind === 'session' ? 0 : 1
 }
 
 function dispatchPath(x1: number, y1: number, x2: number, y2: number): string {
@@ -46,52 +60,80 @@ function dispatchPath(x1: number, y1: number, x2: number, y2: number): string {
 }
 
 export function layoutProjectMap(map: ProjectMap): ProjectLayout {
-  const childrenByParent = new Map<string, MapNode[]>()
-  const sessionNodes: MapNode[] = []
+  const byId = new Map<string, MapNode>()
+  const childrenOf = new Map<string, MapNode[]>()
+  const roots: MapNode[] = []
 
   for (const node of map.nodes) {
-    if (node.parentId === null) {
-      sessionNodes.push(node)
-    } else {
-      const siblings = childrenByParent.get(node.parentId) ?? []
-      siblings.push(node)
-      childrenByParent.set(node.parentId, siblings)
+    byId.set(node.id, node)
+  }
+  for (const node of map.nodes) {
+    if (node.parentId === null || !byId.has(node.parentId)) {
+      roots.push(node)
+      continue
     }
+    const siblings = childrenOf.get(node.parentId) ?? []
+    siblings.push(node)
+    childrenOf.set(node.parentId, siblings)
+  }
+  for (const siblings of childrenOf.values()) {
+    siblings.sort((a, b) => siblingRank(a) - siblingRank(b))
   }
 
-  const nodes: PositionedNode[] = []
-  const positions = new Map<string, PositionedNode>()
-  let blockTop = 0
-
-  sessionNodes.forEach((session, index) => {
-    const children = childrenByParent.get(session.id) ?? []
-    const block = blockHeight(children.length)
-    const sessionY = blockTop + (block - SESSION_HEIGHT) / 2
-
-    const sessionPos: PositionedNode = {
-      ...session,
-      x: 0,
-      y: sessionY,
-      width: SESSION_WIDTH,
-      height: SESSION_HEIGHT,
+  // Column x positions: each column is as wide as its widest node.
+  const columnWidth: number[] = []
+  const depthOf = new Map<string, number>()
+  const queue: Array<{ node: MapNode; depth: number }> = roots.map((node) => ({ node, depth: 0 }))
+  while (queue.length > 0) {
+    const { node, depth } = queue.shift()!
+    if (depthOf.has(node.id)) continue
+    depthOf.set(node.id, depth)
+    columnWidth[depth] = Math.max(columnWidth[depth] ?? 0, nodeWidth(node))
+    for (const child of childrenOf.get(node.id) ?? []) {
+      queue.push({ node: child, depth: depth + 1 })
     }
-    nodes.push(sessionPos)
-    positions.set(session.id, sessionPos)
+  }
+  const columnX: number[] = []
+  let x = 0
+  for (let depth = 0; depth < columnWidth.length; depth++) {
+    columnX[depth] = x
+    x += columnWidth[depth] + COLUMN_GAP
+  }
 
-    children.forEach((child, childIndex) => {
-      const childPos: PositionedNode = {
-        ...child,
-        x: SUBAGENT_X,
-        y: blockTop + childIndex * SUBAGENT_PITCH,
-        width: SUBAGENT_WIDTH,
-        height: SUBAGENT_HEIGHT,
-      }
-      nodes.push(childPos)
-      positions.set(child.id, childPos)
+  const positions = new Map<string, PositionedNode>()
+  const nodes: PositionedNode[] = []
+
+  // Returns the height of the block this subtree occupies, starting at `top`.
+  function place(node: MapNode, top: number): number {
+    const children = childrenOf.get(node.id) ?? []
+    let cursor = top
+    children.forEach((child, index) => {
+      cursor += place(child, cursor) + (index < children.length - 1 ? SIBLING_GAP : 0)
     })
+    const childrenHeight = cursor - top
+    const block = Math.max(nodeHeight(node), childrenHeight)
+    const depth = depthOf.get(node.id) ?? 0
+    const positioned: PositionedNode = {
+      ...node,
+      x: columnX[depth],
+      y: top + (block - nodeHeight(node)) / 2,
+      width: nodeWidth(node),
+      height: nodeHeight(node),
+    }
+    positions.set(node.id, positioned)
+    nodes.push(positioned)
+    return block
+  }
 
-    blockTop += block + (index < sessionNodes.length - 1 ? BLOCK_GAP : 0)
+  let blockTop = 0
+  roots.forEach((root, index) => {
+    blockTop += place(root, blockTop) + (index < roots.length - 1 ? BLOCK_GAP : 0)
   })
+
+  // Placement finishes children first. Return nodes in model order, so keyboard focus
+  // follows the order of sessions and then subagents.
+  const modelOrder = new Map(map.nodes.map((node, index) => [node.id, index]))
+  nodes.sort((a, b) => (modelOrder.get(a.id) ?? 0) - (modelOrder.get(b.id) ?? 0))
 
   const edges: PositionedEdge[] = []
   for (const edge of map.edges) {
@@ -109,10 +151,11 @@ export function layoutProjectMap(map: ProjectMap): ProjectLayout {
     })
   }
 
+  const lastColumn = columnWidth.length - 1
   return {
     nodes,
     edges,
-    width: sessionNodes.length === 0 ? 0 : CANVAS_WIDTH,
+    width: roots.length === 0 ? 0 : columnX[lastColumn] + columnWidth[lastColumn],
     height: blockTop,
   }
 }

@@ -10,9 +10,6 @@ vi.mock('node:fs', () => ({
 vi.mock('@/lib/utils/claude-path', () => ({
   getDataSources: vi.fn(),
   getProjectsDirFor: vi.fn((source: DataSource) => path.join(source.claudeDir, 'projects')),
-  decodeProjectDirName: vi.fn((dirName: string) =>
-    dirName.replace(/^-/, '/').replace(/-/g, '/'),
-  ),
 }))
 
 import * as fs from 'node:fs'
@@ -39,7 +36,7 @@ describe('findSessionFile', () => {
     vi.clearAllMocks()
   })
 
-  it('finds session file in primary source via project path match', async () => {
+  it('finds session file in primary source via the project directory key', async () => {
     const primary = makeSource()
     mockGetDataSources.mockResolvedValue([primary])
     mockReaddirSync.mockReturnValue(['-Users-user-myproject'])
@@ -47,7 +44,7 @@ describe('findSessionFile', () => {
       return p === '/home/user/.claude/projects/-Users-user-myproject/session-123.jsonl'
     })
 
-    const result = await findSessionFile('session-123', '/Users/user/myproject')
+    const result = await findSessionFile('session-123', '-Users-user-myproject')
 
     expect(result).toEqual({
       path: '/home/user/.claude/projects/-Users-user-myproject/session-123.jsonl',
@@ -63,7 +60,7 @@ describe('findSessionFile', () => {
       return p === '/home/user/.claude/projects/-Users-user-myproject/session-123.jsonl'
     })
 
-    const result = await findSessionFile('session-123', '/Users/user/nonexistent')
+    const result = await findSessionFile('session-123', 'nonexistent-key')
 
     expect(result).toEqual({
       path: '/home/user/.claude/projects/-Users-user-myproject/session-123.jsonl',

@@ -14,11 +14,13 @@ import type {
   ContextWindowSnapshot,
   ContextWindowData,
 } from './types'
+import * as path from 'node:path'
 import { discoverSubagentFiles } from './subagent-discovery'
+import { HEAD_SCAN_LINES, findForkedFrom, parseRecord } from './session-head'
 import {
   createSessionNameState,
   observeSessionName,
-  observeSummaryLine,
+  observeTitleLine,
   resolveSessionName,
 } from './session-name'
 
@@ -42,6 +44,9 @@ export async function parseSummary(
 ): Promise<SessionSummary | null> {
   const headLines = await readHeadLines(filePath, HEAD_LINES)
   const tailLines = await readTailLines(filePath, TAIL_LINES)
+  // A longer head, for the names and the fork link. Fork records are copied from the
+  // start of the parent, so the first few lines are enough.
+  const scanHeadLines = await readHeadLines(filePath, HEAD_SCAN_LINES)
   const seen = new Set<string>()
   const allLines: string[] = []
   for (const line of [...headLines, ...tailLines]) {
@@ -103,15 +108,15 @@ export async function parseSummary(
   // and end (for the newest summary and stop reason). A stop reason from the head of a
   // long file would be stale, so the tail is the only source for it.
   const nameState = createSessionNameState()
-  for (const line of headLines) {
-    const msg = safeParse(line)
-    if (msg) observeSessionName(nameState, msg)
-  }
+  const scanHeadRecords = scanHeadLines
+    .map(parseRecord)
+    .filter((r): r is RawJsonlMessage => r !== null)
+  for (const msg of scanHeadRecords) observeSessionName(nameState, msg)
   let lastStopReason: string | null = null
   for (const line of tailLines) {
     const msg = safeParse(line)
     if (!msg) continue
-    observeSummaryLine(nameState, msg)
+    observeTitleLine(nameState, msg)
     // Overwritten on every assistant line, so a null stop_reason on the newest line stays null.
     if (msg.type === 'assistant') lastStopReason = msg.message?.stop_reason ?? null
   }
@@ -141,6 +146,9 @@ export async function parseSummary(
     fileSizeBytes,
     sessionName: resolveSessionName(nameState),
     lastStopReason,
+    // The directory name is an internal key only. The path comes from the records' cwd.
+    projectKey: path.basename(path.dirname(filePath)),
+    forkedFrom: findForkedFrom(scanHeadRecords),
   }
 }
 
@@ -977,17 +985,24 @@ function extractToolResultText(block: {
   return undefined
 }
 
+export interface FullScanResult {
+  /** Total output tokens from assistant messages. */
+  outputTokens: number
+  /** The newest `custom-title` in the whole file, or null. Found anywhere, not just at the ends. */
+  customTitle: string | null
+}
+
 /**
- * Lightweight streaming counter that extracts only output tokens from a session JSONL.
+ * One streaming pass over the whole session file, for the two values the head and tail
+ * reads cannot give: output tokens, and the newest `custom-title` (a /rename can land in
+ * the middle of a long file).
  *
- * Counts only `assistant` message `usage.output_tokens`. Progress messages are
- * excluded to prevent double-counting subagent API calls.
- *
- * Deduplicates by `requestId` to avoid double-counting repeated API responses.
- * Much cheaper than `parseDetail()` -- no turn/tool/agent tracking.
+ * Output tokens: assistant `usage.output_tokens` only. Progress messages are excluded to
+ * prevent double-counting subagent API calls. Deduplicated by `requestId`.
  */
-export async function parseOutputTokens(filePath: string): Promise<number> {
-  let total = 0
+export async function parseFullScan(filePath: string): Promise<FullScanResult> {
+  let outputTokens = 0
+  let customTitle: string | null = null
   const seenRequestIds = new Set<string>()
 
   const stream = fs.createReadStream(filePath, { encoding: 'utf-8' })
@@ -997,19 +1012,25 @@ export async function parseOutputTokens(filePath: string): Promise<number> {
     const msg = safeParse(line)
     if (!msg) continue
 
+    if (msg.type === 'custom-title' && typeof msg.customTitle === 'string' && msg.customTitle.trim()) {
+      customTitle = msg.customTitle
+    }
+
     const requestId = msg.requestId
     if (requestId && seenRequestIds.has(requestId)) continue
     if (requestId) seenRequestIds.add(requestId)
 
-    // Only count direct assistant message output tokens.
-    // Progress messages are intentionally excluded to avoid double-counting
-    // subagent API calls that also appear in their own session JSONL files.
     if (msg.type === 'assistant' && msg.message?.usage?.output_tokens) {
-      total += msg.message.usage.output_tokens
+      outputTokens += msg.message.usage.output_tokens
     }
   }
 
-  return total
+  return { outputTokens, customTitle }
+}
+
+/** Output tokens only. See parseFullScan. */
+export async function parseOutputTokens(filePath: string): Promise<number> {
+  return (await parseFullScan(filePath)).outputTokens
 }
 
 function extractTextContent(msg: RawJsonlMessage): string | undefined {

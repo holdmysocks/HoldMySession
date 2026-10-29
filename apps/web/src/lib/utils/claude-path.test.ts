@@ -4,8 +4,7 @@ import * as path from 'node:path'
 
 // Pure functions can be imported directly
 import {
-  decodeProjectDirName,
-  extractProjectName,
+  projectNameFromPath,
   extractSessionId,
   getProjectsDirFor,
   getStatsPathFor,
@@ -58,6 +57,30 @@ describe('claude-path', () => {
       vi.resetModules()
       const { getClaudeDir } = await import('./claude-path')
       expect(getClaudeDir()).toBe('/custom/claude/dir')
+    })
+
+    it('prefers CLAUDE_CONFIG_DIR over CLAUDE_HOME', async () => {
+      vi.stubEnv('CLAUDE_CONFIG_DIR', '/from/config-dir')
+      vi.stubEnv('CLAUDE_HOME', '/from/claude-home')
+      vi.resetModules()
+      const { getClaudeDir } = await import('./claude-path')
+      expect(getClaudeDir()).toBe('/from/config-dir')
+    })
+
+    it('uses CLAUDE_HOME when CLAUDE_CONFIG_DIR is unset or empty', async () => {
+      vi.stubEnv('CLAUDE_CONFIG_DIR', '')
+      vi.stubEnv('CLAUDE_HOME', '/from/claude-home')
+      vi.resetModules()
+      const { getClaudeDir } = await import('./claude-path')
+      expect(getClaudeDir()).toBe('/from/claude-home')
+    })
+
+    it('uses CLAUDE_CONFIG_DIR alone', async () => {
+      vi.stubEnv('CLAUDE_CONFIG_DIR', '/only/config')
+      vi.stubEnv('CLAUDE_HOME', '')
+      vi.resetModules()
+      const { getClaudeDir } = await import('./claude-path')
+      expect(getClaudeDir()).toBe('/only/config')
     })
 
     it('resolves relative CLAUDE_HOME to absolute path', async () => {
@@ -119,75 +142,33 @@ describe('claude-path', () => {
     })
   })
 
-  describe('decodeProjectDirName', () => {
-    it('decodes leading dash to slash', () => {
-      expect(decodeProjectDirName('-Users-username-project')).toBe('/Users/username/project')
+  describe('projectNameFromPath', () => {
+    it('returns the last segment of a POSIX path', () => {
+      expect(projectNameFromPath('/home/user/work/rusty-mcla')).toBe('rusty-mcla')
     })
 
-    it('decodes a typical encoded project directory name', () => {
-      expect(decodeProjectDirName('-Users-alice-Documents-GitHub-myproject')).toBe(
-        '/Users/alice/Documents/GitHub/myproject'
-      )
+    it('handles a Windows drive path, even when read on another OS', () => {
+      expect(projectNameFromPath('D:\\MCLA')).toBe('MCLA')
+      expect(projectNameFromPath('C:\\Users\\me\\Dev\\rusty-mcla')).toBe('rusty-mcla')
     })
 
-    it('handles a single segment path (no intermediate dashes)', () => {
-      expect(decodeProjectDirName('-project')).toBe('/project')
+    it('handles a UNC path', () => {
+      expect(projectNameFromPath('\\\\server\\share\\proj')).toBe('proj')
     })
 
-    it('converts all dashes to slashes after leading dash is replaced', () => {
-      const result = decodeProjectDirName('-a-b-c-d')
-      expect(result).toBe('/a/b/c/d')
+    it('keeps hyphens and dots in the folder name', () => {
+      expect(projectNameFromPath('/work/my-cool-app')).toBe('my-cool-app')
+      expect(projectNameFromPath('/work/app.v2')).toBe('app.v2')
     })
 
-    it('handles a path with no dashes (returns string unchanged if no leading dash)', () => {
-      // No leading dash means no replacement of leading char
-      const result = decodeProjectDirName('nodash')
-      expect(result).toBe('nodash')
+    it('ignores trailing separators', () => {
+      expect(projectNameFromPath('/work/app/')).toBe('app')
+      expect(projectNameFromPath('D:\\MCLA\\')).toBe('MCLA')
     })
 
-    it('handles deep nested paths', () => {
-      expect(decodeProjectDirName('-home-user-work-clients-acme-frontend')).toBe(
-        '/home/user/work/clients/acme/frontend'
-      )
-    })
-
-    it('decodes Windows C: drive letter paths', () => {
-      expect(decodeProjectDirName('-C-Users-user-project')).toBe('C:/Users/user/project')
-    })
-
-    it('decodes Windows D: drive letter paths', () => {
-      expect(decodeProjectDirName('-D-Projects-myapp')).toBe('D:/Projects/myapp')
-    })
-
-    it('does not treat lowercase single-letter top-level dirs as Windows drives', () => {
-      expect(decodeProjectDirName('-a-b-c')).toBe('/a/b/c')
-    })
-
-    it('does not treat multi-letter top-level dirs as Windows drives', () => {
-      expect(decodeProjectDirName('-home-user-code')).toBe('/home/user/code')
-    })
-  })
-
-  describe('extractProjectName', () => {
-    it('extracts last segment from a decoded path', () => {
-      expect(extractProjectName('/Users/username/Documents/GitHub/myproject')).toBe('myproject')
-    })
-
-    it('handles a short decoded path', () => {
-      expect(extractProjectName('/project')).toBe('project')
-    })
-
-    it('handles paths with various depth levels', () => {
-      expect(extractProjectName('/a/b/c/d/e')).toBe('e')
-    })
-
-    it('returns the name portion from a typical GitHub project path', () => {
-      expect(extractProjectName('/Users/alice/work/repos/dashboard')).toBe('dashboard')
-    })
-
-    it('handles root path by returning empty string', () => {
-      // path.basename('/') returns ''
-      expect(extractProjectName('/')).toBe('')
+    it('returns an empty string for a root path', () => {
+      expect(projectNameFromPath('/')).toBe('')
+      expect(projectNameFromPath('')).toBe('')
     })
   })
 

@@ -4,8 +4,9 @@ import { getProjectsDir, getProjectsDirFor, getDataSources, extractSessionId } f
 import type { DataSource } from '../utils/claude-path'
 import { scanProjects, scanProjectsFrom } from './project-scanner'
 import { isSessionActive } from './active-detector'
-import { parseSummary, parseOutputTokens } from '../parsers/session-parser'
+import { parseSummary, parseFullScan } from '../parsers/session-parser'
 import type { SessionSummary } from '../parsers/types'
+import { truncateSessionName } from '../parsers/session-name'
 import { resolveProjectDisplayName } from './project-display-name'
 
 /** Extended summary that includes the absolute JSONL file path (server-side only). */
@@ -20,6 +21,17 @@ const summaryCache = new Map<
 >()
 
 /**
+ * Fill the values that need the whole file: output tokens, and the newest custom-title,
+ * which can sit anywhere in the file. Called only when a file is parsed (not on cache hits).
+ */
+async function applyFullScan(summary: SessionSummary, filePath: string): Promise<void> {
+  const full = await parseFullScan(filePath).catch(() => null)
+  summary.outputTokens = full?.outputTokens
+  const customName = truncateSessionName(full?.customTitle ?? null)
+  if (customName) summary.sessionName = customName
+}
+
+/**
  * Internal scanning logic that returns summaries with their file paths.
  * Used by both public APIs below.
  */
@@ -28,7 +40,7 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
   const summaries: SessionSummaryWithPath[] = []
 
   for (const project of projects) {
-    const projectDisplayName = await resolveProjectDisplayName(project.decodedPath, project.projectName)
+    const projectDisplayName = await resolveProjectDisplayName(project.projectPath, project.projectName)
     for (const file of project.sessionFiles) {
       const sessionId = extractSessionId(file)
       const filePath = path.join(
@@ -53,7 +65,7 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
       const summary = await parseSummary(
         filePath,
         sessionId,
-        project.decodedPath,
+        project.projectPath,
         project.projectName,
         projectDisplayName,
         stat.size,
@@ -62,7 +74,7 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
       if (summary) {
         const active = await isSessionActive(project.dirName, sessionId)
         summary.isActive = active
-        summary.outputTokens = await parseOutputTokens(filePath).catch(() => undefined)
+        await applyFullScan(summary, filePath)
 
         summaryCache.set(sessionId, {
           mtimeMs: stat.mtimeMs,
@@ -109,7 +121,7 @@ export async function scanSessionsFromSource(source: DataSource): Promise<Sessio
   const projectsDirOverride = source.id !== 'primary' ? getProjectsDirFor(source) : undefined
 
   for (const project of projects) {
-    const projectDisplayName = await resolveProjectDisplayName(project.decodedPath, project.projectName)
+    const projectDisplayName = await resolveProjectDisplayName(project.projectPath, project.projectName)
     for (const file of project.sessionFiles) {
       const sessionId = extractSessionId(file)
       const projectsDir = source.id === 'primary' ? getProjectsDir() : getProjectsDirFor(source)
@@ -135,7 +147,7 @@ export async function scanSessionsFromSource(source: DataSource): Promise<Sessio
       const summary = await parseSummary(
         filePath,
         sessionId,
-        project.decodedPath,
+        project.projectPath,
         project.projectName,
         projectDisplayName,
         stat.size,
@@ -144,7 +156,7 @@ export async function scanSessionsFromSource(source: DataSource): Promise<Sessio
       if (summary) {
         const active = await isSessionActive(project.dirName, sessionId, projectsDirOverride)
         summary.isActive = active
-        summary.outputTokens = await parseOutputTokens(filePath).catch(() => undefined)
+        await applyFullScan(summary, filePath)
         summary.sourceId = source.id
         summary.sourceLabel = source.label
         summary.sourcePlatform = source.platform

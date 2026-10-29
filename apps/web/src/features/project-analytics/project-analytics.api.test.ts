@@ -8,6 +8,8 @@ describe('project-analytics', () => {
   ): SessionSummary => ({
     sessionId: `session-${Math.random()}`,
     projectPath: '/path/to/project',
+    projectKey: 'app',
+    forkedFrom: null,
     projectName: 'test-project',
     branch: 'main',
     cwd: '/path/to/project',

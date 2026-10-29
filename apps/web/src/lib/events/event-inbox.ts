@@ -14,6 +14,10 @@ export const HookEventSchema = z.object({
   sessionId: z.string(),
   cwd: z.string().nullable().optional(),
   message: z.string().nullable().optional(),
+  /** Notification only: permission_prompt, idle_prompt, elicitation_dialog, and so on. */
+  notificationType: z.string().nullable().optional(),
+  /** Notification only, optional in Claude Code's hook input. */
+  title: z.string().nullable().optional(),
 })
 
 export type HookEvent = z.infer<typeof HookEventSchema>

@@ -40,7 +40,7 @@ Options:
   -p, --port <number>   Port to listen on (default: 3000)
   --host <hostname>     Host to bind to (default: localhost)
   -o, --open            Open browser after starting
-  --print-hook-config   Print a ~/.claude/settings.json hooks snippet (Notification and Stop)
+  --print-hook-config   Print a settings.json hooks snippet (Notification and Stop)
                         for the Session Map. Prints only; never writes files.
   -v, --version         Show version number
   -h, --help            Show this help message
@@ -57,7 +57,7 @@ if (hasFlag('print-hook-config')) {
   const hookScript = resolve(__dirname, 'claude-dashboard-hook.mjs');
   const command = hookScript.includes(' ') ? `node "${hookScript}"` : `node ${hookScript}`;
   const hook = { hooks: [{ type: 'command', command }] };
-  console.error('Add the "hooks" block below to ~/.claude/settings.json (merge it with any existing "hooks").');
+  console.error('Add the "hooks" block below to settings.json in your Claude config directory (merge it with any existing "hooks").');
   console.log(JSON.stringify({ hooks: { Notification: [hook], Stop: [hook] } }, null, 2));
   process.exit(0);
 }
@@ -68,11 +68,12 @@ const shouldOpen = hasFlag('open', 'o');
 
 // --- Pre-flight checks ---
 
-const claudeDir = join(homedir(), '.claude');
+// Same precedence as src/lib/utils/claude-path.ts: CLAUDE_CONFIG_DIR, then CLAUDE_HOME, then ~/.claude.
+const claudeDir = process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDE_HOME || join(homedir(), '.claude');
 try {
   await access(claudeDir);
 } catch {
-  console.warn(`\nWarning: ~/.claude directory not found. The dashboard may not show any sessions.\n`);
+  console.warn(`\nWarning: Claude directory not found at ${claudeDir}. The dashboard may not show any sessions.\n`);
 }
 
 try {
@@ -205,7 +206,7 @@ server.listen(port, host, () => {
   console.log(`
   Claude Session Dashboard v${pkg.version}
   Running at ${url}
-  Reading sessions from ~/.claude
+  Reading sessions from ${claudeDir}
 
   Press Ctrl+C to stop
 `);

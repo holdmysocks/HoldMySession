@@ -4,8 +4,8 @@ import * as path from 'node:path'
 /**
  * Human name for a project, read-only from the user's own project directory:
  *   1. `name` in package.json, if it is a non-empty string
- *   2. the repo name from the `origin` remote in .git/config
- *   3. the folder name
+ *   2. the repo name from the `origin` remote in the git config (a `.git` folder or file)
+ *   3. the folder name (the last segment of the working directory)
  *
  * Results are cached by path for the life of the server process. Nothing is written.
  */
@@ -29,8 +29,8 @@ export function clearProjectDisplayNameCache(): void {
 }
 
 async function lookUpDisplayName(projectPath: string, folderName: string): Promise<string> {
-  // Decoded paths on another OS (e.g. "D:/x" read on Linux) are relative and would
-  // resolve against the server's working directory. Skip the lookup for those.
+  // A Windows path read on Linux (e.g. "D:\\x") is not absolute here. Skip the lookup, or
+  // it would resolve against the server's working directory.
   if (!path.isAbsolute(projectPath)) return folderName
 
   return (
@@ -54,15 +54,46 @@ async function readPackageName(projectPath: string): Promise<string | null> {
 }
 
 async function readGitRemoteRepoName(projectPath: string): Promise<string | null> {
-  // A .git file (worktrees, submodules) points elsewhere. It is not followed here.
-  let config: string
-  try {
-    config = await fs.readFile(path.join(projectPath, '.git', 'config'), 'utf8')
-  } catch {
-    return null
-  }
-  const url = originUrl(config)
+  const gitDir = await resolveGitDir(projectPath)
+  if (!gitDir) return null
+
+  const config = await readRepoConfig(gitDir)
+  const url = config ? originUrl(config) : null
   return url ? repoNameFromUrl(url) : null
+}
+
+/**
+ * The git directory for a checkout. A `.git` folder is used as is. A `.git` file holds
+ * "gitdir: <path>" (worktrees and submodules); a relative path is relative to the folder
+ * that holds the file. Nothing is written.
+ */
+async function resolveGitDir(projectPath: string): Promise<string | null> {
+  const dotGit = path.join(projectPath, '.git')
+  const stat = await fs.stat(dotGit).catch(() => null)
+  if (!stat) return null
+  if (stat.isDirectory()) return dotGit
+
+  const text = await fs.readFile(dotGit, 'utf8').catch(() => null)
+  const match = text?.match(/^gitdir:\s*(.+?)\s*$/m)
+  if (!match) return null
+  const target = match[1]
+  return path.isAbsolute(target) ? target : path.resolve(projectPath, target)
+}
+
+/**
+ * The config to read for a git directory. A linked worktree has its own git directory
+ * with a `commondir` file that points at the main repository's directory, where the
+ * remotes live.
+ */
+async function readRepoConfig(gitDir: string): Promise<string | null> {
+  const own = await fs.readFile(path.join(gitDir, 'config'), 'utf8').catch(() => null)
+  if (own !== null) return own
+
+  const commonDir = await fs.readFile(path.join(gitDir, 'commondir'), 'utf8').catch(() => null)
+  if (commonDir === null) return null
+  const target = commonDir.trim()
+  const common = path.isAbsolute(target) ? target : path.resolve(gitDir, target)
+  return fs.readFile(path.join(common, 'config'), 'utf8').catch(() => null)
 }
 
 /** The `url` value under `[remote "origin"]`, or null. */
