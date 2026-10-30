@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test'
 
 test.describe('Navigation', () => {
-  test('Given the app is loaded, When I visit the root URL, Then I am redirected to /sessions', async ({
+  test('Given the app is loaded, When I visit the root URL, Then I am redirected to /stats', async ({
     page,
   }) => {
     await page.goto('/')
-    await expect(page).toHaveURL(/\/sessions/)
+    await expect(page).toHaveURL(/\/stats/)
   })
 
   test('Given I am on sessions, When I click "Stats", Then I see the Stats page', async ({
@@ -34,11 +34,10 @@ test.describe('Navigation', () => {
     })
   })
 
-  test('Given I am on any page, Then the sidebar shows "Claude Dashboard" branding', async ({
+  test('Given I am on any page, Then the sidebar shows "HoldMySession" branding', async ({
     page,
   }) => {
     await page.goto('/sessions')
-    await expect(page.locator('aside')).toContainText('Claude')
-    await expect(page.locator('aside')).toContainText('Dashboard')
+    await expect(page.locator('aside')).toContainText('HoldMySession')
   })
 })

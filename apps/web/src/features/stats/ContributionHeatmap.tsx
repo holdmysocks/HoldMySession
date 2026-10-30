@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { format, addDays, getDay, parseISO } from 'date-fns'
 import type { DailyActivity, DailyModelTokens } from '@/lib/parsers/types'
 import { formatTokenCount } from '@/lib/utils/format'
+import { activityFlavor, flavorReserve } from './activity-flavor'
 
 const INTENSITY_COLORS = [
   'var(--color-gray-800)', // Level 0: warm gray-800 (no activity)
@@ -87,6 +88,8 @@ export function ContributionHeatmap({
   const [tooltip, setTooltip] = useState<TooltipData | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const [gridWidth, setGridWidth] = useState(0)
+  // Picked once per page load, so the line changes on refresh.
+  const [flavorSeed] = useState(() => Math.random())
 
   // Squares grow to fill the card when there are few weeks, and shrink to a year's worth as it fills.
   useEffect(() => {
@@ -186,12 +189,20 @@ export function ContributionHeatmap({
       }
     }
 
+    // A label for the first, partial week would run into the next month's label, so it is dropped when they are close.
+    if (labels.length > 1 && labels[1].weekIndex - labels[0].weekIndex < 3) labels.shift()
+
     return { days: allDays, monthLabels: labels }
   }, [dailyActivity, dailyModelTokens])
 
   const weeks = days.length > 0 ? days[days.length - 1].weekIndex + 1 : 1
-  const fit = Math.floor((gridWidth - DAY_LABEL_WIDTH - (weeks - 1) * CELL_GAP) / weeks)
+  const reserve = flavorReserve(weeks, gridWidth)
+  const fit = Math.floor((gridWidth - DAY_LABEL_WIDTH - reserve - (weeks - 1) * CELL_GAP) / weeks)
   const CELL_SIZE = gridWidth > 0 ? Math.min(MAX_CELL, Math.max(MIN_CELL, fit)) : MIN_CELL
+
+  const textLeft = DAY_LABEL_WIDTH + weeks * (CELL_SIZE + CELL_GAP) + 20
+  const textWidth = gridWidth - textLeft
+  const flavor = reserve > 0 && textWidth >= 80 ? activityFlavor(weeks, flavorSeed) : null
 
   if (days.length === 0) {
     return (
@@ -211,6 +222,15 @@ export function ContributionHeatmap({
 
       <div className="mt-4 overflow-x-auto">
         <div ref={gridRef} className="relative w-full">
+          {flavor && (
+            <p
+              data-flavor
+              className="absolute text-sm italic leading-relaxed text-gray-500"
+              style={{ left: textLeft, width: textWidth, top: 18 + 2, height: 7 * CELL_SIZE + 6 * CELL_GAP }}
+            >
+              <span className="flex h-full items-center">{flavor}</span>
+            </p>
+          )}
           {/* Grid container with day labels */}
           <div className="flex">
             {/* Day labels column (spacer for month row + labels for grid rows) */}

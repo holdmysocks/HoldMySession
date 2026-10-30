@@ -88,10 +88,10 @@ if ($MyInvocation.InvocationName -ne '.') {
     }
     Invoke-Checked "Building" { npm run build }
 
-    $url = "http://localhost:$Port/map"
+    $url = "http://localhost:$Port/"
     Write-Host "==> Starting dashboard at $url (Ctrl+C to stop)" -ForegroundColor Green
 
-    # Open the Map page once the server has had a moment to start.
+    # Open the dashboard once the server has had a moment to start.
     Start-Job -ScriptBlock {
         param($u)
         Start-Sleep -Seconds 4

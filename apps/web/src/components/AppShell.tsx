@@ -1,6 +1,6 @@
 import { Link, useMatches } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
+import { useSyncExternalStore, type ReactNode } from 'react'
 import { ActiveSessionsBadge } from '@/features/sessions/ActiveSessionsBadge'
 import { appInfoQuery } from '@/features/settings/app-info.queries'
 
@@ -51,20 +51,64 @@ const NAV_ITEMS = [
   },
 ] as const
 
+const COLLAPSE_KEY = 'sidebar-collapsed'
+const COLLAPSE_EVENT = 'sidebar-collapsed-change'
+
+function subscribeCollapsed(onChange: () => void) {
+  window.addEventListener(COLLAPSE_EVENT, onChange)
+  window.addEventListener('storage', onChange)
+  return () => {
+    window.removeEventListener(COLLAPSE_EVENT, onChange)
+    window.removeEventListener('storage', onChange)
+  }
+}
+
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(COLLAPSE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function toggleCollapsed() {
+  try {
+    localStorage.setItem(COLLAPSE_KEY, readCollapsed() ? '0' : '1')
+  } catch {
+    // Not remembered, which is fine.
+  }
+  window.dispatchEvent(new Event(COLLAPSE_EVENT))
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const matches = useMatches()
   const currentPath = matches[matches.length - 1]?.pathname ?? ''
   const wide = currentPath.startsWith('/map')
   const { data: appInfo } = useQuery(appInfoQuery)
+  const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false)
 
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
-      <aside className="flex w-56 shrink-0 flex-col border-r border-gray-800 bg-gray-950">
-        <div className="flex h-14 items-center border-b border-gray-800 px-4">
-          <Link to="/sessions" className="text-sm font-bold text-gray-100">
-            <span className="text-brand-500">Claude</span> Dashboard
-          </Link>
+      <aside className={`flex ${collapsed ? 'w-16' : 'w-60'} shrink-0 flex-col border-r border-gray-800 bg-gray-950`}>
+        <div className={`flex h-16 items-center border-b border-gray-800 ${collapsed ? 'justify-center' : 'justify-between pl-4 pr-2'}`}>
+          {!collapsed && (
+            <Link to="/stats" className="text-lg font-bold text-gray-100" title="Go to Stats">
+              HoldMy<span className="text-brand-500">Session</span>
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-900 hover:text-gray-200"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
+              <line x1="6" y1="2.5" x2="6" y2="13.5" />
+            </svg>
+          </button>
         </div>
 
         <nav className="flex-1 p-3">
@@ -74,7 +118,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
+                title={collapsed ? item.label : undefined}
+                className={`flex items-center ${collapsed ? 'justify-center' : 'gap-2.5'} rounded-lg px-3 py-2 text-sm transition-colors ${
                   isActive
                     ? 'bg-gray-800 text-gray-100'
                     : 'text-gray-400 hover:bg-gray-900 hover:text-gray-200'
@@ -83,14 +128,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <span className="text-gray-500">
                   {item.icon}
                 </span>
-                {item.label}
-                {item.to === '/sessions' && <ActiveSessionsBadge />}
+                {!collapsed && item.label}
+                {!collapsed && item.to === '/sessions' && <ActiveSessionsBadge />}
               </Link>
             )
           })}
         </nav>
 
-        <div className="border-t border-gray-800 p-3 space-y-3">
+        {!collapsed && <div className="border-t border-gray-800 p-3 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <a
@@ -126,7 +171,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               v{appInfo.version} · {appInfo.appPath}
             </p>
           )}
-        </div>
+        </div>}
       </aside>
 
       {/* Main content */}
