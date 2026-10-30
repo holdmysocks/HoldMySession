@@ -12,6 +12,8 @@ interface StatsOverviewProps {
   stats: StatsCache | null | undefined
   isLoading: boolean
   cost: { totalUSD: number } | null
+  /** Shown under the cost: what the subscription cost against API prices. Overall stats only. */
+  costNote?: string | null
   totalDurationMs: number
   /** The last card of the first row. The overall overview shows the project count there. */
   fourthCard: { label: string; value: string }
@@ -27,6 +29,7 @@ export function StatsOverview({
   stats,
   isLoading,
   cost,
+  costNote,
   totalDurationMs,
   fourthCard,
   emptyMessage,
@@ -92,6 +95,7 @@ export function StatsOverview({
         <StatCard
           label="Estimated Cost"
           value={cost ? `~${formatUSD(cost.totalUSD)}` : 'N/A'}
+          sub={costNote ?? undefined}
         />
         <StatCard
           label="Tool Calls"

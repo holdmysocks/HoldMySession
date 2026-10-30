@@ -141,6 +141,17 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX price_entries_model ON price_entries (model_id);
   `,
+  // 5: the plan paid for, as dated rows. A plan lasts until the next one starts.
+  `
+  CREATE TABLE subscription_periods (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tier TEXT NOT NULL,
+    monthly_usd REAL NOT NULL CHECK (monthly_usd >= 0),
+    start_day TEXT NOT NULL,
+    note TEXT,
+    created_at TEXT NOT NULL
+  );
+  `,
 ]
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length

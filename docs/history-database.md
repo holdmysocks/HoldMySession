@@ -41,6 +41,12 @@ A model's base price is the built-in one with the user's override from Settings.
 
 Cost is worked out when read, from the stored tokens and the price in force on each day (`src/lib/history/history-cost.ts`), so a backdated entry or a deleted one changes the past immediately and nothing needs recalculating. Stats' Estimated Cost, overall and per project, uses it, and falls back to today's prices if the history cannot be used. A session's own cost on its detail page still uses today's prices. Settings has a Price history panel to see a model's price over time, add entries and delete them.
 
+## Subscription
+
+The plan paid for is kept as dated periods in `subscription_periods`: a plan, its price per month, and the day it starts. A period lasts until the next one starts. Settings has a Subscription card to add and delete them, which replaces the old tier picker. The `subscriptionTier` field in `settings.json` is kept only so older files still load.
+
+`summarizeSubscription` (`src/lib/pricing/subscription.ts`) compares the cost of the plan with the cost of the same usage at API prices, from the day the first plan starts to today, using the day-by-day prices. Each day of a plan costs its monthly price divided by the days in that month, so a part month is paid for in part. Usage before the first plan is left out of both sides. API Only pays the API cost, so it saves nothing. The Subscription card shows the saving or the extra cost, with a month-by-month table, and the Stats cost card shows one line under Estimated Cost. The plan belongs to the account, so the per-project overview does not show it.
+
 ## Planned
 
 Build order from here. Each step is its own commit.
@@ -49,7 +55,7 @@ Build order from here. Each step is its own commit.
 2. **Keys that include the machine (done).** A migration makes `machine_id` part of the keys of `sessions` and `usage_daily`, so rows from two machines can never collide. Done before anything else is stored, while there is only one machine's data.
 3. **Stats read from the database (done).** See below.
 4. **Dated pricing (done).** See below.
-5. **Subscription history.** Tier, monthly price and start date as dated rows (Pro $20, then Max 20x $200 from October 10 as the first test case), the savings against API cost, a monthly view, and a second number on the cost card.
+5. **Subscription history (done).** See below.
 6. **Automatic scan.** On or off, every 5, 10, 15, 30 min, or 1, 2, 6, 12, 24 h, run by a server-side timer so it works with no tab open.
 7. **Backup and restore** of the database from Settings.
 8. **Linked machines**, below.

@@ -1,3 +1,4 @@
+import { formatUSD } from '@/lib/utils/format'
 import { useMemo } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
@@ -21,6 +22,8 @@ import {
 import { ExportDropdown } from '@/components/ExportDropdown'
 import { useSessionCost } from '@/features/cost-estimation/useSessionCost'
 import { historyCostQuery } from '@/features/history/price-history.queries'
+import { subscriptionQuery } from '@/features/history/subscription.queries'
+import { savingsText } from '@/lib/pricing/subscription'
 import type { StatsCache } from '@/lib/parsers/types'
 
 const statsSearchSchema = z.object({
@@ -75,6 +78,8 @@ function StatsPage() {
   // Priced day by day from the history database when it can be, else all at today's prices.
   const { data: datedCost } = useQuery(historyCostQuery())
   const cost = datedCost ?? sessionCost
+  const { data: subscription } = useQuery(subscriptionQuery)
+  const costNote = subscription ? savingsText(subscription.summary, formatUSD) : null
 
   // Projects the by-project tab can show: real projects first, the unlinked group last.
   const projects = useMemo(() => {
@@ -134,6 +139,7 @@ function StatsPage() {
           stats={stats}
           isLoading={isLoading}
           cost={cost}
+          costNote={costNote}
           totalDurationMs={projects.reduce((sum, p) => sum + p.totalDurationMs, 0)}
           fourthCard={{ label: 'Projects', value: String(linkedProjectCount) }}
           emptyMessage="No stats data found. Check ~/.claude/stats-cache.json"

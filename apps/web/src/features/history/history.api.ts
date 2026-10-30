@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import type { PriceEntry } from '@/lib/pricing/price-timeline'
 import type { HistoryCost } from '@/lib/history/history-cost'
+import type { SubscriptionPeriod, SubscriptionSummary } from '@/lib/pricing/subscription'
 
 export interface HistoryStatus {
   path: string
@@ -135,6 +136,63 @@ export const getHistoryCost = createServerFn({ method: 'GET' })
     const db = openHistoryDb()
     try {
       return historyCost(db, getMergedPricing(await getSettings()), { projectPath: data.projectPath })
+    } finally {
+      db.close()
+    }
+  })
+
+export interface SubscriptionData {
+  periods: SubscriptionPeriod[]
+  summary: SubscriptionSummary
+}
+
+export const getSubscription = createServerFn({ method: 'GET' }).handler(async (): Promise<SubscriptionData> => {
+  const { openHistoryDb } = await import('@/lib/history/history-db')
+  const { historyCost } = await import('@/lib/history/history-cost')
+  const { listSubscriptionPeriods } = await import('@/lib/history/subscription-store')
+  const { summarizeSubscription } = await import('@/lib/pricing/subscription')
+  const { localDay } = await import('@/lib/history/day-allocation')
+  const { getSettings } = await import('@/features/settings/settings.api')
+  const { getMergedPricing } = await import('@/features/cost-estimation/cost-calculator')
+  const db = openHistoryDb()
+  try {
+    const periods = listSubscriptionPeriods(db)
+    const cost = historyCost(db, getMergedPricing(await getSettings()))
+    const today = localDay(new Date().toISOString()) ?? new Date().toISOString().slice(0, 10)
+    return { periods, summary: summarizeSubscription(periods, cost?.byDay ?? {}, today) }
+  } finally {
+    db.close()
+  }
+})
+
+const newPeriodSchema = z.object({
+  tier: z.string().min(1),
+  monthlyUSD: z.number(),
+  startDay: z.string(),
+  note: z.string().max(200).nullable(),
+})
+
+export const createSubscriptionPeriod = createServerFn({ method: 'POST' })
+  .inputValidator((input: unknown) => newPeriodSchema.parse(input))
+  .handler(async ({ data }): Promise<SubscriptionPeriod> => {
+    const { openHistoryDb } = await import('@/lib/history/history-db')
+    const { addSubscriptionPeriod } = await import('@/lib/history/subscription-store')
+    const db = openHistoryDb()
+    try {
+      return addSubscriptionPeriod(db, data)
+    } finally {
+      db.close()
+    }
+  })
+
+export const removeSubscriptionPeriod = createServerFn({ method: 'POST' })
+  .inputValidator((input: unknown) => z.object({ id: z.number().int() }).parse(input))
+  .handler(async ({ data }): Promise<boolean> => {
+    const { openHistoryDb } = await import('@/lib/history/history-db')
+    const { deleteSubscriptionPeriod } = await import('@/lib/history/subscription-store')
+    const db = openHistoryDb()
+    try {
+      return deleteSubscriptionPeriod(db, data.id)
     } finally {
       db.close()
     }

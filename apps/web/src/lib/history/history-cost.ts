@@ -13,6 +13,8 @@ export interface HistoryCost {
   byModel: Record<string, number>
   /** yyyy-MM to USD */
   byMonth: Record<string, number>
+  /** yyyy-MM-dd to USD */
+  byDay: Record<string, number>
 }
 
 /**
@@ -32,7 +34,7 @@ export function historyCost(
   const byModelId = new Map<string, PriceEntry[]>()
   for (const entry of entries) byModelId.set(entry.modelId, [...(byModelId.get(entry.modelId) ?? []), entry])
 
-  const result: HistoryCost = { totalUSD: 0, byModel: {}, byMonth: {} }
+  const result: HistoryCost = { totalUSD: 0, byModel: {}, byMonth: {}, byDay: {} }
   const rows = db
     .prepare(
       `SELECT machine_id, session_key, day, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens
@@ -59,6 +61,7 @@ export function historyCost(
     result.byModel[modelId] = (result.byModel[modelId] ?? 0) + cost
     const month = day.slice(0, 7)
     result.byMonth[month] = (result.byMonth[month] ?? 0) + cost
+    result.byDay[day] = (result.byDay[day] ?? 0) + cost
   }
   return result
 }
