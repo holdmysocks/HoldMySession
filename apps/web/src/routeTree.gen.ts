@@ -17,7 +17,9 @@ import { Route as DashboardStatsRouteImport } from './routes/_dashboard/stats'
 import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
 import { Route as DashboardMapRouteImport } from './routes/_dashboard/map'
 import { Route as DashboardSessionsIndexRouteImport } from './routes/_dashboard/sessions/index'
+import { Route as ApiLinkRespondRouteImport } from './routes/api.link.respond'
 import { Route as ApiLinkPushRouteImport } from './routes/api.link.push'
+import { Route as ApiLinkPollRouteImport } from './routes/api.link.poll'
 import { Route as ApiLinkPingRouteImport } from './routes/api.link.ping'
 import { Route as DashboardSessionsSessionIdRouteImport } from './routes/_dashboard/sessions/$sessionId'
 
@@ -60,9 +62,19 @@ const DashboardSessionsIndexRoute = DashboardSessionsIndexRouteImport.update({
   path: '/sessions/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const ApiLinkRespondRoute = ApiLinkRespondRouteImport.update({
+  id: '/api/link/respond',
+  path: '/api/link/respond',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiLinkPushRoute = ApiLinkPushRouteImport.update({
   id: '/api/link/push',
   path: '/api/link/push',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLinkPollRoute = ApiLinkPollRouteImport.update({
+  id: '/api/link/poll',
+  path: '/api/link/poll',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiLinkPingRoute = ApiLinkPingRouteImport.update({
@@ -86,7 +98,9 @@ export interface FileRoutesByFullPath {
   '/api/history-restore': typeof ApiHistoryRestoreRoute
   '/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
   '/api/link/ping': typeof ApiLinkPingRoute
+  '/api/link/poll': typeof ApiLinkPollRoute
   '/api/link/push': typeof ApiLinkPushRoute
+  '/api/link/respond': typeof ApiLinkRespondRoute
   '/sessions/': typeof DashboardSessionsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -98,7 +112,9 @@ export interface FileRoutesByTo {
   '/api/history-restore': typeof ApiHistoryRestoreRoute
   '/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
   '/api/link/ping': typeof ApiLinkPingRoute
+  '/api/link/poll': typeof ApiLinkPollRoute
   '/api/link/push': typeof ApiLinkPushRoute
+  '/api/link/respond': typeof ApiLinkRespondRoute
   '/sessions': typeof DashboardSessionsIndexRoute
 }
 export interface FileRoutesById {
@@ -112,7 +128,9 @@ export interface FileRoutesById {
   '/api/history-restore': typeof ApiHistoryRestoreRoute
   '/_dashboard/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
   '/api/link/ping': typeof ApiLinkPingRoute
+  '/api/link/poll': typeof ApiLinkPollRoute
   '/api/link/push': typeof ApiLinkPushRoute
+  '/api/link/respond': typeof ApiLinkRespondRoute
   '/_dashboard/sessions/': typeof DashboardSessionsIndexRoute
 }
 export interface FileRouteTypes {
@@ -126,7 +144,9 @@ export interface FileRouteTypes {
     | '/api/history-restore'
     | '/sessions/$sessionId'
     | '/api/link/ping'
+    | '/api/link/poll'
     | '/api/link/push'
+    | '/api/link/respond'
     | '/sessions/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -138,7 +158,9 @@ export interface FileRouteTypes {
     | '/api/history-restore'
     | '/sessions/$sessionId'
     | '/api/link/ping'
+    | '/api/link/poll'
     | '/api/link/push'
+    | '/api/link/respond'
     | '/sessions'
   id:
     | '__root__'
@@ -151,7 +173,9 @@ export interface FileRouteTypes {
     | '/api/history-restore'
     | '/_dashboard/sessions/$sessionId'
     | '/api/link/ping'
+    | '/api/link/poll'
     | '/api/link/push'
+    | '/api/link/respond'
     | '/_dashboard/sessions/'
   fileRoutesById: FileRoutesById
 }
@@ -161,7 +185,9 @@ export interface RootRouteChildren {
   ApiHistoryBackupRoute: typeof ApiHistoryBackupRoute
   ApiHistoryRestoreRoute: typeof ApiHistoryRestoreRoute
   ApiLinkPingRoute: typeof ApiLinkPingRoute
+  ApiLinkPollRoute: typeof ApiLinkPollRoute
   ApiLinkPushRoute: typeof ApiLinkPushRoute
+  ApiLinkRespondRoute: typeof ApiLinkRespondRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -222,11 +248,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSessionsIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/api/link/respond': {
+      id: '/api/link/respond'
+      path: '/api/link/respond'
+      fullPath: '/api/link/respond'
+      preLoaderRoute: typeof ApiLinkRespondRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/link/push': {
       id: '/api/link/push'
       path: '/api/link/push'
       fullPath: '/api/link/push'
       preLoaderRoute: typeof ApiLinkPushRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/link/poll': {
+      id: '/api/link/poll'
+      path: '/api/link/poll'
+      fullPath: '/api/link/poll'
+      preLoaderRoute: typeof ApiLinkPollRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/link/ping': {
@@ -272,7 +312,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHistoryBackupRoute: ApiHistoryBackupRoute,
   ApiHistoryRestoreRoute: ApiHistoryRestoreRoute,
   ApiLinkPingRoute: ApiLinkPingRoute,
+  ApiLinkPollRoute: ApiLinkPollRoute,
   ApiLinkPushRoute: ApiLinkPushRoute,
+  ApiLinkRespondRoute: ApiLinkRespondRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

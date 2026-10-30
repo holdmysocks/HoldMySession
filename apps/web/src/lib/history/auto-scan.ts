@@ -59,7 +59,13 @@ let started = false
 export function startAutoScan(): void {
   if (started) return
   started = true
-  const tick = () => void autoScanTick().catch((error) => console.warn('Automatic scan failed:', error))
+  const tick = () => {
+    void autoScanTick().catch((error) => console.warn('Automatic scan failed:', error))
+    // A master asks connected nodes for fresh stats while someone is looking.
+    void import('@/lib/link/master-sync').then((m) => m.masterSyncTick()).catch(() => undefined)
+  }
+  // A node keeps a request open to its master, so the master can ask it for live data.
+  void import('@/lib/link/node-agent').then((m) => m.startNodeAgent()).catch(() => undefined)
   const timer = setInterval(tick, TICK_MS)
   timer.unref?.()
   tick()

@@ -20,14 +20,16 @@ interface ProjectMapPageProps {
 export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps) {
   const { privacyMode, anonymizeProjectName, anonymizePath } = usePrivacy()
   const scope = useMachineScope()
-  const projectsQuery = useQuery(mapProjectsQuery)
+  // On a master with a node chosen, the map is that node's: it answers while this page is open.
+  const machineId = scope.isRemote ? scope.machineId : undefined
+  const projectsQuery = useQuery(mapProjectsQuery(machineId))
   const projects = projectsQuery.data ?? []
 
   // A project in the URL that is not in the dropdown (a scratch folder, or one that is gone) shows the first one.
   const selectedKey = projects.some((p) => p.projectKey === project) ? project! : (projects[0]?.projectKey ?? '')
   const selectedProject = projects.find((p) => p.projectKey === selectedKey) ?? null
-  const mapQuery = useQuery(projectMapQuery(selectedKey))
-  const eventsQuery = useQuery(hookEventsQuery)
+  const mapQuery = useQuery(projectMapQuery(selectedKey, machineId))
+  const eventsQuery = useQuery(hookEventsQuery(machineId))
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
@@ -35,7 +37,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   // In editor mode cards snap to a grid. Holding Alt while dragging places one freely.
   const [snapToGrid, setSnapToGrid] = useState(true)
   // Card positions from the editor. They belong to a project and are saved on the server.
-  const { positions, setPositions, isLoading: layoutLoading, saveFailed } = useMapLayout(selectedKey)
+  const { positions, setPositions, isLoading: layoutLoading, saveFailed } = useMapLayout(machineId ? `${machineId}~${selectedKey}` : selectedKey)
 
   const nodes = useMemo(() => mapQuery.data?.nodes ?? [], [mapQuery.data])
   const baseLayout = useMemo(
@@ -79,22 +81,6 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
 
   function handleResetLayout() {
     setPositions({})
-  }
-
-  // The map draws live sessions, which only the machine running them has. Another machine's are open on that machine.
-  if (scope.isRemote) {
-    return (
-      <div>
-        <Header />
-        <div className="mt-10 rounded-xl border border-dashed border-gray-800 p-8 text-center">
-          <p className="text-sm text-gray-300">The map shows live sessions on the machine you are using</p>
-          <p className="mt-1 text-xs text-gray-500">
-            {scope.machineName ?? 'That machine'} sends its history here, but not its live sessions. Open HoldMySession on
-            that machine to see its map, or choose this machine or All machines above. Stats, Projects and Sessions show {scope.machineName ?? 'its'} history.
-          </p>
-        </div>
-      </div>
-    )
   }
 
   if (projectsQuery.isLoading) {
@@ -248,7 +234,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
         {!panelsHidden && (
           <div className="space-y-4">
             <NeedsYouPanel nodes={nodes} onSelect={setSelectedId} />
-            <NodeDetailPanel node={selectedNode} projectKey={selectedKey} />
+            <NodeDetailPanel node={selectedNode} projectKey={selectedKey} machineId={machineId} />
             <HookEventsPanel events={eventsQuery.data} />
           </div>
         )}

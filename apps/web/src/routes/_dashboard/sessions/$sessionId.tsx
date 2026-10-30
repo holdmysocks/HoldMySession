@@ -20,6 +20,8 @@ import { z } from 'zod'
 
 const searchSchema = z.object({
   project: z.string().optional(),
+  /** The node the session ran on, when this master is showing another machine's session. */
+  machine: z.string().optional(),
 })
 
 export const Route = createFileRoute('/_dashboard/sessions/$sessionId')({
@@ -29,13 +31,13 @@ export const Route = createFileRoute('/_dashboard/sessions/$sessionId')({
 
 function SessionDetailPage() {
   const { sessionId } = Route.useParams()
-  const { project = '' } = Route.useSearch()
+  const { project = '', machine } = Route.useSearch()
 
   const { privacyMode, anonymizeProjectName, anonymizeBranch, anonymizeSessionName } = usePrivacy()
   const isActive = useIsSessionActive(sessionId)
 
   const { data: detail, isLoading, error } = useQuery(
-    sessionDetailQuery(sessionId, project, isActive),
+    sessionDetailQuery(sessionId, project, isActive, machine),
   )
 
   if (isLoading) {

@@ -50,7 +50,8 @@ export function SessionList() {
     const activeIds = new Set(activeSessions.map((s) => s.sessionId))
     return paginatedData.sessions.map((s) => ({
       ...s,
-      isActive: activeIds.has(s.sessionId) || s.isActive,
+      // This computer's active sessions only apply to its own sessions, never to another machine's.
+      isActive: (!s.machine && activeIds.has(s.sessionId)) || s.isActive,
     }))
   }, [paginatedData, activeSessions])
 

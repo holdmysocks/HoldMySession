@@ -160,12 +160,16 @@ export const getPaginatedSessions = createServerFn({ method: 'GET' })
   .handler(async ({ data }): Promise<PaginatedSessionsResponse> => {
     // Sessions with no project, and archived sessions, are left out of the list, the page and the project dropdown.
     // On a master the list covers the machine chosen: this computer's live sessions, and the others' from the history.
-    const { machineView } = await import('@/lib/link/scoped')
-    const view = machineView(data.machineId)
-    const all = [...(view.includeSelf ? await scanAllSessionsWithPaths() : []), ...view.remote]
+    const { machineViewLive } = await import('@/lib/link/scoped')
+    const view = await machineViewLive(data.machineId)
+    // A connected node's sessions come as they are now. Their status is already worked out, and they have no file here.
+    const liveRemote = view.live.flatMap((l) =>
+      l.items.map((item) => ({ ...item, filePath: '' as const, machineId: l.machine.id, machineName: l.machine.name })),
+    )
+    const all = [...(view.includeSelf ? await scanAllSessionsWithPaths() : []), ...view.remote, ...liveRemote]
     const allSessions = filterVisibleSessions(all)
-    const hiddenNoProjectCount = filterHiddenSessions(all).length
-    const hiddenArchivedCount = filterArchivedSessions(all).length
+    const hiddenNoProjectCount = filterHiddenSessions(all).length + view.live.reduce((n, l) => n + l.hiddenNoProjectCount, 0)
+    const hiddenArchivedCount = filterArchivedSessions(all).length + view.live.reduce((n, l) => n + l.hiddenArchivedCount, 0)
     const page = await paginateAndFilterSessions(allSessions, data)
 
     // Signals are computed for the page only. The file scan for open questions runs for active sessions.
@@ -173,12 +177,25 @@ export const getPaginatedSessions = createServerFn({ method: 'GET' })
     const sessions = await Promise.all(
       page.sessions.map(async (item): Promise<SessionListItem> => {
         // Sessions of other machines carry the machine they came from, and have no file here.
-        const { filePath, machineId, machineName, ...summary } = item as typeof item & { machineId?: string; machineName?: string }
+        const { filePath, machineId, machineName, ...summary } = item as typeof item & {
+          machineId?: string
+          machineName?: string
+          lastNotificationAt?: string | null
+          hasOpenQuestion?: boolean
+        }
+        if (machineId) {
+          return {
+            ...summary,
+            machine: { id: machineId, name: machineName ?? '' },
+            lastNotificationAt: summary.lastNotificationAt ?? null,
+            hasOpenQuestion: summary.hasOpenQuestion ?? false,
+          }
+        }
         return {
           ...summary,
-          machine: machineId ? { id: machineId, name: machineName ?? '' } : null,
+          machine: null,
           lastNotificationAt: notifications.get(summary.sessionId) ?? null,
-          hasOpenQuestion: !machineId && summary.isActive && (await findPendingQuestions(filePath)).length > 0,
+          hasOpenQuestion: summary.isActive && (await findPendingQuestions(filePath)).length > 0,
         }
       }),
     )

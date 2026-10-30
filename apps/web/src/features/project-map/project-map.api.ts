@@ -1,23 +1,11 @@
-import * as fs from 'node:fs'
-import * as path from 'node:path'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { scanAllSessionsWithPaths } from '@/lib/scanner/session-scanner'
-import type { SessionSummaryWithPath } from '@/lib/scanner/session-scanner'
-import { parseDetail } from '@/lib/parsers/session-parser'
-import { readSubagentLastActivity } from '@/lib/parsers/subagent-discovery'
-import { backgroundTaskDir, countRunningBackgroundTasks } from '@/lib/scanner/background-tasks'
 import type { AgentInvocation, SessionSummary } from '@/lib/parsers/types'
-import { findPendingQuestions } from '@/lib/map/pending-requests'
 import type { PendingQuestion } from '@/lib/map/pending-requests'
-import { buildProjectMap, tokenTotal } from '@/lib/map/project-map'
-import type { MapSessionInput, ProjectMap } from '@/lib/map/project-map'
-import { latestNotificationBySession, readRecentEvents } from '@/lib/events/event-inbox'
+import type { ProjectMap } from '@/lib/map/project-map'
+import { filterVisibleSessions } from '@/lib/map/session-visibility'
 import type { HookEvent } from '@/lib/events/event-inbox'
-import { filterArchivedSessions, filterHiddenSessions, filterVisibleSessions } from '@/lib/map/session-visibility'
 import { isUnlinkedSession } from '@/lib/projects/unlinked'
-
-const HOOK_EVENTS_SHOWN = 100
 
 export interface MapProject {
   /** Directory name under projects/. Addresses the project in the URL. */
@@ -42,7 +30,7 @@ export interface CachedSessionDetail extends SessionDetailInput {
 }
 
 /** Keyed by absolute file path. Server-side only; file paths never reach the client. */
-const detailCache = new Map<string, CachedSessionDetail>()
+export const detailCache = new Map<string, CachedSessionDetail>()
 
 /** Group sessions into projects by directory, most recently active first. Every session is counted. */
 export function groupMapProjects(sessions: SessionSummary[]): MapProject[] {
@@ -116,84 +104,46 @@ export function dropdownSessions<T extends SessionSummary>(sessions: T[]): T[] {
   return filterVisibleSessions(sessions).filter((session) => !isUnlinkedSession(session))
 }
 
-/** The project dropdown lists projects with at least one real session: a working directory, and not scratch. */
-export const getMapProjects = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<MapProject[]> => {
-    const sessions = await scanAllSessionsWithPaths()
-    return groupMapProjects(dropdownSessions(sessions))
-  },
-)
-
 /** The map for one project, plus how many of its sessions were left out (no project, or archived). */
 export interface ProjectMapResponse extends ProjectMap {
   hiddenNoProjectCount: number
   hiddenArchivedCount: number
 }
 
+const machineSchema = z.object({ machineId: z.string().optional() })
+
+/** The project dropdown lists projects with at least one real session: a working directory, and not scratch. */
+export const getMapProjects = createServerFn({ method: 'GET' })
+  .inputValidator((input: unknown) => machineSchema.parse(input ?? {}))
+  .handler(async ({ data }): Promise<MapProject[]> => {
+    const { remoteCallFor } = await import('@/lib/link/remote-call')
+    const remote = await remoteCallFor<MapProject[]>(data.machineId, 'map-projects', {})
+    if (remote.used) return remote.data
+    const { computeMapProjects } = await import('@/lib/live/project-map')
+    return computeMapProjects()
+  })
+
 const projectMapInputSchema = z.object({
   projectKey: z.string().min(1).max(512),
+  machineId: z.string().optional(),
 })
 
 export const getProjectMap = createServerFn({ method: 'GET' })
   .inputValidator((input: unknown) => projectMapInputSchema.parse(input))
   .handler(async ({ data }): Promise<ProjectMapResponse> => {
-    const all = await scanAllSessionsWithPaths()
-    const inProject = selectMapSessions(all, data.projectKey)
-    // Sessions with no project, and archived sessions, are not drawn, and their subagents go with them.
-    const sessions = orderByActivity(filterVisibleSessions(inProject))
-    const hiddenNoProjectCount = filterHiddenSessions(inProject).length
-    const hiddenArchivedCount = filterArchivedSessions(inProject).length
-
-    const notifications = latestNotificationBySession(await readRecentEvents())
-
-    const inputs: MapSessionInput[] = []
-    for (const session of sessions) {
-      const stat = await fs.promises.stat(session.filePath).catch(() => null)
-      if (!stat) continue
-
-      const detail = await resolveSessionDetail(detailCache, session, stat.mtimeMs, () =>
-        loadSessionDetail(session),
-      )
-
-      // Read every time, not cached: a subagent is running while its file keeps growing.
-      const sessionDir = path.join(path.dirname(session.filePath), session.sessionId)
-      inputs.push({
-        summary: session,
-        agents: detail.agents,
-        subagentLastActivity: await readSubagentLastActivity(sessionDir),
-        backgroundTaskCount: await countRunningBackgroundTasks(backgroundTaskDir(session.projectKey, session.sessionId)),
-        pendingQuestions: detail.pendingQuestions,
-        lastNotificationAt: notifications.get(session.sessionId) ?? null,
-        totalTokens: detail.totalTokens,
-      })
-    }
-
-    const projectDisplayName = sessions[0]?.projectDisplayName ?? data.projectKey
-    const projectPath = sessions[0]?.projectPath ?? data.projectKey
-    return {
-      ...buildProjectMap(data.projectKey, projectPath, projectDisplayName, inputs),
-      hiddenNoProjectCount,
-      hiddenArchivedCount,
-    }
+    const { remoteCallFor } = await import('@/lib/link/remote-call')
+    const remote = await remoteCallFor<ProjectMapResponse>(data.machineId, 'project-map', { projectKey: data.projectKey })
+    if (remote.used) return remote.data
+    const { computeProjectMap } = await import('@/lib/live/project-map')
+    return computeProjectMap(data.projectKey)
   })
 
-async function loadSessionDetail(session: SessionSummaryWithPath): Promise<SessionDetailInput> {
-  const detail = await parseDetail(
-    session.filePath,
-    session.sessionId,
-    session.projectPath,
-    session.projectName,
-  )
-  return {
-    agents: detail.agents,
-    totalTokens: tokenTotal(detail.totalTokens),
-    pendingQuestions: await findPendingQuestions(session.filePath),
-  }
-}
-
-export const getHookEvents = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<HookEvent[]> => {
-    const events = await readRecentEvents(HOOK_EVENTS_SHOWN)
-    return events.reverse()
-  },
-)
+export const getHookEvents = createServerFn({ method: 'GET' })
+  .inputValidator((input: unknown) => machineSchema.parse(input ?? {}))
+  .handler(async ({ data }): Promise<HookEvent[]> => {
+    const { remoteCallFor } = await import('@/lib/link/remote-call')
+    const remote = await remoteCallFor<HookEvent[]>(data.machineId, 'hook-events', {})
+    if (remote.used) return remote.data
+    const { computeHookEvents } = await import('@/lib/live/project-map')
+    return computeHookEvents()
+  })

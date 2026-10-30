@@ -8,9 +8,12 @@ import { kindLabel, shortModelName, statusLabel } from './format-node'
 export function NodeDetailPanel({
   node,
   projectKey,
+  machineId,
 }: {
   node: MapNode | null
   projectKey: string
+  /** The node the map belongs to, when this master is showing another machine's map. */
+  machineId?: string
 }) {
   const { privacyMode, anonymizeSessionName, anonymizeProjectName } = usePrivacy()
 
@@ -83,7 +86,7 @@ export function NodeDetailPanel({
         <Link
           to="/sessions/$sessionId"
           params={{ sessionId: node.sessionId }}
-          search={{ project: projectKey }}
+          search={{ project: projectKey, machine: machineId }}
           className="mt-4 inline-block text-sm text-brand-300 hover:underline"
         >
           Open session

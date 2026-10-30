@@ -9,6 +9,8 @@ export interface MachineSummary {
   appVersion: string | null
   lastSeenAt: string
   sessions: number
+  /** Connected to this master right now, so its live data can be asked for. */
+  online: boolean
 }
 
 export interface LinkState {
@@ -29,7 +31,10 @@ async function readState(): Promise<LinkState> {
   const { listMachines, selfMachineId, hasOtherMachines } = await import('@/lib/link/machines')
   const { isLinkedNode } = await import('@/lib/link/shared')
   const { linkStatus } = await import('@/lib/link/node-sync')
+  const { isOnline, touchActivity } = await import('@/lib/link/channel')
   const settings = readSettingsFile()
+  // A page being open is what keeps a master asking its nodes for fresh stats.
+  if (settings.link.role === 'master') touchActivity()
   const db = openHistoryDb()
   try {
     return {
@@ -40,6 +45,7 @@ async function readState(): Promise<LinkState> {
       selfMachineId: selfMachineId(db),
       machines: listMachines(db).map((m) => ({
         machineId: m.machineId, name: m.name, isSelf: m.isSelf, appVersion: m.appVersion, lastSeenAt: m.lastSeenAt, sessions: m.sessions,
+        online: m.isSelf || isOnline(m.machineId),
       })),
       sync: linkStatus(db),
     }

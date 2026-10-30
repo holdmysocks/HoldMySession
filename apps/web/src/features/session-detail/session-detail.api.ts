@@ -1,37 +1,22 @@
-import * as fs from 'node:fs/promises'
-import * as path from 'node:path'
 import { createServerFn } from '@tanstack/react-start'
-import { parseDetail } from '@/lib/parsers/session-parser'
-import { buildProjectInfo } from '@/lib/scanner/project-scanner'
-import { resolveProjectDisplayName } from '@/lib/scanner/project-display-name'
-import { applyAutoCompactWindow } from '@/lib/parsers/context-limit'
-import { loadAutoCompactWindow } from '@/lib/claude-settings/auto-compact'
-import { findSessionFile } from './find-session-file'
+import { z } from 'zod'
 
+const inputSchema = z.object({ sessionId: z.string().min(1).max(200), projectKey: z.string().min(1).max(512), machineId: z.string().optional() })
+
+/**
+ * One session's detail. With a machine chosen on a master, the node that owns the session is asked
+ * for it and answers while this page is open. Otherwise it is read from this computer.
+ */
 export const getSessionDetail = createServerFn({ method: 'GET' })
-  .inputValidator((input: { sessionId: string; projectKey: string }) => input)
+  .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data }) => {
-    const filePath = await findSessionFile(data.sessionId, data.projectKey)
-    if (!filePath) {
-      throw new Error(`Session not found: ${data.sessionId}`)
-    }
-
-    // The project's path and name come from the transcripts' cwd, as on the list page.
-    const dirPath = path.dirname(filePath.path)
-    const files = await fs.readdir(dirPath).catch(() => [] as string[])
-    const project = await buildProjectInfo(
-      dirPath,
-      filePath.dirName,
-      files.filter((f) => f.endsWith('.jsonl')),
+    const { remoteCallFor } = await import('@/lib/link/remote-call')
+    const remote = await remoteCallFor<Awaited<ReturnType<typeof import('@/lib/live/session-detail').loadSessionDetail>>>(
+      data.machineId,
+      'session-detail',
+      { sessionId: data.sessionId, projectKey: data.projectKey },
     )
-
-    const detail = await parseDetail(filePath.path, data.sessionId, project.projectPath, project.projectName)
-    const projectDisplayName = await resolveProjectDisplayName(project.projectPath, project.projectName)
-
-    // A window the user set with /autocompact or in settings.json is the one they work in.
-    const configured = detail.contextWindow
-      ? await loadAutoCompactWindow(project.projectPath, detail.contextWindow.modelName)
-      : null
-    const contextWindow = applyAutoCompactWindow(detail.contextWindow, configured)
-    return { ...detail, contextWindow, projectDisplayName }
+    if (remote.used) return remote.data
+    const { loadSessionDetail } = await import('@/lib/live/session-detail')
+    return loadSessionDetail(data)
   })

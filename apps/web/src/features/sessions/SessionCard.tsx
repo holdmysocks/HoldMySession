@@ -9,7 +9,7 @@ import { STATUS_BORDER, STATUS_PULSE } from '@/components/ui/session-status-styl
 import { StatusBadge } from './StatusBadge'
 import { RunningTimer } from './RunningTimer'
 
-/** A session of another machine has no transcript here, so its card is not a link and shows where it ran. */
+/** A session of another machine shows where it ran. Its page asks that machine for the detail while it is open. */
 export function SessionCard({
   session,
   status,
@@ -103,21 +103,14 @@ export function SessionCard({
     </>
   )
 
-  if (session.machine) {
-    return (
-      <div className={cardClass} data-status={status} data-machine={session.machine.id}>
-        {body}
-      </div>
-    )
-  }
-
   return (
     <Link
       to="/sessions/$sessionId"
       params={{ sessionId: session.sessionId }}
-      search={{ project: session.projectKey }}
+      search={{ project: session.projectKey, machine: session.machine?.id }}
       className={cardClass}
       data-status={status}
+      data-machine={session.machine?.id}
     >
       {body}
     </Link>
