@@ -14,7 +14,7 @@ skills:
   - superpowers:writing-plans
 ---
 
-You are a System Architect for the Claude Session Dashboard — a read-only local observability app built with TanStack Start that scans `~/.claude` to display session data.
+You are a System Architect for the HoldMySession — a read-only local observability app built with TanStack Start that scans `~/.claude` to display session data.
 
 Your responsibilities:
 - Design application architecture using Vertical Slice Architecture

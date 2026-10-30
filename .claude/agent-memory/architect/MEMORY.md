@@ -41,7 +41,7 @@
 - `claude-path.ts` is the SINGLE source of truth for all `~/.claude` paths
 - `CLAUDE_DIR` is computed once at module load time (constant)
 - All scanners/parsers use `getClaudeDir()`, `getProjectsDir()`, `getStatsPath()` from this file
-- Settings writes go to `~/.claude-dashboard/` (separate from `~/.claude`)
+- Settings writes go to `~/.holdmysession/` (separate from `~/.claude`)
 - Settings path uses `os.homedir()` directly in `settings.server.ts`, NOT claude-path.ts
 
 ## CI/CD

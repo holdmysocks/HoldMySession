@@ -1,3 +1,4 @@
+import { clockPattern } from '@/lib/utils/time-format'
 import {
   addDays,
   addMonths,
@@ -242,8 +243,8 @@ export function buildTimeScale(startMs: number, endMs: number, widthPx: number):
       major && step.unit === 'hour'
         ? format(date, 'EEE d MMM')
         : major && (step.unit === 'minute' || step.unit === 'second')
-          ? format(date, 'd MMM HH:mm')
-          : format(date, TICK_FORMAT[step.unit])
+          ? format(date, clockPattern('d MMM HH:mm'))
+          : format(date, clockPattern(TICK_FORMAT[step.unit]))
     return { ms, label, major }
   })
   return { unit: step.unit, ticks, bands }
@@ -251,7 +252,7 @@ export function buildTimeScale(startMs: number, endMs: number, widthPx: number):
 
 /** The full time at a point on the axis, for the hover readout. */
 export function formatCursorTime(ms: number): string {
-  return format(new Date(ms), 'EEE d MMM yyyy HH:mm:ss')
+  return format(new Date(ms), clockPattern('EEE d MMM yyyy HH:mm:ss'))
 }
 
 /** How long a span is, in the unit that reads best: seconds, minutes, hours, then days for long ones. */
@@ -269,6 +270,6 @@ export function formatSpan(ms: number): string {
 /** A compact range for a heading: "3 Mar 10:02 → 5 Mar 18:20", with the year when it is not this one. */
 export function formatRange(startMs: number, endMs: number, nowMs: number = Date.now()): string {
   const thisYear = new Date(nowMs).getFullYear()
-  const fmt = (ms: number) => format(new Date(ms), new Date(ms).getFullYear() === thisYear ? 'd MMM HH:mm' : 'd MMM yyyy HH:mm')
+  const fmt = (ms: number) => format(new Date(ms), new Date(ms).getFullYear() === thisYear ? clockPattern('d MMM HH:mm') : clockPattern('d MMM yyyy HH:mm'))
   return `${fmt(startMs)} → ${fmt(endMs)}`
 }

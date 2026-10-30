@@ -73,6 +73,18 @@ describe('PrivacyContext', () => {
     })
 
     it('should initialize with privacyMode true when localStorage has "true"', () => {
+      localStorage.setItem('holdmysession:privacy-mode', 'true')
+
+      render(
+        <PrivacyProvider>
+          <TestComponent />
+        </PrivacyProvider>
+      )
+
+      expect(screen.getByTestId('privacy-mode').textContent).toBe('true')
+    })
+
+    it('should carry over the choice saved under the old key name', () => {
       localStorage.setItem('claude-dashboard:privacy-mode', 'true')
 
       render(
@@ -85,7 +97,7 @@ describe('PrivacyContext', () => {
     })
 
     it('should initialize with privacyMode false when localStorage has "false"', () => {
-      localStorage.setItem('claude-dashboard:privacy-mode', 'false')
+      localStorage.setItem('holdmysession:privacy-mode', 'false')
 
       render(
         <PrivacyProvider>
@@ -97,7 +109,7 @@ describe('PrivacyContext', () => {
     })
 
     it('should initialize with privacyMode false when localStorage has invalid value', () => {
-      localStorage.setItem('claude-dashboard:privacy-mode', 'invalid')
+      localStorage.setItem('holdmysession:privacy-mode', 'invalid')
 
       render(
         <PrivacyProvider>
@@ -123,12 +135,12 @@ describe('PrivacyContext', () => {
 
       await waitFor(() => {
         expect(getByTestId('privacy-mode').textContent).toBe('true')
-        expect(localStorage.getItem('claude-dashboard:privacy-mode')).toBe('true')
+        expect(localStorage.getItem('holdmysession:privacy-mode')).toBe('true')
       })
     })
 
     it('should toggle from true to false', async () => {
-      localStorage.setItem('claude-dashboard:privacy-mode', 'true')
+      localStorage.setItem('holdmysession:privacy-mode', 'true')
 
       const { getByTestId } = render(
         <PrivacyProvider>
@@ -142,7 +154,7 @@ describe('PrivacyContext', () => {
 
       await waitFor(() => {
         expect(getByTestId('privacy-mode').textContent).toBe('false')
-        expect(localStorage.getItem('claude-dashboard:privacy-mode')).toBe('false')
+        expect(localStorage.getItem('holdmysession:privacy-mode')).toBe('false')
       })
     })
 
@@ -159,7 +171,7 @@ describe('PrivacyContext', () => {
 
         await waitFor(() => {
           expect(getByTestId('privacy-mode').textContent).toBe(expectedValue)
-          expect(localStorage.getItem('claude-dashboard:privacy-mode')).toBe(expectedValue)
+          expect(localStorage.getItem('holdmysession:privacy-mode')).toBe(expectedValue)
         })
       }
     })

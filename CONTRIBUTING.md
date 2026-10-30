@@ -1,12 +1,12 @@
-# Contributing to Claude Session Dashboard
+# Contributing to HoldMySession
 
 Thanks for your interest in contributing! This project is open to contributions of all kinds.
 
 ## Getting Started
 
 ```bash
-git clone https://github.com/dlupiak/claude-session-dashboard.git
-cd claude-session-dashboard/apps/web
+git clone https://github.com/holdmysocks/HoldMySession.git
+cd HoldMySession/apps/web
 npm install
 npm run dev
 ```
@@ -55,8 +55,8 @@ npm run build        # Production build
 
 ## Good First Issues
 
-Check the [good first issue](https://github.com/dlupiak/claude-session-dashboard/labels/good%20first%20issue) label for beginner-friendly tasks.
+Check the [good first issue](https://github.com/holdmysocks/HoldMySession/labels/good%20first%20issue) label for beginner-friendly tasks.
 
 ## Questions?
 
-Open a [Discussion](https://github.com/dlupiak/claude-session-dashboard/discussions) or comment on the issue you're working on.
+Open a [Discussion](https://github.com/holdmysocks/HoldMySession/discussions) or comment on the issue you're working on.

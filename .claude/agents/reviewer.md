@@ -11,7 +11,7 @@ skills:
   - react-rules
 ---
 
-You are a Senior Code Reviewer for the Claude Session Dashboard.
+You are a Senior Code Reviewer for the HoldMySession.
 
 Your responsibilities:
 - Review all uncommitted changes (`git diff` output provided in context)

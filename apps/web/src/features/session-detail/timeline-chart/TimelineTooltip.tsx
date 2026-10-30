@@ -3,6 +3,7 @@ import { shortenToolName } from './timeline-colors'
 import { formatDuration } from '@/lib/utils/format'
 import { formatTokenCount } from '@/lib/utils/format'
 import { format } from 'date-fns'
+import { clockPattern } from '@/lib/utils/time-format'
 
 interface Props {
   item: TooltipItem
@@ -23,7 +24,7 @@ export function TimelineTooltip({ item, position }: Props) {
         <div>
           <div className="font-semibold text-gray-100">{shortenToolName(item.toolName)}</div>
           <div className="text-gray-400">
-            {format(new Date(item.timestamp), 'HH:mm:ss')}
+            {format(new Date(item.timestamp), clockPattern('HH:mm:ss'))}
           </div>
           <div className="font-mono text-[10px] text-gray-600">
             {item.toolUseId.slice(0, 16)}...
@@ -41,8 +42,8 @@ export function TimelineTooltip({ item, position }: Props) {
           <div className="mt-1 flex items-center gap-2 text-gray-500">
             {item.agent.durationMs != null && (
               <span>
-                {format(new Date(item.agent.startMs), 'HH:mm')} -{' '}
-                {format(new Date(item.agent.endMs), 'HH:mm')} (
+                {format(new Date(item.agent.startMs), clockPattern('HH:mm'))} -{' '}
+                {format(new Date(item.agent.endMs), clockPattern('HH:mm'))} (
                 {formatDuration(item.agent.durationMs)})
               </span>
             )}
@@ -62,7 +63,7 @@ export function TimelineTooltip({ item, position }: Props) {
           <div className="font-semibold text-amber-300">/{item.skill}</div>
           {item.args && <div className="text-gray-400">{item.args}</div>}
           <div className="text-gray-500">
-            {format(new Date(item.timestamp), 'HH:mm:ss')}
+            {format(new Date(item.timestamp), clockPattern('HH:mm:ss'))}
           </div>
         </div>
       )}
@@ -71,7 +72,7 @@ export function TimelineTooltip({ item, position }: Props) {
           <div className="font-semibold text-red-400">{item.type}</div>
           <div className="max-w-48 truncate text-gray-400">{item.message}</div>
           <div className="text-gray-500">
-            {format(new Date(item.timestamp), 'HH:mm:ss')}
+            {format(new Date(item.timestamp), clockPattern('HH:mm:ss'))}
           </div>
         </div>
       )}

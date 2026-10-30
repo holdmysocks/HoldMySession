@@ -1,6 +1,6 @@
 ---
 name: dashboard
-description: Open the Claude Session Dashboard in the browser. Starts it first if not already running. Checks for and installs updates before starting.
+description: Open the HoldMySession in the browser. Starts it first if not already running. Checks for and installs updates before starting.
 user-invocable: true
 ---
 

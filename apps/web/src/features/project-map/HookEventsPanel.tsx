@@ -14,7 +14,7 @@ export function HookEventsPanel({ events }: { events: HookEvent[] | undefined })
         <div className="space-y-2 text-sm text-gray-500">
           <p>No hook events yet.</p>
           <p>
-            Run <code className="font-mono text-xs text-gray-300">claude-dashboard --print-hook-config</code> to
+            Run <code className="font-mono text-xs text-gray-300">holdmysession --print-hook-config</code> to
             get a snippet for <code className="font-mono text-xs text-gray-300">settings.json</code> in your Claude config directory.
           </p>
         </div>

@@ -15,15 +15,15 @@ npm run build && npm start
 
 Open `http://localhost:3000/map`, or pick a project from the **Map** entry in the sidebar. The project selector shows each project's name and session count.
 
-Options: `-p, --port <number>` (default 3000), `--host <hostname>` (default localhost), and `-o, --open`. Run `claude-dashboard --help` for the full list.
+Options: `-p, --port <number>` (default 3000), `--host <hostname>` (default localhost), and `-o, --open`. Run `holdmysession --help` for the full list.
 
 ## Setup on Windows
 
 The dashboard reads the Claude config directory on Windows, which is `%USERPROFILE%\.claude` (for example `C:\Users\<you>\.claude`). Nothing needs configuring for that.
 
-1. **Run it.** Install from npm (`npm install -g claude-session-dashboard`, then `claude-dashboard`), or from a clone. From a clone, `Update-SessionMap.ps1` in the repo root pulls the session map branch, installs dependencies when the lock file changed, rebuilds and starts the dashboard. Run it from PowerShell in the repo folder: `powershell -ExecutionPolicy Bypass -File .\Update-SessionMap.ps1`. Use `-SkipTests` to skip the test run, `-ForceInstall` to reinstall dependencies, and `-Port` to change the port (default 3000).
+1. **Run it.** Run it from a clone. `Update-SessionMap.ps1` in the repo root pulls the session map branch, installs dependencies when the lock file changed, rebuilds and starts the dashboard. Run it from PowerShell in the repo folder: `powershell -ExecutionPolicy Bypass -File .\Update-SessionMap.ps1`. Use `-SkipTests` to skip the test run, `-ForceInstall` to reinstall dependencies, and `-Port` to change the port (default 3000).
 2. **Custom config dir (optional).** Set `CLAUDE_CONFIG_DIR` to the folder that holds `projects\`. `CLAUDE_HOME` is accepted as an older alias.
-3. **Notifications (optional).** Run `claude-dashboard --print-hook-config`. Merge the `hooks` block into `%USERPROFILE%\.claude\settings.json`. The printed command points at the hook script's absolute path, quoted if the path has spaces.
+3. **Notifications (optional).** Run `holdmysession --print-hook-config`. Merge the `hooks` block into `%USERPROFILE%\.claude\settings.json`. The printed command points at the hook script's absolute path, quoted if the path has spaces.
 4. **WSL.** When the dashboard runs on Windows, WSL distributions with a `.claude` folder under `\\wsl$` are listed as extra data sources. They appear in the Sessions list. **They do not appear on the map** (see limitations).
 
 **Not verified:** the hook command on Windows. We do not know whether Claude Code on Windows runs the hook through `cmd`, PowerShell or Git Bash. The hook script itself is tested on Linux only. Check that a Notification event lands in `%USERPROFILE%\.holdmysession\events.jsonl` after you trigger one.
@@ -137,7 +137,7 @@ The side panel shows tokens, duration, tool calls, model and the dispatch time. 
 
 ### Hook events
 
-`bin/claude-dashboard-hook.mjs` appends one line per `Notification` or `Stop` event to `~/.holdmysession/events.jsonl` (or `$HOLDMYSESSION_DIR/events.jsonl`):
+`bin/holdmysession-hook.mjs` appends one line per `Notification` or `Stop` event to `~/.holdmysession/events.jsonl` (or `$HOLDMYSESSION_DIR/events.jsonl`):
 
 ```json
 {"ts":"2026-10-29T10:03:00.000Z","event":"Notification","sessionId":"<id>","cwd":"/path/to/project","message":"Claude needs your permission to use Bash","notificationType":"permission_prompt","title":null}
@@ -157,7 +157,7 @@ The hook is the only writer of this file. It always exits 0 and swallows errors,
 
 **The snippet has no matcher.** A `Notification` entry with no matcher fires for every notification type, and the Stop entry has no matcher, since `Stop` does not support one. Use `notificationType` in the events panel to tell them apart.
 
-**The path is absolute.** The snippet points at `bin/claude-dashboard-hook.mjs` in the install it was printed from. If you move or delete that install, the hook breaks silently. A global install is recommended. Re-run `--print-hook-config` after installing.
+**The path is absolute.** The snippet points at `bin/holdmysession-hook.mjs` in the install it was printed from. If you move or delete that install, the hook breaks silently. A global install is recommended. Re-run `--print-hook-config` after installing.
 
 ## Status of features
 
@@ -212,7 +212,7 @@ Steps 1 and 2 are maintenance and should run after each Claude Code upgrade. Ste
 
 2. **Measure the active-folder rule.** Count how many real sessions are written in the last 2 minutes but have no folder. If the number is large, look for another signal, such as the `sessions/` directory once its format is confirmed.
 
-3. **Option: Stop-hook inbox (Phase 2).** A message written by the dashboard goes into an inbox under `~/.holdmysession/`, and a Stop hook delivers it when Claude finishes a turn. Changes: `bin/claude-dashboard-hook.mjs` (returns pending messages in the hook's output format, confirmed for the installed version first), an inbox module under `src/lib/`, and a composer in `src/features/project-map/`. Which hook output shape delivers a message, and how a message reaches an idle session, is a design decision. Review it with an architect before implementing.
+3. **Option: Stop-hook inbox (Phase 2).** A message written by the dashboard goes into an inbox under `~/.holdmysession/`, and a Stop hook delivers it when Claude finishes a turn. Changes: `bin/holdmysession-hook.mjs` (returns pending messages in the hook's output format, confirmed for the installed version first), an inbox module under `src/lib/`, and a composer in `src/features/project-map/`. Which hook output shape delivers a message, and how a message reaches an idle session, is a design decision. Review it with an architect before implementing.
 
 4. **Option: headless resume for idle sessions (Phase 2).** `claude --resume <id> -p "<message>"` for sessions that are not running. Spawn with `execFile`, never a shell string. Add a per-session lock, a timeout, and a clear UI state while it runs. Handle the case where the session is open in a terminal.
 
@@ -254,7 +254,7 @@ Fixes for problems a Windows user reported with real data.
 
 - New **Map** page at `/map` with a per-project map of sessions and their subagents, dispatch edges, a Needs you panel, a recent hook events panel, and a details panel.
 - Open `AskUserQuestion` calls are detected from session transcripts.
-- Opt-in `Notification` and `Stop` hooks write to `~/.holdmysession/events.jsonl`. Print the snippet with `claude-dashboard --print-hook-config`.
+- Opt-in `Notification` and `Stop` hooks write to `~/.holdmysession/events.jsonl`. Print the snippet with `holdmysession --print-hook-config`.
 - New `--print-hook-config` CLI flag and help text.
 - Read-only: no writes to `~/.claude`.
 

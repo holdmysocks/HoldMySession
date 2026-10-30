@@ -1,5 +1,6 @@
 import type { TaskItem } from '@/lib/parsers/types'
 import { format } from 'date-fns'
+import { clockPattern } from '@/lib/utils/time-format'
 
 const statusConfig: Record<
   TaskItem['status'],
@@ -60,7 +61,7 @@ export function TasksPanel({ tasks }: { tasks: TaskItem[] }) {
               )}
               {task.timestamp && (
                 <span className="shrink-0 text-[10px] text-gray-600">
-                  {format(new Date(task.timestamp), 'HH:mm:ss')}
+                  {format(new Date(task.timestamp), clockPattern('HH:mm:ss'))}
                 </span>
               )}
             </div>

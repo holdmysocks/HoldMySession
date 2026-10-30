@@ -8,12 +8,14 @@ import {
 import type { ReactNode } from 'react'
 import { anonymizePath as anonymizePathUtil } from './anonymize'
 
-const STORAGE_KEY = 'claude-dashboard:privacy-mode'
+const STORAGE_KEY = 'holdmysession:privacy-mode'
+/** The key before the rename. Read when the new one is not set, so the choice carries over. */
+const LEGACY_STORAGE_KEY = 'claude-dashboard:privacy-mode'
 
 function readStoredPrivacyMode(): boolean {
   if (typeof window === 'undefined') return false
   try {
-    return localStorage.getItem(STORAGE_KEY) === 'true'
+    return (localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY)) === 'true'
   } catch {
     return false
   }

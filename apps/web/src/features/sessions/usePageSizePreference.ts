@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react'
 
-const STORAGE_KEY = 'claude-dashboard:page-size'
+const STORAGE_KEY = 'holdmysession:page-size'
+/** The key before the rename. Read when the new one is not set, so the choice carries over. */
+const LEGACY_STORAGE_KEY = 'claude-dashboard:page-size'
 const VALID_SIZES = [5, 10, 25, 50] as const
 const DEFAULT_SIZE = 5
 
@@ -13,7 +15,7 @@ function isValidSize(value: number): value is ValidPageSize {
 function readStoredPageSize(): number | null {
   if (typeof window === 'undefined') return null
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY)
     if (raw !== null) {
       const parsed = Number(raw)
       if (isValidSize(parsed)) return parsed

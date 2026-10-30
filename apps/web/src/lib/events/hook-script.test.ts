@@ -6,9 +6,9 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { getEventLogPath, parseEventLines, readRecentEvents } from './event-inbox'
 
-const HOOK_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../bin/claude-dashboard-hook.mjs')
+const HOOK_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../bin/holdmysession-hook.mjs')
 
-describe('bin/claude-dashboard-hook.mjs', () => {
+describe('bin/holdmysession-hook.mjs', () => {
   let home: string
   const originalHome = process.env.CLAUDE_DASHBOARD_HOME
 

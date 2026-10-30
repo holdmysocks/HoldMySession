@@ -51,7 +51,7 @@ jobs:
         working-directory: ./apps/web
         run: |
           cp ../../LICENSE ./LICENSE
-          ARTIFACT="claude-session-dashboard-v${{ steps.version.outputs.version }}.tar.gz"
+          ARTIFACT="holdmysession-v${{ steps.version.outputs.version }}.tar.gz"
           tar -czf "${ARTIFACT}" \
             bin/ \
             dist/ \

@@ -8,7 +8,7 @@ Only the latest release receives security updates.
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-Instead, use [GitHub Security Advisories](https://github.com/dlupiak/claude-session-dashboard/security/advisories/new) to report them privately.
+Instead, use [GitHub Security Advisories](https://github.com/holdmysocks/HoldMySession/security/advisories/new) to report them privately.
 
 Include:
 - Description of the vulnerability

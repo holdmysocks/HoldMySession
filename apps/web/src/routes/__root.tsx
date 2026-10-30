@@ -9,6 +9,7 @@ import {
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PrivacyProvider } from '@/features/privacy/PrivacyContext'
 import { ThemeProvider } from '@/features/theme/ThemeProvider'
+import { ClockFormatProvider } from '@/features/time/ClockFormatProvider'
 import appCss from '@/styles/app.css?url'
 
 const queryClient = new QueryClient({
@@ -25,7 +26,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'Claude Session Dashboard' },
+      { title: 'HoldMySession' },
       { name: 'theme-color', content: '#141413' },
       { name: 'description', content: 'Local observability dashboard for Claude Code sessions' },
     ],
@@ -46,7 +47,9 @@ function RootComponent() {
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>
           <PrivacyProvider>
-            <Outlet />
+            <ClockFormatProvider>
+              <Outlet />
+            </ClockFormatProvider>
           </PrivacyProvider>
         </QueryClientProvider>
       </ThemeProvider>

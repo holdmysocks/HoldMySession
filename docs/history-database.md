@@ -51,6 +51,8 @@ The plan paid for is kept as dated periods in `subscription_periods`: a plan, it
 
 Settings, under History database, has a switch and an interval: 5, 10, 15, 30 minutes, or 1, 2, 6, 12, 24 hours. It is on every 15 minutes by default, and is saved as `autoScan` in `settings.json`. A scan runs inside the server process (`src/lib/history/auto-scan.ts`), so it works with no browser open. It looks at the clock every 30 seconds, scans when the last scan finished more than the interval ago, and reads the setting each time, so a change applies without a restart. A scan that is overdue runs at server start. `bin/cli.mjs` loads the app once after it starts listening so that happens at once. When it is switched off the history only refreshes with Rescan now, so Stats can be behind. A failed scan is recorded in the scan log and tried again after the interval.
 
+The pages follow the scans without a refresh. The page frame checks the scan state every 10 seconds, and every 2 seconds while one is running (`useHistoryRefresh`). The History database card shows Scanning while one runs, and when a scan finishes, the stats, costs and subscription are fetched again. A scan left marked running by a crash stops counting as running after 15 minutes.
+
 ## Planned
 
 Build order from here. Each step is its own commit.

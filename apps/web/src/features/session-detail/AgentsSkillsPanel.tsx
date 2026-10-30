@@ -5,6 +5,7 @@ import { formatTokenCount, formatDuration, formatUSD } from '@/lib/utils/format'
 import { format } from 'date-fns'
 import { settingsQuery } from '@/features/settings/settings.queries'
 import { getMergedPricing, calculateSessionCost } from '@/features/cost-estimation/cost-calculator'
+import { clockPattern } from '@/lib/utils/time-format'
 
 function computeAgentTokens(agent: AgentInvocation): number | undefined {
   if (!agent.tokens) return undefined
@@ -152,7 +153,7 @@ export function AgentDispatchesPanel({
                     <span className="text-[10px] text-gray-600">{formatDuration(a.durationMs)}</span>
                   )}
                   {row.count === 1 && a.timestamp && (
-                    <span className="text-[10px] text-gray-600">{format(new Date(a.timestamp), 'HH:mm:ss')}</span>
+                    <span className="text-[10px] text-gray-600">{format(new Date(a.timestamp), clockPattern('HH:mm:ss'))}</span>
                   )}
                 </div>
               </div>
@@ -238,7 +239,7 @@ export function SkillInvocationsPanel({
                   <span className="text-gray-400">{inv.agentSource ?? 'session'}</span>
                   {', '}
                   <span className="text-gray-600">
-                    {format(new Date(inv.timestamp), 'HH:mm:ss')}
+                    {format(new Date(inv.timestamp), clockPattern('HH:mm:ss'))}
                   </span>
                   {j < group.invocations.length - 1 && (
                     <span className="text-gray-700">{'; '}</span>

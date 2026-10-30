@@ -47,7 +47,7 @@ jobs:
         working-directory: ./apps/web
         run: |
           cp ../../LICENSE ./LICENSE
-          tar -czf "claude-session-dashboard-v${{ steps.version.outputs.version }}.tar.gz" \
+          tar -czf "holdmysession-v${{ steps.version.outputs.version }}.tar.gz" \
             bin/ \
             dist/ \
             node_modules/ \
@@ -57,12 +57,12 @@ jobs:
       - name: Generate SLSA provenance attestation
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
-          subject-path: ./apps/web/claude-session-dashboard-v${{ steps.version.outputs.version }}.tar.gz
+          subject-path: ./apps/web/holdmysession-v${{ steps.version.outputs.version }}.tar.gz
 
       - name: Upload release tarball
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ github.event.release.tag_name }}" \
-            "claude-session-dashboard-v${{ steps.version.outputs.version }}.tar.gz" \
+            "holdmysession-v${{ steps.version.outputs.version }}.tar.gz" \
             --repo "${{ github.repository }}"

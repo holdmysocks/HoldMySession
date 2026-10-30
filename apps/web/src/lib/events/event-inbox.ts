@@ -4,7 +4,7 @@ import * as path from 'node:path'
 import { z } from 'zod'
 
 /**
- * Hook events written by bin/claude-dashboard-hook.mjs, one JSON object per line.
+ * Hook events written by bin/holdmysession-hook.mjs, one JSON object per line.
  * The dashboard only reads this file; the hook is the sole writer.
  */
 

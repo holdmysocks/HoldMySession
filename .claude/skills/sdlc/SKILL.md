@@ -68,7 +68,7 @@ Output a formatted dashboard:
 
 ```
 ========================================
-  Claude Session Dashboard -- SDLC Pipeline Status
+  HoldMySession -- SDLC Pipeline Status
 ========================================
 
 Branch:    <current branch>

@@ -1,4 +1,5 @@
 import { formatDistanceToNow, format } from 'date-fns'
+import { clockPattern } from '@/lib/utils/time-format'
 
 export function formatDuration(ms: number): string {
   if (ms < 1000) return '<1s'
@@ -22,7 +23,7 @@ export function formatRelativeTime(dateStr: string): string {
 }
 
 export function formatDateTime(dateStr: string): string {
-  return format(new Date(dateStr), 'MMM d, yyyy HH:mm')
+  return format(new Date(dateStr), clockPattern('MMM d, yyyy HH:mm'))
 }
 
 export function formatTokenCount(count: number): string {

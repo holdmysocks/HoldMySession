@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 const APP_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const CLI = path.join(APP_DIR, 'bin', 'cli.mjs')
-const HOOK_SCRIPT = path.join(APP_DIR, 'bin', 'claude-dashboard-hook.mjs')
+const HOOK_SCRIPT = path.join(APP_DIR, 'bin', 'holdmysession-hook.mjs')
 
 function runCli(args: string[]) {
   return spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf-8', timeout: 15_000 })

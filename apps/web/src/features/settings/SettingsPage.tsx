@@ -10,6 +10,7 @@ import { PricingTableEditor } from './PricingTableEditor'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { useTheme } from '@/features/theme/ThemeProvider'
 import { HistoryPanel } from '@/features/history/HistoryPanel'
+import { ClockFormatSetting } from '@/features/time/ClockFormatSetting'
 import { PriceHistoryPanel } from '@/features/history/PriceHistoryPanel'
 import { SubscriptionPanel } from '@/features/history/SubscriptionPanel'
 
@@ -163,6 +164,8 @@ function SettingsForm({ settings }: { settings: Settings }) {
           </div>
         </div>
       </div>
+
+      <ClockFormatSetting />
 
       <HistoryPanel />
 

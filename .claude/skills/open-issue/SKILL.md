@@ -7,7 +7,7 @@ argument-hint: "<description>"
 
 # Open GitHub Issue
 
-You are creating a GitHub issue for the **Claude Session Dashboard** — a read-only local observability app that scans `~/.claude` to display session data. No database. No auth. Filesystem reads only.
+You are creating a GitHub issue for the **HoldMySession** — a read-only local observability app that scans `~/.claude` to display session data. No database. No auth. Filesystem reads only.
 
 ## Step 1: Explore
 

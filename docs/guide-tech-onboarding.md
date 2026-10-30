@@ -1,6 +1,6 @@
 # Technology Onboarding Guide
 
-A developer reference for all technologies, patterns, and approaches used in claude-session-dashboard. Use this to understand how the codebase works and learn the tools needed to make manual changes.
+A developer reference for all technologies, patterns, and approaches used in HoldMySession. Use this to understand how the codebase works and learn the tools needed to make manual changes.
 
 ---
 
@@ -410,8 +410,8 @@ Mtime-based cache with atomic writes. Prevents re-parsing unchanged files.
 ### NPM Package
 
 ```bash
-npx claude-session-dashboard          # Run directly
-npx claude-session-dashboard --port 8080 --open  # Custom port + open browser
+npm start                              # Run the built app
+npm start -- --port 8080 --open        # Custom port + open browser
 ```
 
 **CLI entry point:** `apps/web/bin/cli.mjs`

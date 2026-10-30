@@ -1,13 +1,13 @@
 {
-  "name": "claude-session-dashboard",
+  "name": "holdmysession",
   "version": "0.5.1",
   "description": "Local observability dashboard for Claude Code sessions",
   "type": "module",
   "license": "MIT",
-  "homepage": "https://github.com/dlupiak/claude-session-dashboard",
+  "homepage": "https://github.com/holdmysocks/HoldMySession",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dlupiak/claude-session-dashboard.git"
+    "url": "git+https://github.com/holdmysocks/HoldMySession.git"
   },
   "keywords": [
     "claude",
@@ -19,11 +19,10 @@
     "anthropic"
   ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.13.0"
   },
   "bin": {
-    "claude-dashboard": "bin/cli.mjs",
-    "claude-session-dashboard": "bin/cli.mjs"
+    "holdmysession": "bin/cli.mjs"
   },
   "files": [
     "bin/",

@@ -2,7 +2,7 @@
 # This file defines who will be automatically requested for review when PRs are opened.
 
 # Default owner for everything
-* @dlupiak
+* @holdmysocks
 
 # CI/CD workflows need extra review
-.github/ @dlupiak
+.github/ @holdmysocks

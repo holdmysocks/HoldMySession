@@ -1,20 +1,15 @@
-# Claude Session Dashboard
+# HoldMySession
 
-[![CI](https://github.com/dlupiak/claude-session-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/dlupiak/claude-session-dashboard/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/dlupiak/claude-session-dashboard/actions/workflows/codeql.yml/badge.svg)](https://github.com/dlupiak/claude-session-dashboard/actions/workflows/codeql.yml)
-[![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/dlupiak/claude-session-dashboard)](https://securityscorecards.dev/viewer/?uri=github.com/dlupiak/claude-session-dashboard)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12094/badge)](https://www.bestpractices.dev/projects/12094)
-[![codecov](https://codecov.io/gh/dlupiak/claude-session-dashboard/graph/badge.svg)](https://codecov.io/gh/dlupiak/claude-session-dashboard)
-[![Socket](https://img.shields.io/badge/Socket-secured-green?logo=socket.dev)](https://socket.dev/npm/package/claude-session-dashboard)
-[![npm version](https://img.shields.io/npm/v/claude-session-dashboard)](https://www.npmjs.com/package/claude-session-dashboard)
-[![npm downloads](https://img.shields.io/npm/dm/claude-session-dashboard)](https://www.npmjs.com/package/claude-session-dashboard)
-[![Node.js](https://img.shields.io/node/v/claude-session-dashboard)](https://nodejs.org)
+[![CI](https://github.com/holdmysocks/HoldMySession/actions/workflows/ci.yml/badge.svg)](https://github.com/holdmysocks/HoldMySession/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/holdmysocks/HoldMySession/actions/workflows/codeql.yml/badge.svg)](https://github.com/holdmysocks/HoldMySession/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 See exactly where your context window goes. Trace every agent delegation. Understand how your Claude Code workflows actually execute — all from your local `~/.claude`, no data sent anywhere.
 
 ```bash
-npx claude-session-dashboard
+git clone https://github.com/holdmysocks/HoldMySession.git
+cd HoldMySession/apps/web
+npm install && npm run build && npm start
 ```
 
 ## Why?
@@ -90,46 +85,28 @@ Everything runs entirely on your machine. Read-only — it never modifies any Cl
 
 ## Quick Start
 
-### Using npx (recommended)
-
-```bash
-npx claude-session-dashboard
-```
-
-### Using npm (global install)
-
-```bash
-npm install -g claude-session-dashboard
-claude-dashboard
-```
+Needs Node.js 22 or newer.
 
 ### From source
 
 ```bash
-git clone https://github.com/dlupiak/claude-session-dashboard.git
-cd claude-session-dashboard/apps/web
+git clone https://github.com/holdmysocks/HoldMySession.git
+cd HoldMySession/apps/web
 npm install
 npm run build
 npm start
 ```
 
+On Windows, `Update-SessionMap.ps1` in the repository root pulls, rebuilds and starts it for you.
+
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### Updating
 
-**npx** — always fetches the latest published version automatically. No action needed.
-
-**Global install** — check your current version and update:
+Pull the latest changes and rebuild:
 
 ```bash
-claude-dashboard --version           # see current version
-npm install -g claude-session-dashboard@latest
-```
-
-**From source** — pull the latest changes and rebuild:
-
-```bash
-cd claude-session-dashboard
+cd HoldMySession
 git pull
 cd apps/web && npm install && npm run build
 ```
@@ -153,7 +130,7 @@ The **Map** page (`/map`) shows one project's sessions as a tree: each session, 
 
 Sessions with no working directory in their transcripts have no project, so the map and the Sessions list hide them and show a count. Sessions archived in the Claude desktop app are hidden too, and counted. Stats and project analytics still count every session. A session the desktop app split to the top level is not linked to its old parent.
 
-Project and session names come from the transcripts: the project from the recorded working directory, the session from its `/rename` name. Notifications need an opt-in hook. Run `claude-dashboard --print-hook-config` and merge the output into the `hooks` section of `settings.json` in your Claude config directory. The hook records each notification's type and title. Details, data sources, status and limitations are in [docs/session-map/README.md](docs/session-map/README.md).
+Project and session names come from the transcripts: the project from the recorded working directory, the session from its `/rename` name. Notifications need an opt-in hook. Run `holdmysession --print-hook-config` and merge the output into the `hooks` section of `settings.json` in your Claude config directory. The hook records each notification's type and title. Details, data sources, status and limitations are in [docs/session-map/README.md](docs/session-map/README.md).
 
 ## Tech Stack
 
@@ -215,16 +192,15 @@ npm run e2e          # End-to-end tests (Playwright)
 
 ## Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and conventions. Check [good first issues](https://github.com/dlupiak/claude-session-dashboard/labels/good%20first%20issue) for beginner-friendly tasks.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and conventions. Check [good first issues](https://github.com/holdmysocks/HoldMySession/labels/good%20first%20issue) for beginner-friendly tasks.
 
 If you find this project useful, consider giving it a star -- it helps others discover it.
 
 ## Links
 
-- [GitHub](https://github.com/dlupiak/claude-session-dashboard)
-- [npm](https://www.npmjs.com/package/claude-session-dashboard)
-- [Issues](https://github.com/dlupiak/claude-session-dashboard/issues)
-- [Discussions](https://github.com/dlupiak/claude-session-dashboard/discussions)
+- [GitHub](https://github.com/holdmysocks/HoldMySession)
+- [Issues](https://github.com/holdmysocks/HoldMySession/issues)
+- [Discussions](https://github.com/holdmysocks/HoldMySession/discussions)
 
 ## License
 

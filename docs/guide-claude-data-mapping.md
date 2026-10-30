@@ -50,7 +50,7 @@ The `D--MCLA` example comes from the rule above: `D`, `:` and `\` each become `-
 | `projects/<project>/<session-id>/tool-results/` | Documented | Not read. |
 | `projects/<project>/<session-id>/` (the folder itself) | Documented as the place for subagents and tool results | Used as a *lock directory*: the active check requires it to exist. See the warning in the active-session section. |
 | `sessions/` (one small file per running session) | Documented. **Not located in the 2.1.312 bundle** | Not used. The dashboard keeps the mtime heuristic. |
-| `settings.json` (`hooks` key) | Documented | Not read. The dashboard prints a snippet for you to merge (`claude-dashboard --print-hook-config`). |
+| `settings.json` (`hooks` key) | Documented | Not read. The dashboard prints a snippet for you to merge (`holdmysession --print-hook-config`). |
 | `stats-cache.json`, `history.jsonl` | Unverified in the 2.1.312 bundle review | Stats page. Not part of the Session Map. |
 
 ### Project directory naming (why the dashboard never decodes it)
@@ -179,7 +179,7 @@ Notification input (Documented; the fields and the matcher values also appear in
 
 ### What the dashboard records
 
-`bin/claude-dashboard-hook.mjs` appends one line to `~/.holdmysession/events.jsonl` (or `HOLDMYSESSION_DIR/events.jsonl`) for `Notification` and `Stop`:
+`bin/holdmysession-hook.mjs` appends one line to `~/.holdmysession/events.jsonl` (or `HOLDMYSESSION_DIR/events.jsonl`) for `Notification` and `Stop`:
 
 ```json
 {"ts":"2026-10-29T10:03:00.000Z","event":"Notification","sessionId":"<id>","cwd":"/path","message":"Claude needs your permission to use Bash","notificationType":"permission_prompt","title":null}

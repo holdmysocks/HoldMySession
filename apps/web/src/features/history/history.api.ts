@@ -13,6 +13,8 @@ export interface HistoryStatus {
   usageRows: number
   firstDay: string | null
   lastDay: string | null
+  /** A scan is running now. A scan row left 'running' by a crash does not count after 15 minutes. */
+  scanning: boolean
   lastScan: {
     startedAt: string
     finishedAt: string | null
@@ -35,6 +37,10 @@ export const getHistoryStatus = createServerFn({ method: 'GET' }).handler(async 
       const n = (sql: string) => Number(db.prepare(sql).get()?.n ?? 0)
       const range = db.prepare('SELECT MIN(day) AS first, MAX(day) AS last FROM usage_daily').get()
       const scan = db.prepare('SELECT * FROM scan_log ORDER BY id DESC LIMIT 1').get()
+      const scanning =
+        scan?.status === 'running' && Date.now() - new Date(String(scan.started_at)).getTime() < 15 * 60_000
+      // The last scan that finished, so the panel can still say when it last worked while one is running.
+      const done = db.prepare("SELECT * FROM scan_log WHERE status != 'running' ORDER BY id DESC LIMIT 1").get()
       return {
         path: dbPath,
         schemaVersion: schemaVersion(db),
@@ -43,15 +49,16 @@ export const getHistoryStatus = createServerFn({ method: 'GET' }).handler(async 
         usageRows: n('SELECT COUNT(*) AS n FROM usage_daily'),
         firstDay: (range?.first as string | null) ?? null,
         lastDay: (range?.last as string | null) ?? null,
-        lastScan: scan
+        scanning,
+        lastScan: done
           ? {
-              startedAt: String(scan.started_at),
-              finishedAt: (scan.finished_at as string | null) ?? null,
-              status: String(scan.status),
-              sessionsSeen: Number(scan.sessions_seen),
-              sessionsAdded: Number(scan.sessions_added),
-              sessionsMissing: Number(scan.sessions_missing),
-              message: (scan.message as string | null) ?? null,
+              startedAt: String(done.started_at),
+              finishedAt: (done.finished_at as string | null) ?? null,
+              status: String(done.status),
+              sessionsSeen: Number(done.sessions_seen),
+              sessionsAdded: Number(done.sessions_added),
+              sessionsMissing: Number(done.sessions_missing),
+              message: (done.message as string | null) ?? null,
             }
           : null,
         error: null,
@@ -61,7 +68,7 @@ export const getHistoryStatus = createServerFn({ method: 'GET' }).handler(async 
     }
   } catch (error) {
     return {
-      path: dbPath, schemaVersion: 0, sessions: 0, sessionsNotOnDisk: 0, usageRows: 0, firstDay: null, lastDay: null,
+      path: dbPath, scanning: false, schemaVersion: 0, sessions: 0, sessionsNotOnDisk: 0, usageRows: 0, firstDay: null, lastDay: null,
       lastScan: null, error: error instanceof Error ? error.message : String(error),
     }
   }

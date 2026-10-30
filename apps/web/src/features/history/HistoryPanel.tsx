@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { settingsQuery } from '@/features/settings/settings.queries'
 import { AUTO_SCAN_INTERVALS } from '@/features/settings/settings.types'
 import { checkHistory, getHistoryStatus, rescanHistory, setAutoScan } from './history.api'
+import { clockPattern } from '@/lib/utils/time-format'
 
 const intervalLabel = (m: number) => (m < 60 ? `${m} minutes` : m === 60 ? '1 hour' : `${m / 60} hours`)
 
@@ -10,6 +11,8 @@ export const historyStatusQuery = queryOptions({
   queryKey: ['history-status'],
   queryFn: () => getHistoryStatus(),
   refetchOnWindowFocus: false,
+  // Quick while a scan runs, so its end shows without a refresh, and slow otherwise so a scan that starts by itself shows too.
+  refetchInterval: (query) => (query.state.data?.scanning ? 2_000 : 10_000),
 })
 
 export function HistoryPanel() {
@@ -29,6 +32,7 @@ export function HistoryPanel() {
   })
 
   const scan = status?.lastScan
+  const scanning = !!status?.scanning || rescan.isPending
   return (
     <div className="mt-6">
       <h2 className="text-sm font-semibold text-gray-300">History database</h2>
@@ -56,9 +60,15 @@ export function HistoryPanel() {
             </dd>
             <dt className="text-gray-500">Last scan</dt>
             <dd className="text-gray-300">
+              {scanning && (
+                <span className="mr-2 inline-flex items-center gap-1.5 text-brand-600">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-brand-500" aria-hidden="true" />
+                  Scanning…
+                </span>
+              )}
               {scan
-                ? `${format(new Date(scan.startedAt), 'MMM d, HH:mm')}: ${scan.status}, ${scan.sessionsSeen} sessions seen, ${scan.sessionsAdded} new`
-                : 'Never'}
+                ? `${format(new Date(scan.startedAt), clockPattern('MMM d, HH:mm'))}: ${scan.status}, ${scan.sessionsSeen} sessions seen, ${scan.sessionsAdded} new`
+                : scanning ? '' : 'Never'}
               {scan?.message && <span className="block text-amber-400">{scan.message}</span>}
             </dd>
           </dl>
@@ -94,10 +104,12 @@ export function HistoryPanel() {
               </select>
             </label>
             <span className="text-gray-500">
-              {!autoScan.enabled
+              {scanning
+                ? 'Scanning now'
+                : !autoScan.enabled
                 ? 'Off. Use Rescan now to refresh.'
                 : scan?.finishedAt
-                  ? `Next around ${format(new Date(new Date(scan.finishedAt).getTime() + autoScan.intervalMinutes * 60_000), 'HH:mm')}`
+                  ? `Next around ${format(new Date(new Date(scan.finishedAt).getTime() + autoScan.intervalMinutes * 60_000), clockPattern('HH:mm'))}`
                   : 'Runs when the server starts'}
             </span>
           </div>
@@ -106,10 +118,10 @@ export function HistoryPanel() {
           <button
             type="button"
             onClick={() => rescan.mutate()}
-            disabled={rescan.isPending}
+            disabled={scanning}
             className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-xs text-gray-300 hover:text-gray-100 disabled:opacity-50"
           >
-            {rescan.isPending ? 'Scanning…' : 'Rescan now'}
+            {scanning ? 'Scanning…' : 'Rescan now'}
           </button>
           <button
             type="button"

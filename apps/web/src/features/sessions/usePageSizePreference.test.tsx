@@ -65,7 +65,7 @@ describe('usePageSizePreference', () => {
     })
 
     it('should return stored value when valid (5)', async () => {
-      localStorage.setItem('claude-dashboard:page-size', '5')
+      localStorage.setItem('holdmysession:page-size', '5')
       render(<TestComponent />)
 
       await waitFor(() => {
@@ -74,7 +74,7 @@ describe('usePageSizePreference', () => {
     })
 
     it('should return stored value when valid (10)', async () => {
-      localStorage.setItem('claude-dashboard:page-size', '10')
+      localStorage.setItem('holdmysession:page-size', '10')
       render(<TestComponent />)
 
       await waitFor(() => {
@@ -83,7 +83,7 @@ describe('usePageSizePreference', () => {
     })
 
     it('should return stored value when valid (25)', async () => {
-      localStorage.setItem('claude-dashboard:page-size', '25')
+      localStorage.setItem('holdmysession:page-size', '25')
       render(<TestComponent />)
 
       await waitFor(() => {
@@ -92,7 +92,7 @@ describe('usePageSizePreference', () => {
     })
 
     it('should return stored value when valid (50)', async () => {
-      localStorage.setItem('claude-dashboard:page-size', '50')
+      localStorage.setItem('holdmysession:page-size', '50')
       render(<TestComponent />)
 
       await waitFor(() => {
@@ -101,28 +101,28 @@ describe('usePageSizePreference', () => {
     })
 
     it('should return null when stored value is invalid (too small)', () => {
-      localStorage.setItem('claude-dashboard:page-size', '3')
+      localStorage.setItem('holdmysession:page-size', '3')
       render(<TestComponent />)
 
       expect(screen.getByTestId('page-size').textContent).toBe('null')
     })
 
     it('should return null when stored value is invalid (too large)', () => {
-      localStorage.setItem('claude-dashboard:page-size', '100')
+      localStorage.setItem('holdmysession:page-size', '100')
       render(<TestComponent />)
 
       expect(screen.getByTestId('page-size').textContent).toBe('null')
     })
 
     it('should return null when stored value is invalid (not a number)', () => {
-      localStorage.setItem('claude-dashboard:page-size', 'invalid')
+      localStorage.setItem('holdmysession:page-size', 'invalid')
       render(<TestComponent />)
 
       expect(screen.getByTestId('page-size').textContent).toBe('null')
     })
 
     it('should return null when stored value is invalid (negative)', () => {
-      localStorage.setItem('claude-dashboard:page-size', '-10')
+      localStorage.setItem('holdmysession:page-size', '-10')
       render(<TestComponent />)
 
       expect(screen.getByTestId('page-size').textContent).toBe('null')
@@ -136,7 +136,7 @@ describe('usePageSizePreference', () => {
       getByTestId('set-25').click()
 
       await waitFor(() => {
-        expect(localStorage.getItem('claude-dashboard:page-size')).toBe('25')
+        expect(localStorage.getItem('holdmysession:page-size')).toBe('25')
         expect(getByTestId('page-size').textContent).toBe('25')
       })
     })
@@ -165,7 +165,7 @@ describe('usePageSizePreference', () => {
       // Wait a bit to ensure any state updates would have happened
       await new Promise(resolve => setTimeout(resolve, 50))
 
-      expect(localStorage.getItem('claude-dashboard:page-size')).toBeNull()
+      expect(localStorage.getItem('holdmysession:page-size')).toBeNull()
       expect(getByTestId('page-size').textContent).toBe('null')
     })
 
@@ -187,7 +187,7 @@ describe('usePageSizePreference', () => {
 
       // Should remain at 25
       expect(getByTestId('page-size').textContent).toBe('25')
-      expect(localStorage.getItem('claude-dashboard:page-size')).toBe('25')
+      expect(localStorage.getItem('holdmysession:page-size')).toBe('25')
     })
 
     it('should write all valid sizes correctly', async () => {
@@ -198,7 +198,7 @@ describe('usePageSizePreference', () => {
 
         await waitFor(() => {
           expect(getByTestId('page-size').textContent).toBe(String(size))
-          expect(localStorage.getItem('claude-dashboard:page-size')).toBe(String(size))
+          expect(localStorage.getItem('holdmysession:page-size')).toBe(String(size))
         })
       }
     })

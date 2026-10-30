@@ -32,9 +32,9 @@ const hasFlag = (name, short) => args.includes(`--${name}`) || (short && args.in
 
 if (hasFlag('help', 'h')) {
   console.log(`
-Claude Session Dashboard v${pkg.version}
+HoldMySession v${pkg.version}
 
-Usage: claude-dashboard [options]
+Usage: holdmysession [options]
 
 Options:
   -p, --port <number>   Port to listen on (default: 3000)
@@ -54,7 +54,7 @@ if (hasFlag('version', 'v')) {
 }
 
 if (hasFlag('print-hook-config')) {
-  const hookScript = resolve(__dirname, 'claude-dashboard-hook.mjs');
+  const hookScript = resolve(__dirname, 'holdmysession-hook.mjs');
   const command = hookScript.includes(' ') ? `node "${hookScript}"` : `node ${hookScript}`;
   const hook = { hooks: [{ type: 'command', command }] };
   console.error('Add the "hooks" block below to settings.json in your Claude config directory (merge it with any existing "hooks").');
@@ -193,7 +193,7 @@ const server = createServer(async (req, res) => {
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`\nError: Port ${port} is already in use.`);
-    console.error(`Try a different port: claude-dashboard --port ${port + 1}\n`);
+    console.error(`Try a different port: holdmysession --port ${port + 1}\n`);
     process.exit(1);
   }
   console.error('Server error:', err);
@@ -204,7 +204,7 @@ server.listen(port, host, () => {
   const url = `http://${host}:${port}`;
 
   console.log(`
-  Claude Session Dashboard v${pkg.version}
+  HoldMySession v${pkg.version}
   Running at ${url}
   Reading sessions from ${claudeDir}
 
