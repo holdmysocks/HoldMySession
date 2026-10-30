@@ -2,6 +2,7 @@ import type { SessionDetail, SessionSummary, TokenUsage } from '@/lib/parsers/ty
 import type { Db } from './sqlite'
 import { getMeta, inTransaction } from './history-db'
 import { localDay, splitByWeight } from './day-allocation'
+import { refreshFingerprints } from '@/lib/link/sync-hash'
 
 export interface IngestEntry {
   summary: SessionSummary
@@ -146,6 +147,8 @@ export function ingestSessions(db: Db, entries: IngestEntry[], now: Date = new D
         result.missing += 1
       }
     }
+    // A master is told about a session when its fingerprint changes.
+    refreshFingerprints(db, machineId)
   })
 
   return result

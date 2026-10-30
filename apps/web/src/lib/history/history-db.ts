@@ -1,6 +1,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
+import * as os from 'node:os'
 import { openSqlite, type Db } from './sqlite'
 import { dataDir } from '@/lib/data-dir'
 
@@ -152,6 +153,22 @@ const MIGRATIONS: string[] = [
     created_at TEXT NOT NULL
   );
   `,
+  // 6: linked machines. Every machine whose data is in this database has a row, this one included. sync_hash is
+  // a fingerprint of a session and its usage, and synced_hash the one last sent to the master, so only changes are sent.
+  `
+  CREATE TABLE machines (
+    machine_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    name_updated_at TEXT NOT NULL,
+    is_self INTEGER NOT NULL DEFAULT 0,
+    app_version TEXT,
+    schema_version INTEGER,
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL
+  );
+  ALTER TABLE sessions ADD COLUMN sync_hash TEXT;
+  ALTER TABLE sessions ADD COLUMN synced_hash TEXT;
+  `,
 ]
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length
@@ -239,6 +256,14 @@ export function openHistoryDb(file: string = historyDbPath()): Db {
     setMeta(db, 'machine_id', randomUUID())
     setMeta(db, 'created_at', new Date().toISOString())
     setMeta(db, 'timezone', Intl.DateTimeFormat().resolvedOptions().timeZone)
+  }
+  // This machine's own row. Its name starts as the computer's name and can be changed in Settings.
+  const self = getMeta(db, 'machine_id')!
+  if (!db.prepare('SELECT 1 AS found FROM machines WHERE machine_id = ?').get(self)) {
+    const now = new Date().toISOString()
+    db.prepare(
+      'INSERT INTO machines (machine_id, name, name_updated_at, is_self, first_seen_at, last_seen_at) VALUES (?, ?, ?, 1, ?, ?)',
+    ).run(self, os.hostname() || 'This computer', now, now, now)
   }
   return db
 }

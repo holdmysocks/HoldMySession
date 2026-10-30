@@ -10,7 +10,7 @@ export interface AppInfo {
   nodeEnv: string
 }
 
-function readVersionFromPackageJson(): string {
+export function readVersionFromPackageJson(): string {
   // Try multiple candidate paths relative to the compiled server file
   // (dist/server/assets/app-info.api-*.js), walking up to the package root.
   const candidates = [

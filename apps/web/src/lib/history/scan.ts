@@ -3,6 +3,7 @@ import { parseDetailsDeduplicated } from '@/lib/parsers/stats-parser'
 import type { Db } from './sqlite'
 import { openHistoryDb } from './history-db'
 import { ingestSessions } from './ingest'
+import { readSettingsFile } from '@/lib/settings-file'
 
 export interface ScanOutcome {
   ok: boolean
@@ -71,6 +72,16 @@ async function scanOnce(existing?: Db): Promise<ScanOutcome> {
     new Date().toISOString(), outcome.ok ? 'ok' : 'error', outcome.sessionsSeen, outcome.added, outcome.updated,
     outcome.missing, outcome.ok ? 0 : 1, outcome.message, logId,
   )
+  // A linked node tells its master what changed. A failure is kept for Settings to show and never fails the scan.
+  if (outcome.ok) {
+    try {
+      const { pushToMaster } = await import('@/lib/link/node-sync')
+      const { readVersionFromPackageJson } = await import('@/features/settings/app-info.api')
+      await pushToMaster(db, readSettingsFile(), readVersionFromPackageJson())
+    } catch (error) {
+      console.warn('Sending to the master failed:', error)
+    }
+  }
   if (!existing) db.close()
   return outcome
 }

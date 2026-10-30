@@ -21,12 +21,26 @@ export const AutoScanSchema = z.object({
     .default(15),
 })
 
+/** Whether this install is a node (the default, working on its own or sending to a master) or a master. */
+export const LinkSchema = z.object({
+  role: z.enum(['node', 'master']).default('node'),
+  /** Node: the master's address, as typed. Any address that reaches it works, local or tailnet. */
+  masterUrl: z.string().default(''),
+  /** Node: the master's token. */
+  masterToken: z.string().default(''),
+  /** Master: the token a node must present. Empty until the master role is first switched on. */
+  nodeToken: z.string().default(''),
+  /** Whether the server listens only on this computer, or on the network. Applied when the server starts. */
+  listen: z.enum(['local', 'network']).default('local'),
+})
+
 export const SettingsSchema = z.object({
   version: z.literal(1),
   subscriptionTier: z
     .enum(['free', 'pro', 'max-5x', 'max-20x', 'teams', 'enterprise', 'api'])
     .default('pro'),
   autoScan: AutoScanSchema.default({ enabled: true, intervalMinutes: 15 }),
+  link: LinkSchema.default({ role: 'node', masterUrl: '', masterToken: '', nodeToken: '', listen: 'local' }),
   pricingOverrides: z
     .record(z.string(), ModelPricingOverrideSchema)
     .default({}),
@@ -48,6 +62,7 @@ export const SettingsSchema = z.object({
 export type ModelPricingOverride = z.infer<typeof ModelPricingOverrideSchema>
 export type Settings = z.infer<typeof SettingsSchema>
 export type AutoScanSetting = z.infer<typeof AutoScanSchema>
+export type LinkSetting = z.infer<typeof LinkSchema>
 export type SubscriptionTierId = Settings['subscriptionTier']
 
 export interface ModelPricing {
@@ -267,6 +282,7 @@ export const DEFAULT_SETTINGS: Settings = {
   version: 1,
   subscriptionTier: 'pro',
   autoScan: { enabled: true, intervalMinutes: 15 },
+  link: { role: 'node', masterUrl: '', masterToken: '', nodeToken: '', listen: 'local' },
   pricingOverrides: {},
   dataSources: [],
 }

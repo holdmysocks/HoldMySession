@@ -17,6 +17,8 @@ import { Route as DashboardStatsRouteImport } from './routes/_dashboard/stats'
 import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
 import { Route as DashboardMapRouteImport } from './routes/_dashboard/map'
 import { Route as DashboardSessionsIndexRouteImport } from './routes/_dashboard/sessions/index'
+import { Route as ApiLinkPushRouteImport } from './routes/api.link.push'
+import { Route as ApiLinkPingRouteImport } from './routes/api.link.ping'
 import { Route as DashboardSessionsSessionIdRouteImport } from './routes/_dashboard/sessions/$sessionId'
 
 const DashboardRoute = DashboardRouteImport.update({
@@ -58,6 +60,16 @@ const DashboardSessionsIndexRoute = DashboardSessionsIndexRouteImport.update({
   path: '/sessions/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const ApiLinkPushRoute = ApiLinkPushRouteImport.update({
+  id: '/api/link/push',
+  path: '/api/link/push',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLinkPingRoute = ApiLinkPingRouteImport.update({
+  id: '/api/link/ping',
+  path: '/api/link/ping',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardSessionsSessionIdRoute =
   DashboardSessionsSessionIdRouteImport.update({
     id: '/sessions/$sessionId',
@@ -73,6 +85,8 @@ export interface FileRoutesByFullPath {
   '/api/history-backup': typeof ApiHistoryBackupRoute
   '/api/history-restore': typeof ApiHistoryRestoreRoute
   '/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
+  '/api/link/ping': typeof ApiLinkPingRoute
+  '/api/link/push': typeof ApiLinkPushRoute
   '/sessions/': typeof DashboardSessionsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -83,6 +97,8 @@ export interface FileRoutesByTo {
   '/api/history-backup': typeof ApiHistoryBackupRoute
   '/api/history-restore': typeof ApiHistoryRestoreRoute
   '/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
+  '/api/link/ping': typeof ApiLinkPingRoute
+  '/api/link/push': typeof ApiLinkPushRoute
   '/sessions': typeof DashboardSessionsIndexRoute
 }
 export interface FileRoutesById {
@@ -95,6 +111,8 @@ export interface FileRoutesById {
   '/api/history-backup': typeof ApiHistoryBackupRoute
   '/api/history-restore': typeof ApiHistoryRestoreRoute
   '/_dashboard/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
+  '/api/link/ping': typeof ApiLinkPingRoute
+  '/api/link/push': typeof ApiLinkPushRoute
   '/_dashboard/sessions/': typeof DashboardSessionsIndexRoute
 }
 export interface FileRouteTypes {
@@ -107,6 +125,8 @@ export interface FileRouteTypes {
     | '/api/history-backup'
     | '/api/history-restore'
     | '/sessions/$sessionId'
+    | '/api/link/ping'
+    | '/api/link/push'
     | '/sessions/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -117,6 +137,8 @@ export interface FileRouteTypes {
     | '/api/history-backup'
     | '/api/history-restore'
     | '/sessions/$sessionId'
+    | '/api/link/ping'
+    | '/api/link/push'
     | '/sessions'
   id:
     | '__root__'
@@ -128,6 +150,8 @@ export interface FileRouteTypes {
     | '/api/history-backup'
     | '/api/history-restore'
     | '/_dashboard/sessions/$sessionId'
+    | '/api/link/ping'
+    | '/api/link/push'
     | '/_dashboard/sessions/'
   fileRoutesById: FileRoutesById
 }
@@ -136,6 +160,8 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRouteWithChildren
   ApiHistoryBackupRoute: typeof ApiHistoryBackupRoute
   ApiHistoryRestoreRoute: typeof ApiHistoryRestoreRoute
+  ApiLinkPingRoute: typeof ApiLinkPingRoute
+  ApiLinkPushRoute: typeof ApiLinkPushRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -196,6 +222,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSessionsIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/api/link/push': {
+      id: '/api/link/push'
+      path: '/api/link/push'
+      fullPath: '/api/link/push'
+      preLoaderRoute: typeof ApiLinkPushRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/link/ping': {
+      id: '/api/link/ping'
+      path: '/api/link/ping'
+      fullPath: '/api/link/ping'
+      preLoaderRoute: typeof ApiLinkPingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_dashboard/sessions/$sessionId': {
       id: '/_dashboard/sessions/$sessionId'
       path: '/sessions/$sessionId'
@@ -231,6 +271,8 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRouteWithChildren,
   ApiHistoryBackupRoute: ApiHistoryBackupRoute,
   ApiHistoryRestoreRoute: ApiHistoryRestoreRoute,
+  ApiLinkPingRoute: ApiLinkPingRoute,
+  ApiLinkPushRoute: ApiLinkPushRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
