@@ -213,3 +213,25 @@ export const setAutoScan = createServerFn({ method: 'POST' })
     const { readSettingsFile, writeSettingsFile } = await import('@/lib/settings-file')
     return writeSettingsFile({ ...readSettingsFile(), autoScan: data }).autoScan
   })
+
+export interface BackupSummary {
+  name: string
+  sizeBytes: number
+  createdAt: string
+}
+
+export const getBackups = createServerFn({ method: 'GET' }).handler(async (): Promise<BackupSummary[]> => {
+  const { listBackups } = await import('@/lib/history/backup')
+  return listBackups()
+})
+
+export const backUpNow = createServerFn({ method: 'POST' }).handler(async (): Promise<BackupSummary> => {
+  const { openHistoryDb } = await import('@/lib/history/history-db')
+  const { createBackup } = await import('@/lib/history/backup')
+  const db = openHistoryDb()
+  try {
+    return createBackup(db, 'manual')
+  } finally {
+    db.close()
+  }
+})

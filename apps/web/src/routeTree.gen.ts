@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as DashboardRouteImport } from './routes/_dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiHistoryRestoreRouteImport } from './routes/api.history-restore'
+import { Route as ApiHistoryBackupRouteImport } from './routes/api.history-backup'
 import { Route as DashboardStatsRouteImport } from './routes/_dashboard/stats'
 import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
 import { Route as DashboardMapRouteImport } from './routes/_dashboard/map'
@@ -24,6 +26,16 @@ const DashboardRoute = DashboardRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHistoryRestoreRoute = ApiHistoryRestoreRouteImport.update({
+  id: '/api/history-restore',
+  path: '/api/history-restore',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHistoryBackupRoute = ApiHistoryBackupRouteImport.update({
+  id: '/api/history-backup',
+  path: '/api/history-backup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardStatsRoute = DashboardStatsRouteImport.update({
@@ -58,6 +70,8 @@ export interface FileRoutesByFullPath {
   '/map': typeof DashboardMapRoute
   '/settings': typeof DashboardSettingsRoute
   '/stats': typeof DashboardStatsRoute
+  '/api/history-backup': typeof ApiHistoryBackupRoute
+  '/api/history-restore': typeof ApiHistoryRestoreRoute
   '/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
   '/sessions/': typeof DashboardSessionsIndexRoute
 }
@@ -66,6 +80,8 @@ export interface FileRoutesByTo {
   '/map': typeof DashboardMapRoute
   '/settings': typeof DashboardSettingsRoute
   '/stats': typeof DashboardStatsRoute
+  '/api/history-backup': typeof ApiHistoryBackupRoute
+  '/api/history-restore': typeof ApiHistoryRestoreRoute
   '/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
   '/sessions': typeof DashboardSessionsIndexRoute
 }
@@ -76,6 +92,8 @@ export interface FileRoutesById {
   '/_dashboard/map': typeof DashboardMapRoute
   '/_dashboard/settings': typeof DashboardSettingsRoute
   '/_dashboard/stats': typeof DashboardStatsRoute
+  '/api/history-backup': typeof ApiHistoryBackupRoute
+  '/api/history-restore': typeof ApiHistoryRestoreRoute
   '/_dashboard/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
   '/_dashboard/sessions/': typeof DashboardSessionsIndexRoute
 }
@@ -86,6 +104,8 @@ export interface FileRouteTypes {
     | '/map'
     | '/settings'
     | '/stats'
+    | '/api/history-backup'
+    | '/api/history-restore'
     | '/sessions/$sessionId'
     | '/sessions/'
   fileRoutesByTo: FileRoutesByTo
@@ -94,6 +114,8 @@ export interface FileRouteTypes {
     | '/map'
     | '/settings'
     | '/stats'
+    | '/api/history-backup'
+    | '/api/history-restore'
     | '/sessions/$sessionId'
     | '/sessions'
   id:
@@ -103,6 +125,8 @@ export interface FileRouteTypes {
     | '/_dashboard/map'
     | '/_dashboard/settings'
     | '/_dashboard/stats'
+    | '/api/history-backup'
+    | '/api/history-restore'
     | '/_dashboard/sessions/$sessionId'
     | '/_dashboard/sessions/'
   fileRoutesById: FileRoutesById
@@ -110,6 +134,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRouteWithChildren
+  ApiHistoryBackupRoute: typeof ApiHistoryBackupRoute
+  ApiHistoryRestoreRoute: typeof ApiHistoryRestoreRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -126,6 +152,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/history-restore': {
+      id: '/api/history-restore'
+      path: '/api/history-restore'
+      fullPath: '/api/history-restore'
+      preLoaderRoute: typeof ApiHistoryRestoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/history-backup': {
+      id: '/api/history-backup'
+      path: '/api/history-backup'
+      fullPath: '/api/history-backup'
+      preLoaderRoute: typeof ApiHistoryBackupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_dashboard/stats': {
@@ -189,6 +229,8 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRouteWithChildren,
+  ApiHistoryBackupRoute: ApiHistoryBackupRoute,
+  ApiHistoryRestoreRoute: ApiHistoryRestoreRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

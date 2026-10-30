@@ -53,6 +53,14 @@ Settings, under History database, has a switch and an interval: 5, 10, 15, 30 mi
 
 The pages follow the scans without a refresh. The page frame checks the scan state every 10 seconds, and every 2 seconds while one is running (`useHistoryRefresh`). The History database card shows Scanning while one runs, and when a scan finishes, the stats, costs and subscription are fetched again. A scan left marked running by a crash stops counting as running after 15 minutes.
 
+## Backup and restore
+
+Settings, under Backup and restore, has **Back up now**, a list of backups with a Download link each, and **Restore from file…**. A backup is a consistent copy of the database made with SQLite's `VACUUM INTO`, which is safe while the dashboard is running, saved in `backups/` in the data folder. The newest 10 are kept (`src/lib/history/backup.ts`).
+
+A restore checks the file first: it must be a SQLite database with this app's tables, pass SQLite's integrity check, and not be from a newer app. It then saves the current database as a `before-restore` backup, upgrades the uploaded file to the current schema, and swaps it in, so a restore can be undone by restoring that backup. The machine id travels with the file, so a database copied to a new machine carries on as the same machine. A restore is refused while a scan is running.
+
+Download and restore are two small server routes, `/api/history-backup` and `/api/history-restore`. The dashboard has no login, so the restore only accepts a request that carries the `x-holdmysession` header and, if the browser names an origin, one that is this server (`request-guard.ts`), so another website open in the same browser cannot replace the history through localhost. Backup names are checked against a fixed pattern, never used to build a path.
+
 ## Planned
 
 Build order from here. Each step is its own commit.
@@ -63,7 +71,7 @@ Build order from here. Each step is its own commit.
 4. **Dated pricing (done).** See below.
 5. **Subscription history (done).** See below.
 6. **Automatic scan (done).** See below.
-7. **Backup and restore** of the database from Settings.
+7. **Backup and restore (done).** See below.
 8. **Linked machines**, below.
 
 ## Linked machines (master and node)

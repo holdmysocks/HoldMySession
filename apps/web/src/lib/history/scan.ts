@@ -15,6 +15,11 @@ export interface ScanOutcome {
 
 let running: Promise<ScanOutcome> | null = null
 
+/** Whether a scan is running in this process. A restore must not start in the middle of one. */
+export function isHistoryScanRunning(): boolean {
+  return running !== null
+}
+
 /**
  * Reads every session from the Claude folder and records it in the history database. One scan runs
  * at a time: a call made while one is running gets that scan's result. An empty scan (the Claude
