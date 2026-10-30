@@ -251,6 +251,7 @@ export async function parseDetail(
         existing.outputTokens += usage.output_tokens ?? 0
         existing.cacheReadInputTokens += usage.cache_read_input_tokens ?? 0
         existing.cacheCreationInputTokens += usage.cache_creation_input_tokens ?? 0
+        existing.thinkingTokens = (existing.thinkingTokens ?? 0) + (usage.output_tokens_details?.thinking_tokens ?? 0)
         agentProgressTokens.set(parentId, existing)
 
         // Also add to session-level totals for accurate cost estimation
@@ -259,12 +260,14 @@ export async function parseDetail(
           outputTokens: usage.output_tokens ?? 0,
           cacheReadInputTokens: usage.cache_read_input_tokens ?? 0,
           cacheCreationInputTokens: usage.cache_creation_input_tokens ?? 0,
+          thinkingTokens: usage.output_tokens_details?.thinking_tokens ?? 0,
         }
 
         totalTokens.inputTokens += tokens.inputTokens
         totalTokens.outputTokens += tokens.outputTokens
         totalTokens.cacheReadInputTokens += tokens.cacheReadInputTokens
         totalTokens.cacheCreationInputTokens += tokens.cacheCreationInputTokens
+        totalTokens.thinkingTokens = (totalTokens.thinkingTokens ?? 0) + (tokens.thinkingTokens ?? 0)
 
         // Add to per-model tracking using model from progress message
         const modelId = msg.data?.message?.message?.model ?? 'unknown'
@@ -279,6 +282,7 @@ export async function parseDetail(
           modelExisting.outputTokens += tokens.outputTokens
           modelExisting.cacheReadInputTokens += tokens.cacheReadInputTokens
           modelExisting.cacheCreationInputTokens += tokens.cacheCreationInputTokens
+          modelExisting.thinkingTokens = (modelExisting.thinkingTokens ?? 0) + (tokens.thinkingTokens ?? 0)
           tokensByModel[modelId] = modelExisting
         }
       }
@@ -376,6 +380,7 @@ export async function parseDetail(
           outputTokens: u.output_tokens ?? 0,
           cacheReadInputTokens: u.cache_read_input_tokens ?? 0,
           cacheCreationInputTokens: u.cache_creation_input_tokens ?? 0,
+          thinkingTokens: u.output_tokens_details?.thinking_tokens ?? 0,
         }
 
         // Deduplicate by requestId — same API call can appear in multiple JSONL lines
@@ -388,6 +393,7 @@ export async function parseDetail(
           totalTokens.outputTokens += tokens.outputTokens
           totalTokens.cacheReadInputTokens += tokens.cacheReadInputTokens
           totalTokens.cacheCreationInputTokens += tokens.cacheCreationInputTokens
+          totalTokens.thinkingTokens = (totalTokens.thinkingTokens ?? 0) + (tokens.thinkingTokens ?? 0)
 
           // Track per-model token usage
           if (msg.message.model) {
@@ -403,6 +409,7 @@ export async function parseDetail(
             existing.outputTokens += tokens.outputTokens
             existing.cacheReadInputTokens += tokens.cacheReadInputTokens
             existing.cacheCreationInputTokens += tokens.cacheCreationInputTokens
+            existing.thinkingTokens = (existing.thinkingTokens ?? 0) + (tokens.thinkingTokens ?? 0)
             tokensByModel[modelId] = existing
           }
         }
@@ -771,6 +778,7 @@ async function parseSubagentDetail(
         tokens.outputTokens += u.output_tokens ?? 0
         tokens.cacheReadInputTokens += u.cache_read_input_tokens ?? 0
         tokens.cacheCreationInputTokens += u.cache_creation_input_tokens ?? 0
+        tokens.thinkingTokens = (tokens.thinkingTokens ?? 0) + (u.output_tokens_details?.thinking_tokens ?? 0)
       }
 
       // Extract tool calls and skills from content blocks
@@ -851,6 +859,7 @@ function addTokens(target: TokenUsage, source: TokenUsage): void {
   target.outputTokens += source.outputTokens
   target.cacheReadInputTokens += source.cacheReadInputTokens
   target.cacheCreationInputTokens += source.cacheCreationInputTokens
+  target.thinkingTokens = (target.thinkingTokens ?? 0) + (source.thinkingTokens ?? 0)
 }
 
 function subtractTokens(target: TokenUsage, source: TokenUsage): void {
@@ -858,6 +867,7 @@ function subtractTokens(target: TokenUsage, source: TokenUsage): void {
   target.outputTokens -= source.outputTokens
   target.cacheReadInputTokens -= source.cacheReadInputTokens
   target.cacheCreationInputTokens -= source.cacheCreationInputTokens
+  target.thinkingTokens = (target.thinkingTokens ?? 0) - (source.thinkingTokens ?? 0)
 }
 
 /**

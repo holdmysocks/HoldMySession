@@ -83,9 +83,15 @@ export interface ToolCall {
 
 export interface TokenUsage {
   inputTokens: number
+  /** Everything the model generated, reasoning included. This is what is billed as output. */
   outputTokens: number
   cacheReadInputTokens: number
   cacheCreationInputTokens: number
+  /**
+   * The part of `outputTokens` the model spent on internal reasoning, from the transcripts'
+   * `output_tokens_details.thinking_tokens`. Absent when the source does not record it.
+   */
+  thinkingTokens?: number
 }
 
 export interface AgentInvocation {
@@ -185,6 +191,7 @@ export const ModelUsageSchema = z.record(
     outputTokens: z.number(),
     cacheReadInputTokens: z.number(),
     cacheCreationInputTokens: z.number(),
+    thinkingTokens: z.number().optional(),
     webSearchRequests: z.number().optional(),
     costUSD: z.number().optional(),
   }),
@@ -272,6 +279,7 @@ export interface RawJsonlMessage {
       output_tokens?: number
       cache_read_input_tokens?: number
       cache_creation_input_tokens?: number
+      output_tokens_details?: { thinking_tokens?: number }
     }
     stop_reason?: string
   }
@@ -289,6 +297,7 @@ export interface RawJsonlMessage {
           output_tokens?: number
           cache_read_input_tokens?: number
           cache_creation_input_tokens?: number
+          output_tokens_details?: { thinking_tokens?: number }
         }
       }
     }

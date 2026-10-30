@@ -12,6 +12,7 @@ export function tokensByModelOf(stats: StatsCache | null | undefined): Record<st
       outputTokens: usage.outputTokens,
       cacheReadInputTokens: usage.cacheReadInputTokens,
       cacheCreationInputTokens: usage.cacheCreationInputTokens,
+      thinkingTokens: usage.thinkingTokens,
     }
   }
   return result

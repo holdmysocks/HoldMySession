@@ -146,8 +146,10 @@ describe('formatTokenCount', () => {
     expect(formatTokenCount(10_000_000)).toBe('10.0M')
   })
 
-  it('handles very large token counts', () => {
-    expect(formatTokenCount(1_000_000_000)).toBe('1000.0M')
+  it('shows billions with a B', () => {
+    expect(formatTokenCount(1_000_000_000)).toBe('1.0B')
+    expect(formatTokenCount(9_876_543_210)).toBe('9.9B')
+    expect(formatTokenCount(999_999_999)).toBe('1000.0M')
   })
 })
 

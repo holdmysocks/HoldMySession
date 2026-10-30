@@ -92,6 +92,14 @@ export const DEFAULT_PRICING: ModelPricing[] = [
     cacheWritePerMTok: 0.125,
   },
   {
+    modelId: 'claude-opus-5',
+    displayName: 'Claude Opus 5',
+    inputPerMTok: 5.0,
+    outputPerMTok: 25.0,
+    cacheReadPerMTok: 0.5,
+    cacheWritePerMTok: 6.25,
+  },
+  {
     modelId: 'claude-opus-4-6',
     displayName: 'Claude Opus 4.6',
     inputPerMTok: 5.0,

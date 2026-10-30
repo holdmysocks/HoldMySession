@@ -134,7 +134,7 @@ describe('stats across forked sessions', () => {
     const sink: RequestUsageSink = new Map()
     await parseDetail(write('parent', parentRecords), 'parent', '/w/app', 'app', sink)
     expect([...sink.keys()].sort()).toEqual(['req_1', 'req_2'])
-    expect(sink.get('req_2')).toEqual({ model: 'claude-haiku-5-5', usage: usage(200, 20, 6000, 0) })
+    expect(sink.get('req_2')).toEqual({ model: 'claude-haiku-5-5', usage: { ...usage(200, 20, 6000, 0), thinkingTokens: 0 } })
   })
 
   it('counts a request that sits in a parent and a fork once', async () => {
@@ -156,5 +156,56 @@ describe('stats across forked sessions', () => {
     const one = await computeStatsFromSummaries([parent, fork])
     const other = await computeStatsFromSummaries([fork, parent])
     expect(other!.modelUsage).toEqual(one!.modelUsage)
+  })
+})
+
+describe('reasoning tokens', () => {
+  let dir: string
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stats-thinking-'))
+  })
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  const assistant = (requestId: string, output: number, thinking: number | undefined) => ({
+    type: 'assistant', uuid: requestId, sessionId: 's', requestId, timestamp: '2026-03-01T10:01:00.000Z', cwd: '/w/app',
+    message: {
+      role: 'assistant', model: 'claude-opus-5-5', stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }],
+      usage: {
+        input_tokens: 1, output_tokens: output, cache_read_input_tokens: 0, cache_creation_input_tokens: 0,
+        ...(thinking === undefined ? {} : { output_tokens_details: { thinking_tokens: thinking } }),
+      },
+    },
+  })
+
+  it('adds up thinking tokens per model, once per request, from the transcript', async () => {
+    const file = path.join(dir, 's.jsonl')
+    // req_1 is written twice, as a streamed response is, and must count once.
+    fs.writeFileSync(
+      file,
+      [assistant('req_1', 455, 307), assistant('req_1', 455, 307), assistant('req_2', 100, 40), assistant('req_3', 50, undefined)]
+        .map((r) => JSON.stringify(r)).join('\n') + '\n',
+    )
+    const detail = await parseDetail(file, 's', '/w/app', 'app')
+    expect(detail.tokensByModel['claude-opus-5-5'].outputTokens).toBe(605)
+    expect(detail.tokensByModel['claude-opus-5-5'].thinkingTokens).toBe(347)
+    expect(detail.totalTokens.thinkingTokens).toBe(347)
+  })
+
+  it('carries thinking tokens into the stats model usage, and a shared request does not add them twice', async () => {
+    const parent = path.join(dir, 'parent.jsonl')
+    const fork = path.join(dir, 'fork.jsonl')
+    fs.writeFileSync(parent, [assistant('req_1', 100, 60)].map((r) => JSON.stringify(r)).join('\n') + '\n')
+    fs.writeFileSync(fork, [assistant('req_1', 100, 60), assistant('req_2', 200, 20)].map((r) => JSON.stringify(r)).join('\n') + '\n')
+    const summary = (id: string, file: string, start: string) =>
+      ({ sessionId: id, filePath: file, startedAt: start, lastActiveAt: start, projectPath: '/w/app', projectName: 'app', projectDisplayName: 'App', cwd: '/w/app', durationMs: 1, messageCount: 1 }) as SessionSummaryWithPath
+    const stats = await computeStatsFromSummaries([
+      summary('parent', parent, '2026-03-01T10:00:00.000Z'),
+      summary('fork', fork, '2026-03-02T10:00:00.000Z'),
+    ])
+    expect(stats!.modelUsage['claude-opus-5-5']).toMatchObject({ outputTokens: 300, thinkingTokens: 80 })
   })
 })

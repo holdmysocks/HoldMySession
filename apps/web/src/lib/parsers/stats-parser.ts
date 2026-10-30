@@ -126,6 +126,7 @@ interface TokenTotals {
   outputTokens: number
   cacheReadInputTokens: number
   cacheCreationInputTokens: number
+  thinkingTokens?: number
 }
 
 function subtractClamped(target: TokenTotals, source: TokenTotals): void {
@@ -133,6 +134,9 @@ function subtractClamped(target: TokenTotals, source: TokenTotals): void {
   target.outputTokens = Math.max(0, target.outputTokens - source.outputTokens)
   target.cacheReadInputTokens = Math.max(0, target.cacheReadInputTokens - source.cacheReadInputTokens)
   target.cacheCreationInputTokens = Math.max(0, target.cacheCreationInputTokens - source.cacheCreationInputTokens)
+  if (target.thinkingTokens !== undefined || source.thinkingTokens !== undefined) {
+    target.thinkingTokens = Math.max(0, (target.thinkingTokens ?? 0) - (source.thinkingTokens ?? 0))
+  }
 }
 
 /**
@@ -297,6 +301,7 @@ async function mergeRecentSessions(stats: StatsCache): Promise<StatsCache> {
   const modelUsage: Record<string, {
     inputTokens: number; outputTokens: number
     cacheReadInputTokens: number; cacheCreationInputTokens: number
+    thinkingTokens?: number
   }> = {}
   for (const [model, usage] of Object.entries(stats.modelUsage)) {
     modelUsage[model] = { ...usage }
@@ -340,6 +345,7 @@ async function mergeRecentSessions(stats: StatsCache): Promise<StatsCache> {
         existing.outputTokens += usage.outputTokens
         existing.cacheReadInputTokens += usage.cacheReadInputTokens
         existing.cacheCreationInputTokens += usage.cacheCreationInputTokens
+        existing.thinkingTokens = (existing.thinkingTokens ?? 0) + (usage.thinkingTokens ?? 0)
         modelUsage[model] = existing
       }
 
@@ -454,6 +460,7 @@ export function mergeStatsCaches(caches: StatsCache[]): StatsCache | null {
   const modelUsage: Record<string, {
     inputTokens: number; outputTokens: number
     cacheReadInputTokens: number; cacheCreationInputTokens: number
+    thinkingTokens?: number
     webSearchRequests?: number; costUSD?: number
   }> = {}
   for (const cache of caches) {
@@ -466,6 +473,9 @@ export function mergeStatsCaches(caches: StatsCache[]): StatsCache | null {
       existing.outputTokens += usage.outputTokens
       existing.cacheReadInputTokens += usage.cacheReadInputTokens
       existing.cacheCreationInputTokens += usage.cacheCreationInputTokens
+      if (usage.thinkingTokens !== undefined) {
+        existing.thinkingTokens = (existing.thinkingTokens ?? 0) + usage.thinkingTokens
+      }
       if (usage.webSearchRequests !== undefined) {
         existing.webSearchRequests = (existing.webSearchRequests ?? 0) + usage.webSearchRequests
       }
@@ -569,6 +579,7 @@ export async function computeStatsFromSummaries(
     const modelUsage: Record<string, {
       inputTokens: number; outputTokens: number
       cacheReadInputTokens: number; cacheCreationInputTokens: number
+    thinkingTokens?: number
     }> = {}
     const hourCounts: Record<string, number> = {}
     let totalMessages = 0
@@ -606,6 +617,7 @@ export async function computeStatsFromSummaries(
           existing.outputTokens += usage.outputTokens
           existing.cacheReadInputTokens += usage.cacheReadInputTokens
           existing.cacheCreationInputTokens += usage.cacheCreationInputTokens
+          existing.thinkingTokens = (existing.thinkingTokens ?? 0) + (usage.thinkingTokens ?? 0)
           modelUsage[model] = existing
         }
       } else {
