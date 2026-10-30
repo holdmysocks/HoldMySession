@@ -27,8 +27,27 @@ describe('parseDesktopRecord', () => {
       lineageDetached: true,
       lastActivityAt: 1793280587490,
       parentLocalId: 'local_0',
+      cwd: null,
       parentCliSessionId: null,
     })
+  })
+
+  it('does not nest a user fork or a side question under the session it came from', () => {
+    expect(
+      parseDesktopRecord({ cliSessionId: 'a', spawnedFrom: { sessionId: 'local_9', userFork: true } })?.parentLocalId,
+    ).toBeNull()
+    expect(
+      parseDesktopRecord({ cliSessionId: 'a', spawnedFrom: { sessionId: 'local_9', btw: true } })?.parentLocalId,
+    ).toBeNull()
+    // A side session that is not a user fork still nests, as the app shows it.
+    expect(
+      parseDesktopRecord({ cliSessionId: 'a', spawnedFrom: { sessionId: 'local_9', sideSession: true } })?.parentLocalId,
+    ).toBe('local_9')
+  })
+
+  it('reads the project folder, and treats a blank one as not set', () => {
+    expect(parseDesktopRecord({ cliSessionId: 'a', cwd: 'D:\\MCLA' })?.cwd).toBe('D:\\MCLA')
+    expect(parseDesktopRecord({ cliSessionId: 'a', cwd: '  ' })?.cwd).toBeNull()
   })
 
   it('treats missing or odd flags as not set', () => {
@@ -39,6 +58,7 @@ describe('parseDesktopRecord', () => {
       lineageDetached: false,
       lastActivityAt: null,
       parentLocalId: null,
+      cwd: null,
       parentCliSessionId: null,
     })
     expect(parseDesktopRecord({ cliSessionId: 'abc', isArchived: 'yes', lineageDetached: null })).toMatchObject({
@@ -170,6 +190,7 @@ describe('desktopFlagsFor', () => {
           lineageDetached: false,
           lastActivityAt: 1793280587490,
           parentLocalId: 'local_parent',
+          cwd: null,
           parentCliSessionId: 'cli-parent',
         },
       ],

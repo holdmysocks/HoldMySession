@@ -84,6 +84,7 @@ function flags(cliSessionId: string, overrides: Partial<DesktopSessionFlags> = {
     lastActivityAt: null,
     lineageDetached: false,
     parentLocalId: null,
+    cwd: null,
     parentCliSessionId: null,
     ...overrides,
   }
@@ -433,6 +434,28 @@ describe('session-scanner', () => {
 
       expect(byId.get('session-abc')).toMatchObject({ isArchived: true, lineageDetached: false })
       expect(byId.get('session-def')).toMatchObject({ isArchived: false, lineageDetached: true })
+    })
+
+    it('takes the project folder from the desktop record when the transcript has no working directory', async () => {
+      const {
+        scanAllSessionsWithPaths,
+        mockScanProjects,
+        mockParseSummary,
+        mockIsSessionActive,
+        mockStat,
+      } = await importScanner()
+      const { loadDesktopSessionFlags } = await import('../desktop/desktop-records')
+
+      mockScanProjects.mockResolvedValue([makeProject({ sessionFiles: ['session-abc.jsonl'] })])
+      mockStat.mockResolvedValue({ mtimeMs: 1000, size: 1024 })
+      mockParseSummary.mockResolvedValue(makeSummary({ cwd: null }))
+      mockIsSessionActive.mockResolvedValue(false)
+      vi.mocked(loadDesktopSessionFlags).mockResolvedValue(
+        new Map([['session-abc', flags('session-abc', { cwd: 'D:\\MCLA' })]]),
+      )
+
+      const result = await scanAllSessionsWithPaths()
+      expect(result[0].cwd).toBe('D:\\MCLA')
     })
 
     it('filePath contains the project dirName and session filename', async () => {

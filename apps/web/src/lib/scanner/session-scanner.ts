@@ -93,8 +93,13 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
   )
 
   // Desktop app flags (archived, split). Added to copies, so the summary cache is not changed.
+  // A session whose transcript has no working directory takes the desktop record's, so it keeps its project.
   const desktopFlags = await loadDesktopSessionFlags()
-  return summaries.map((summary) => ({ ...summary, ...desktopFlagsFor(desktopFlags, summary.sessionId) }))
+  return summaries.map((summary) => ({
+    ...summary,
+    ...desktopFlagsFor(desktopFlags, summary.sessionId),
+    cwd: summary.cwd ?? desktopFlags.get(summary.sessionId)?.cwd ?? null,
+  }))
 }
 
 /** Public API: returns SessionSummary[] without filePath -- used by server functions that serialize to client. */

@@ -25,8 +25,13 @@ export interface DesktopSessionFlags {
    * and `spawnedFrom` still point at the parent, so the map must not draw that link.
    */
   lineageDetached: boolean
-  /** `spawnedFrom`, as the app's own ID of the parent (local_<uuid>), or null. */
+  /**
+   * `spawnedFrom`, as the app's own ID of the parent (local_<uuid>), or null. Null for a user fork
+   * or a side question (`userFork` or `btw`): the app lists those as separate sessions, not nested.
+   */
   parentLocalId: string | null
+  /** `cwd` from the app's record: the project folder, or null. Used when the transcript has none. */
+  cwd: string | null
   /**
    * The parent's transcript ID, resolved from `parentLocalId` across all records. Null when the
    * session is not nested, or the parent has no record on this machine.
@@ -47,6 +52,18 @@ function spawnedFromLocalId(value: unknown): string | null {
   return null
 }
 
+/**
+ * The parent to nest under, from `spawnedFrom`. A user fork or a side question (`btw`) is not
+ * nested: the app lists it as its own session, even though `spawnedFrom` names the parent.
+ */
+function nestingParentLocalId(spawnedFrom: unknown): string | null {
+  if (typeof spawnedFrom === 'object' && spawnedFrom !== null) {
+    const ref = spawnedFrom as Record<string, unknown>
+    if (ref.userFork === true || ref.btw === true) return null
+  }
+  return spawnedFromLocalId(spawnedFrom)
+}
+
 /** Pure: the flags from one parsed record, or null when the record has no transcript ID. */
 export function parseDesktopRecord(value: unknown): DesktopSessionFlags | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
@@ -61,7 +78,8 @@ export function parseDesktopRecord(value: unknown): DesktopSessionFlags | null {
         ? record.lastActivityAt
         : null,
     lineageDetached: Boolean(record.lineageDetached),
-    parentLocalId: spawnedFromLocalId(record.spawnedFrom),
+    parentLocalId: nestingParentLocalId(record.spawnedFrom),
+    cwd: typeof record.cwd === 'string' && record.cwd.trim() !== '' ? record.cwd : null,
     parentCliSessionId: null,
   }
 }
