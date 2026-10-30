@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { layoutProjectMap } from '@/lib/map/layout'
+import { applyNodeOffsets, layoutProjectMap } from '@/lib/map/layout'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { mapProjectsQuery, projectMapQuery, hookEventsQuery } from './project-map.queries'
 import { MapCanvas } from './MapCanvas'
@@ -8,6 +8,7 @@ import { NeedsYouPanel } from './NeedsYouPanel'
 import { NodeDetailPanel } from './NodeDetailPanel'
 import { HookEventsPanel } from './HookEventsPanel'
 import { expiredSubagentsLabel } from './format-node'
+import { useNodeOffsets } from './use-node-offsets'
 
 interface ProjectMapPageProps {
   /** Project key (directory name), from the URL. */
@@ -26,12 +27,21 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   const eventsQuery = useQuery(hookEventsQuery)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [editMode, setEditMode] = useState(false)
+  const [panelsHidden, setPanelsHidden] = useState(false)
+  // Card positions from the editor. They belong to a project and are kept in this browser's storage.
+  const [offsets, setOffsets] = useNodeOffsets(selectedKey)
 
   const nodes = useMemo(() => mapQuery.data?.nodes ?? [], [mapQuery.data])
-  const layout = useMemo(
+  const baseLayout = useMemo(
     () => (mapQuery.data ? layoutProjectMap(mapQuery.data) : null),
     [mapQuery.data],
   )
+  const layout = useMemo(
+    () => (baseLayout ? applyNodeOffsets(baseLayout, offsets) : null),
+    [baseLayout, offsets],
+  )
+  const movedCount = layout && baseLayout ? layout.nodes.filter((n) => Object.hasOwn(offsets, n.id)).length : 0
   const selectedNode = nodes.find((n) => n.id === selectedId) ?? null
   // Counted from the map's own session nodes, so the line matches the borders on screen.
   const sessionNodes = nodes.filter((n) => n.kind === 'session')
@@ -46,6 +56,17 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   function handleProjectChange(projectKey: string) {
     setSelectedId(null)
     onProjectChange(projectKey)
+  }
+
+  // The editor reports where a card should now be. Store it as the distance from its automatic spot.
+  function handleNodeMove(nodeId: string, x: number, y: number) {
+    const home = baseLayout?.nodes.find((n) => n.id === nodeId)
+    if (!home) return
+    setOffsets({ ...offsets, [nodeId]: { dx: x - home.x, dy: y - home.y } })
+  }
+
+  function handleResetLayout() {
+    setOffsets({})
   }
 
   if (projectsQuery.isLoading) {
@@ -114,10 +135,48 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
         )}
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          aria-pressed={editMode}
+          onClick={() => setEditMode((on) => !on)}
+          className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+            editMode
+              ? 'border-brand-500 bg-brand-500/15 text-brand-600'
+              : 'border-gray-800 bg-gray-900 text-gray-300 hover:text-gray-100'
+          }`}
+        >
+          {editMode ? 'Editing layout' : 'Edit layout'}
+        </button>
+        {editMode && (
+          <button
+            type="button"
+            onClick={handleResetLayout}
+            disabled={movedCount === 0}
+            className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-300 hover:text-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Reset layout
+          </button>
+        )}
+        <button
+          type="button"
+          aria-pressed={panelsHidden}
+          onClick={() => setPanelsHidden((hidden) => !hidden)}
+          className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-300 hover:text-gray-100"
+        >
+          {panelsHidden ? 'Show panels' : 'Hide panels'}
+        </button>
+        <p className="text-xs text-gray-500">
+          {editMode
+            ? 'Drag a card to move it, drag empty space to pan, scroll to zoom. Arrow keys nudge a focused card.'
+            : 'Drag to pan, scroll to zoom.'}
+        </p>
+      </div>
+
+      <div className={`mt-3 grid gap-4 ${panelsHidden ? '' : 'lg:grid-cols-[minmax(0,1fr)_320px]'}`}>
         <section
           aria-label="Project map"
-          className="max-h-[75vh] min-h-64 self-start overflow-auto rounded-xl border border-gray-800 bg-gray-950 p-4"
+          className="h-[calc(100vh-18rem)] min-h-[28rem] min-w-0 overflow-hidden rounded-xl border border-gray-800 bg-gray-950"
         >
           {mapQuery.isLoading ? (
             <div className="h-64 animate-pulse rounded-xl bg-gray-900/50" />
@@ -126,7 +185,14 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
               Failed to load map: {mapQuery.error.message}
             </p>
           ) : layout && layout.nodes.length > 0 ? (
-            <MapCanvas layout={layout} selectedId={selectedId} onSelect={setSelectedId} />
+            <MapCanvas
+              key={selectedKey}
+              layout={layout}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              editMode={editMode}
+              onNodeMove={handleNodeMove}
+            />
           ) : (
             <p className="py-12 text-center text-sm text-gray-500">
               This project has no sessions yet.
@@ -134,11 +200,13 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
           )}
         </section>
 
-        <div className="space-y-4">
-          <NeedsYouPanel nodes={nodes} onSelect={setSelectedId} />
-          <NodeDetailPanel node={selectedNode} projectKey={selectedKey} />
-          <HookEventsPanel events={eventsQuery.data} />
-        </div>
+        {!panelsHidden && (
+          <div className="space-y-4">
+            <NeedsYouPanel nodes={nodes} onSelect={setSelectedId} />
+            <NodeDetailPanel node={selectedNode} projectKey={selectedKey} />
+            <HookEventsPanel events={eventsQuery.data} />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -149,7 +217,7 @@ function Header() {
     <div>
       <h1 className="text-2xl font-bold text-gray-100">Session Map</h1>
       <p className="mt-1 text-sm text-gray-400">
-        Sessions in a project, with the subagents they dispatched. Read-only.
+        Sessions in a project, with the subagents they dispatched. Read-only: the editor only moves cards in this browser.
       </p>
       <p className="mt-2 text-xs text-gray-500">
         Messaging and linking sessions: Phase 2, see docs/session-map/README.md

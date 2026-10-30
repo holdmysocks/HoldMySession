@@ -34,6 +34,13 @@ export interface PositionedEdge extends MapEdge {
   d: string
 }
 
+/**
+ * How far the user dragged a node from its automatic position in the editor, by node ID. Offsets
+ * rather than absolute positions, so a node keeps its place relative to the layout when sessions
+ * are added or removed.
+ */
+export type NodeOffsets = Record<string, { dx: number; dy: number }>
+
 export interface ProjectLayout {
   nodes: PositionedNode[]
   edges: PositionedEdge[]
@@ -157,5 +164,40 @@ export function layoutProjectMap(map: ProjectMap): ProjectLayout {
     edges,
     width: roots.length === 0 ? 0 : columnX[lastColumn] + columnWidth[lastColumn],
     height: blockTop,
+  }
+}
+
+/**
+ * The layout with each node moved by its offset and the edges redrawn to follow. Returns the same
+ * layout when nothing is moved. Offsets for nodes that no longer exist are ignored.
+ */
+export function applyNodeOffsets(layout: ProjectLayout, offsets: NodeOffsets): ProjectLayout {
+  const offsetOf = (id: string) => (Object.hasOwn(offsets, id) ? offsets[id] : undefined)
+  if (!layout.nodes.some((node) => {
+    const offset = offsetOf(node.id)
+    return offset !== undefined && (offset.dx !== 0 || offset.dy !== 0)
+  })) {
+    return layout
+  }
+
+  const nodes = layout.nodes.map((node) => {
+    const offset = offsetOf(node.id)
+    return offset ? { ...node, x: node.x + offset.dx, y: node.y + offset.dy } : node
+  })
+  const byId = new Map(nodes.map((node) => [node.id, node]))
+  const edges = layout.edges.map((edge) => {
+    const from = byId.get(edge.from)
+    const to = byId.get(edge.to)
+    if (!from || !to) return edge
+    return {
+      ...edge,
+      d: dispatchPath(from.x + from.width, from.y + from.height / 2, to.x, to.y + to.height / 2),
+    }
+  })
+  return {
+    nodes,
+    edges,
+    width: nodes.reduce((max, node) => Math.max(max, node.x + node.width), 0),
+    height: nodes.reduce((max, node) => Math.max(max, node.y + node.height), 0),
   }
 }

@@ -1,6 +1,8 @@
-import type { KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { KeyboardEvent, PointerEvent } from 'react'
 import type { PositionedEdge, PositionedNode, ProjectLayout } from '@/lib/map/layout'
 import type { MapNodeStatus } from '@/lib/map/project-map'
+import { boundsOf, fitView, zoomAt, type FitOptions, type MapView, type ViewSize } from '@/lib/map/viewport'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { expiredSubagentsLabel, kindLabel, relationTag, shortModelName, statusLabel, truncateLabel } from './format-node'
 
@@ -8,6 +10,10 @@ interface MapCanvasProps {
   layout: ProjectLayout
   selectedId: string | null
   onSelect: (nodeId: string) => void
+  /** Editor mode: dragging a card moves it. Otherwise dragging anywhere pans the map. */
+  editMode?: boolean
+  /** Called while a card is dragged or nudged, with its new top-left corner in map coordinates. */
+  onNodeMove?: (nodeId: string, x: number, y: number) => void
 }
 
 /**
@@ -36,30 +42,216 @@ const SESSION_STROKE = 2
 const SUBAGENT_STROKE = 1.5
 /** How far the halo extends past the node on each side at rest. */
 const HALO_INSET = 2
-/**
- * Empty space around the drawing. The border, the halo and the selection outline sit just
- * outside each node, so without this they are cut off at the canvas edge.
- */
-const CANVAS_PAD = 8
 
-/** Inline SVG rendering of a laid-out project map. Nodes are focusable; Enter or Space selects. */
-export function MapCanvas({ layout, selectedId, onSelect }: MapCanvasProps) {
+/** Pointer travel, in pixels, before a press counts as a drag. Below it the press is a click. */
+const DRAG_THRESHOLD = 4
+/** Map units a focused card moves per arrow key press in editor mode. */
+const NUDGE_STEP = 10
+/** The first view fits the whole drawing, but never smaller than this, so text stays readable. */
+const INITIAL_FIT: FitOptions = { padding: 16, minScale: 0.5, maxScale: 1, center: false }
+/** The Fit button shows everything, however small that makes it. */
+const FULL_FIT: FitOptions = { padding: 32, minScale: 0.15, maxScale: 1.5, center: true }
+const ZOOM_BUTTON_FACTOR = 1.25
+
+interface Drag {
+  pointerId: number
+  startX: number
+  startY: number
+  moved: boolean
+  /** A card being moved, or null when the drag pans the map. */
+  nodeId: string | null
+  /** The card's position, or the view's, when the drag started. */
+  originX: number
+  originY: number
+}
+
+/**
+ * Inline SVG rendering of a laid-out project map. It fills the space it is given. Dragging empty
+ * space pans, the wheel zooms, and in editor mode dragging a card moves it. Nodes are focusable;
+ * Enter or Space selects, and in editor mode the arrow keys nudge the focused card.
+ */
+export function MapCanvas({ layout, selectedId, onSelect, editMode = false, onNodeMove }: MapCanvasProps) {
+  const svgRef = useRef<SVGSVGElement>(null)
+  const dragRef = useRef<Drag | null>(null)
+  const suppressClickRef = useRef(false)
+  const [size, setSize] = useState<ViewSize>({ width: 0, height: 0 })
+  // Null until the user pans or zooms. Until then the view follows the drawing and the panel size.
+  const [userView, setUserView] = useState<MapView | null>(null)
+  const [panning, setPanning] = useState(false)
+
+  const bounds = useMemo(() => boundsOf(layout.nodes), [layout.nodes])
+  const view = useMemo<MapView>(() => {
+    if (userView) return userView
+    if (!bounds || !(size.width > 0 && size.height > 0)) return { x: INITIAL_FIT.padding, y: INITIAL_FIT.padding, k: 1 }
+    return fitView(bounds, size, INITIAL_FIT)
+  }, [userView, bounds, size])
+
+  // The pointer and wheel handlers read the view from here, so they never act on a stale one.
+  const viewRef = useRef(view)
+  useEffect(() => {
+    viewRef.current = view
+  }, [view])
+
+  const commitView = useCallback((next: MapView) => {
+    viewRef.current = next
+    setUserView(next)
+  }, [])
+
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    const measure = () => {
+      const { width, height } = svg.getBoundingClientRect()
+      setSize({ width, height })
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(svg)
+    return () => observer.disconnect()
+  }, [])
+
+  // React registers wheel listeners as passive, which cannot stop the page from scrolling.
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    function handleWheel(event: WheelEvent) {
+      event.preventDefault()
+      const rect = svg!.getBoundingClientRect()
+      const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY
+      const factor = Math.exp(-delta * (event.ctrlKey ? 0.01 : 0.0015))
+      commitView(zoomAt(viewRef.current, factor, event.clientX - rect.left, event.clientY - rect.top))
+    }
+    svg.addEventListener('wheel', handleWheel, { passive: false })
+    return () => svg.removeEventListener('wheel', handleWheel)
+  }, [commitView])
+
+  function handlePointerDown(event: PointerEvent<SVGSVGElement>) {
+    if (event.button !== 0) return
+    const nodeId = (event.target as Element).closest?.('[data-node-id]')?.getAttribute('data-node-id') ?? null
+    const node = editMode && onNodeMove && nodeId ? layout.nodes.find((n) => n.id === nodeId) : undefined
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+      nodeId: node?.id ?? null,
+      originX: node ? node.x : viewRef.current.x,
+      originY: node ? node.y : viewRef.current.y,
+    }
+  }
+
+  function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    const dx = event.clientX - drag.startX
+    const dy = event.clientY - drag.startY
+    if (!drag.moved) {
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return
+      drag.moved = true
+      // Hold the view where it is, so moving a card does not make the map refit under the pointer.
+      commitView(viewRef.current)
+      // Captured only once it is a drag, so a plain click still reaches the card.
+      svgRef.current?.setPointerCapture?.(event.pointerId)
+      if (drag.nodeId === null) setPanning(true)
+    }
+    if (drag.nodeId !== null) {
+      const k = viewRef.current.k
+      onNodeMove?.(drag.nodeId, drag.originX + dx / k, drag.originY + dy / k)
+    } else {
+      commitView({ ...viewRef.current, x: drag.originX + dx, y: drag.originY + dy })
+    }
+  }
+
+  function handlePointerEnd(event: PointerEvent<SVGSVGElement>) {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    dragRef.current = null
+    setPanning(false)
+    if (!drag.moved) return
+    svgRef.current?.releasePointerCapture?.(event.pointerId)
+    // The click that ends a drag must not select the card it ended on.
+    suppressClickRef.current = true
+    window.setTimeout(() => {
+      suppressClickRef.current = false
+    }, 0)
+  }
+
+  function zoomFromCentre(factor: number) {
+    commitView(zoomAt(viewRef.current, factor, size.width / 2, size.height / 2))
+  }
+
+  function fitAll() {
+    if (bounds && size.width > 0 && size.height > 0) commitView(fitView(bounds, size, FULL_FIT))
+  }
+
   return (
-    <svg
-      role="group"
-      aria-label="Session map"
-      width={layout.width + CANVAS_PAD * 2}
-      height={layout.height + CANVAS_PAD * 2}
-      viewBox={`${-CANVAS_PAD} ${-CANVAS_PAD} ${layout.width + CANVAS_PAD * 2} ${layout.height + CANVAS_PAD * 2}`}
-      className="block"
+    <div className="relative h-full w-full overflow-hidden">
+      <svg
+        ref={svgRef}
+        role="group"
+        aria-label="Session map"
+        width="100%"
+        height="100%"
+        className={`block touch-none select-none ${panning ? 'cursor-grabbing' : 'cursor-grab'}`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onClickCapture={(event) => {
+          if (!suppressClickRef.current) return
+          suppressClickRef.current = false
+          event.stopPropagation()
+          event.preventDefault()
+        }}
+      >
+        <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
+          {layout.edges.map((edge) => (
+            <MapEdgeLine key={edge.id} edge={edge} />
+          ))}
+          {layout.nodes.map((node) => (
+            <NodeView
+              key={node.id}
+              node={node}
+              selected={node.id === selectedId}
+              editMode={editMode}
+              onSelect={onSelect}
+              onNodeMove={onNodeMove}
+            />
+          ))}
+        </g>
+      </svg>
+
+      <div
+        role="toolbar"
+        aria-label="Map view"
+        className="absolute bottom-3 right-3 flex items-center gap-1 rounded-lg border border-gray-800 bg-gray-900/90 p-1 text-xs text-gray-300 shadow-lg"
+      >
+        <ViewButton label="Zoom out" onClick={() => zoomFromCentre(1 / ZOOM_BUTTON_FACTOR)}>
+          −
+        </ViewButton>
+        <span className="w-11 text-center tabular-nums text-gray-400">{Math.round(view.k * 100)}%</span>
+        <ViewButton label="Zoom in" onClick={() => zoomFromCentre(ZOOM_BUTTON_FACTOR)}>
+          +
+        </ViewButton>
+        <ViewButton label="Fit map to screen" onClick={fitAll}>
+          Fit
+        </ViewButton>
+      </div>
+    </div>
+  )
+}
+
+function ViewButton({ label, onClick, children }: { label: string; onClick: () => void; children: string }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="min-w-7 rounded-md px-2 py-1 font-medium text-gray-200 hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400"
     >
-      {layout.edges.map((edge) => (
-        <MapEdgeLine key={edge.id} edge={edge} />
-      ))}
-      {layout.nodes.map((node) => (
-        <NodeView key={node.id} node={node} selected={node.id === selectedId} onSelect={onSelect} />
-      ))}
-    </svg>
+      {children}
+    </button>
   )
 }
 
@@ -80,10 +272,19 @@ function MapEdgeLine({ edge }: { edge: PositionedEdge }) {
 interface NodeViewProps {
   node: PositionedNode
   selected: boolean
+  editMode: boolean
   onSelect: (nodeId: string) => void
+  onNodeMove?: (nodeId: string, x: number, y: number) => void
 }
 
-function NodeView({ node, selected, onSelect }: NodeViewProps) {
+const NUDGE_KEYS: Record<string, [number, number]> = {
+  ArrowLeft: [-NUDGE_STEP, 0],
+  ArrowRight: [NUDGE_STEP, 0],
+  ArrowUp: [0, -NUDGE_STEP],
+  ArrowDown: [0, NUDGE_STEP],
+}
+
+function NodeView({ node, selected, editMode, onSelect, onNodeMove }: NodeViewProps) {
   const { privacyMode, anonymizeSessionName, anonymizeProjectName, anonymizeBranch } = usePrivacy()
   const isSession = node.kind === 'session'
   const classes = STATUS_CLASSES[node.status]
@@ -113,19 +314,26 @@ function NodeView({ node, selected, onSelect }: NodeViewProps) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       onSelect(node.id)
+      return
+    }
+    const nudge = editMode && onNodeMove ? NUDGE_KEYS[event.key] : undefined
+    if (nudge) {
+      event.preventDefault()
+      onNodeMove?.(node.id, node.x + nudge[0], node.y + nudge[1])
     }
   }
 
   return (
     <g
       transform={`translate(${node.x} ${node.y})`}
+      data-node-id={node.id}
       role="button"
       tabIndex={0}
       aria-pressed={selected}
       aria-label={label}
       onClick={() => onSelect(node.id)}
       onKeyDown={handleKeyDown}
-      className="group cursor-pointer outline-none"
+      className={`group outline-none ${editMode ? 'cursor-move' : 'cursor-pointer'}`}
     >
       <title>{label}</title>
       {classes.halo && (

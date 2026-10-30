@@ -54,6 +54,7 @@ const NAV_ITEMS = [
 export function AppShell({ children }: { children: ReactNode }) {
   const matches = useMatches()
   const currentPath = matches[matches.length - 1]?.pathname ?? ''
+  const wide = currentPath.startsWith('/map')
   const { data: appInfo } = useQuery(appInfoQuery)
 
   return (
@@ -129,8 +130,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-5xl px-6 py-6">{children}</div>
+      <main className="min-w-0 flex-1 overflow-auto">
+        {/* The map fills the width it is given. Every other page keeps a readable column. */}
+        <div className={wide ? 'px-6 py-6' : 'mx-auto max-w-5xl px-6 py-6'}>{children}</div>
       </main>
     </div>
   )

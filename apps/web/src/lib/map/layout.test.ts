@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { AgentInvocation, SessionSummary } from '../parsers/types'
 import { buildProjectMap, type MapSessionInput, type ProjectMap } from './project-map'
 import {
+  applyNodeOffsets,
   layoutProjectMap,
   SESSION_HEIGHT,
   SESSION_WIDTH,
@@ -237,5 +238,42 @@ describe('layoutProjectMap', () => {
   it('reports a canvas width that covers the deepest column', () => {
     const layout = layoutProjectMap(mapOf([input('a', 0), input('b', 0, 'a'), input('c', 0, 'b')]))
     expect(layout.width).toBe(SUBAGENT_X + SESSION_WIDTH + 60 + SESSION_WIDTH)
+  })
+})
+
+describe('applyNodeOffsets', () => {
+  const base = layoutProjectMap(mapOf([input('a', 1), input('b', 0, 'a')]))
+  const session = base.nodes.find((n) => n.kind === 'session' && n.id.includes('a'))!
+  const child = base.nodes.find((n) => n.id.includes('b'))!
+
+  it('returns the same layout when there are no offsets, or only zero ones', () => {
+    expect(applyNodeOffsets(base, {})).toBe(base)
+    expect(applyNodeOffsets(base, { [session.id]: { dx: 0, dy: 0 } })).toBe(base)
+  })
+
+  it('moves only the offset node and leaves the others where they were', () => {
+    const moved = applyNodeOffsets(base, { [child.id]: { dx: 40, dy: -15 } })
+    const next = moved.nodes.find((n) => n.id === child.id)!
+    expect(next.x).toBe(child.x + 40)
+    expect(next.y).toBe(child.y - 15)
+    expect(moved.nodes.find((n) => n.id === session.id)).toEqual(session)
+  })
+
+  it('redraws the edge to end at the moved node', () => {
+    const edge = base.edges.find((e) => e.to === child.id)!
+    const moved = applyNodeOffsets(base, { [child.id]: { dx: 100, dy: 200 } })
+    const next = moved.edges.find((e) => e.to === child.id)!
+    expect(next.d).not.toBe(edge.d)
+    expect(next.d.endsWith(`${child.x + 100} ${child.y + 200 + child.height / 2}`)).toBe(true)
+  })
+
+  it('ignores offsets for nodes that no longer exist', () => {
+    expect(applyNodeOffsets(base, { gone: { dx: 50, dy: 50 } })).toBe(base)
+  })
+
+  it('grows the reported size to cover a node moved outside the original area', () => {
+    const moved = applyNodeOffsets(base, { [child.id]: { dx: 500, dy: 300 } })
+    expect(moved.width).toBe(child.x + 500 + child.width)
+    expect(moved.height).toBe(child.y + 300 + child.height)
   })
 })

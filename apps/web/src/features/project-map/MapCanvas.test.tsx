@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MapCanvas } from './MapCanvas'
 import { PrivacyProvider } from '@/features/privacy/PrivacyContext'
 import { buildProjectMap, type MapSessionInput } from '@/lib/map/project-map'
@@ -79,7 +79,7 @@ describe('MapCanvas', () => {
 
   it('renders one focusable button per node', () => {
     renderCanvas(layout)
-    const buttons = screen.getAllByRole('button')
+    const buttons = within(screen.getByRole('group', { name: 'Session map' })).getAllByRole('button')
     expect(buttons).toHaveLength(layout.nodes.length)
     for (const button of buttons) {
       expect(button.getAttribute('tabindex')).toBe('0')
@@ -291,5 +291,122 @@ describe('MapCanvas status styling', () => {
     const { body, halo } = renderWith({ isActive: false, lastStopReason: 'tool_use' })
     expect(body).toContain('stroke-gray-600')
     expect(halo).toBeNull()
+  })
+})
+
+describe('MapCanvas pan, zoom and editor mode', () => {
+  const layout = buildLayout([
+    {
+      summary: summary('aaaaaaaa-1111'),
+      agents: [],
+      subagentLastActivity: new Map(),
+      pendingQuestions: [],
+      lastNotificationAt: null,
+      totalTokens: 0,
+    },
+  ])
+  const node = layout.nodes[0]
+
+  function renderEditable(editMode: boolean) {
+    const onSelect = vi.fn()
+    const onNodeMove = vi.fn()
+    const { container } = render(
+      <PrivacyProvider>
+        <MapCanvas layout={layout} selectedId={null} onSelect={onSelect} editMode={editMode} onNodeMove={onNodeMove} />
+      </PrivacyProvider>,
+    )
+    const svg = container.querySelector('svg[role="group"]')!
+    const content = svg.querySelector(':scope > g')!
+    const card = screen.getByRole('button', { name: /^Session, My App/ })
+    return { svg, content, card, onSelect, onNodeMove }
+  }
+
+  function drag(target: Element, from: [number, number], to: [number, number]) {
+    fireEvent.pointerDown(target, { pointerId: 1, button: 0, clientX: from[0], clientY: from[1] })
+    fireEvent.pointerMove(target, { pointerId: 1, clientX: to[0], clientY: to[1] })
+    fireEvent.pointerUp(target, { pointerId: 1, clientX: to[0], clientY: to[1] })
+  }
+
+  it('fills the space it is given, not a fixed size', () => {
+    const { svg } = renderEditable(false)
+    expect(svg.getAttribute('width')).toBe('100%')
+    expect(svg.getAttribute('height')).toBe('100%')
+  })
+
+  it('pans the map when empty space is dragged', () => {
+    const { svg, content } = renderEditable(false)
+    const before = content.getAttribute('transform')
+    drag(svg, [100, 100], [160, 130])
+    expect(content.getAttribute('transform')).not.toBe(before)
+    expect(content.getAttribute('transform')).toMatch(/^translate\(76 46\) scale\(1\)$/)
+  })
+
+  it('pans, and does not move the card or select it, when a card is dragged outside editor mode', () => {
+    const { card, content, onSelect, onNodeMove } = renderEditable(false)
+    drag(card, [100, 100], [160, 130])
+    fireEvent.click(card)
+    expect(content.getAttribute('transform')).toBe('translate(76 46) scale(1)')
+    expect(onNodeMove).not.toHaveBeenCalled()
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('still selects a card on a plain click', () => {
+    const { card, onSelect } = renderEditable(false)
+    fireEvent.pointerDown(card, { pointerId: 1, button: 0, clientX: 50, clientY: 50 })
+    fireEvent.pointerUp(card, { pointerId: 1, clientX: 51, clientY: 50 })
+    fireEvent.click(card)
+    expect(onSelect).toHaveBeenCalledWith(node.id)
+  })
+
+  it('moves the card, not the map, when it is dragged in editor mode', () => {
+    const { card, content, onSelect, onNodeMove } = renderEditable(true)
+    drag(card, [100, 100], [160, 130])
+    expect(onNodeMove).toHaveBeenLastCalledWith(node.id, node.x + 60, node.y + 30)
+    expect(content.getAttribute('transform')).toBe('translate(16 16) scale(1)')
+    fireEvent.click(card)
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('still pans from empty space in editor mode', () => {
+    const { svg, content, onNodeMove } = renderEditable(true)
+    drag(svg, [100, 100], [140, 100])
+    expect(onNodeMove).not.toHaveBeenCalled()
+    expect(content.getAttribute('transform')).toBe('translate(56 16) scale(1)')
+  })
+
+  it('nudges a focused card with the arrow keys in editor mode only', () => {
+    const edit = renderEditable(true)
+    fireEvent.keyDown(edit.card, { key: 'ArrowRight' })
+    fireEvent.keyDown(edit.card, { key: 'ArrowUp' })
+    expect(edit.onNodeMove).toHaveBeenNthCalledWith(1, node.id, node.x + 10, node.y)
+    expect(edit.onNodeMove).toHaveBeenNthCalledWith(2, node.id, node.x, node.y - 10)
+  })
+
+  it('does not move a card with the arrow keys outside editor mode', () => {
+    const view = renderEditable(false)
+    fireEvent.keyDown(view.card, { key: 'ArrowRight' })
+    expect(view.onNodeMove).not.toHaveBeenCalled()
+  })
+
+  it('zooms with the wheel around the pointer', () => {
+    const { svg, content } = renderEditable(false)
+    // jsdom's wheel events carry no pointer position, so set it as a browser would.
+    const wheel = new WheelEvent('wheel', { deltaY: -200, bubbles: true, cancelable: true })
+    Object.defineProperty(wheel, 'clientX', { value: 0 })
+    Object.defineProperty(wheel, 'clientY', { value: 0 })
+    fireEvent(svg, wheel)
+    expect(wheel.defaultPrevented).toBe(true)
+    const match = content.getAttribute('transform')!.match(/scale\(([\d.]+)\)/)!
+    expect(Number(match[1])).toBeGreaterThan(1)
+  })
+
+  it('zooms with the buttons and shows the zoom level', () => {
+    const { content } = renderEditable(false)
+    expect(screen.getByText('100%')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }))
+    expect(screen.getByText('125%')).toBeTruthy()
+    expect(content.getAttribute('transform')).toContain('scale(1.25)')
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }))
+    expect(screen.getByText('100%')).toBeTruthy()
   })
 })
