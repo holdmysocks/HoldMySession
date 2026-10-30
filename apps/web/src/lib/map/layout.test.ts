@@ -271,19 +271,48 @@ describe('edgePath', () => {
     expect(edgePath(card, left)).toBe('M 0 46 C -60 46, -60 46, -120 46')
   })
 
-  it('links bottom to top for a card below, even one far to the side', () => {
-    // Below the card, and entirely to its right: the vertical link still wins.
-    const belowRight = { x: 330, y: 110, width: 190, height: 50 }
-    expect(edgePath(card, belowRight).startsWith('M 140 92')).toBe(true)
-    expect(edgePath(card, belowRight).endsWith('425 110')).toBe(true)
-    // Below and far to the left.
-    const belowLeft = { x: -600, y: 200, width: 190, height: 50 }
-    expect(edgePath(card, belowLeft).startsWith('M 140 92')).toBe(true)
+  it('links bottom to top for a card directly below, overlapping it horizontally', () => {
+    const below = { x: 100, y: 200, width: 190, height: 50 }
+    expect(edgePath(card, below).startsWith('M 140 92')).toBe(true)
+    expect(edgePath(card, below).endsWith('195 200')).toBe(true)
   })
 
-  it('links top to bottom for a card above, even one far to the side', () => {
+  it('links top to bottom for a card directly above', () => {
+    const above = { x: 100, y: -200, width: 190, height: 50 }
+    expect(edgePath(card, above).startsWith('M 140 0')).toBe(true)
+    expect(edgePath(card, above).endsWith('195 -150')).toBe(true)
+  })
+
+  it('leaves the side and enters the top for a card below and to the right', () => {
+    const belowRight = { x: 330, y: 110, width: 190, height: 50 }
+    const d = edgePath(card, belowRight)
+    expect(d.startsWith('M 280 46')).toBe(true)
+    expect(d.endsWith('425 110')).toBe(true)
+  })
+
+  it('leaves the left side and enters the top for a card below and to the left', () => {
+    const belowLeft = { x: -500, y: 200, width: 190, height: 50 }
+    const d = edgePath(card, belowLeft)
+    expect(d.startsWith('M 0 46')).toBe(true)
+    expect(d.endsWith('-405 200')).toBe(true)
+  })
+
+  it('leaves the side and enters the bottom for a card above and to the side', () => {
     const aboveRight = { x: 500, y: -200, width: 190, height: 50 }
-    expect(edgePath(card, aboveRight).startsWith('M 140 0')).toBe(true)
+    expect(edgePath(card, aboveRight).startsWith('M 280 46')).toBe(true)
+    expect(edgePath(card, aboveRight).endsWith('595 -150')).toBe(true)
+    const aboveLeft = { x: -500, y: -200, width: 190, height: 50 }
+    expect(edgePath(card, aboveLeft).startsWith('M 0 46')).toBe(true)
+    expect(edgePath(card, aboveLeft).endsWith('-405 -150')).toBe(true)
+  })
+
+  it('bends once on a diagonal: it leaves level and arrives upright', () => {
+    const d = edgePath(card, { x: 330, y: 110, width: 190, height: 50 })
+    const [x0, y0, c1x, c1y, c2x, c2y, x3, y3] = d.match(/-?\d+(\.\d+)?/g)!.map(Number)
+    expect(c1y).toBe(y0) // the first handle runs along the side's level
+    expect(c1x).toBeGreaterThan(x0)
+    expect(c2x).toBe(x3) // the second handle is straight above the end point
+    expect(c2y).toBeLessThan(y3)
   })
 
   it('uses the sides only when the other card is level with this one', () => {
@@ -335,10 +364,11 @@ describe('applyCustomPositions', () => {
     expect(edgeAfter.d).not.toBe(edgeBefore.d)
     // Far to the right of its parent and level with it: right side to left side.
     expect(edgeAfter.d.startsWith(`M ${sessionA.x + SESSION_WIDTH} ${sessionA.y + SESSION_HEIGHT / 2}`)).toBe(true)
-    // Moved below the parent, still far to the right: bottom to top.
+    // Moved below the parent and far to the right: out of its right side, into the card's top.
     const below = applyCustomPositions(base, saveAll({ [agents[0].id]: { x: 2000, y: 400 } }))
     const edgeBelow = below.edges.find((e) => e.to === agents[0].id)!
-    expect(edgeBelow.d.startsWith(`M ${sessionA.x + SESSION_WIDTH / 2} ${sessionA.y + SESSION_HEIGHT}`)).toBe(true)
+    expect(edgeBelow.d.startsWith(`M ${sessionA.x + SESSION_WIDTH} ${sessionA.y + SESSION_HEIGHT / 2}`)).toBe(true)
+    expect(edgeBelow.d.endsWith(`${2000 + SUBAGENT_WIDTH / 2} 400`)).toBe(true)
   })
 
   it('puts a new top-level session to the right of everything saved, level with the saved top row', () => {
@@ -406,14 +436,14 @@ describe('edgePath next to another card', () => {
     })
   }
 
-  it('hangs from the top of a subagent below and to the right without crossing the card between them', () => {
+  it('enters the top of a subagent below and to the right without crossing the card between them', () => {
     // A session, a sub-session under it, and a subagent card placed below and to the right of the
     // session, with the sub-session's card sitting just to the left of that subagent.
     const session = { x: 0, y: 0, width: 280, height: 92 }
     const subSession = { x: 48, y: 161, width: 280, height: 92 }
     const subagent = { x: 334, y: 172, width: 190, height: 50 }
     const d = edgePath(session, subagent)
-    expect(d.startsWith('M 140 92')).toBe(true)
+    expect(d.startsWith('M 280 46')).toBe(true)
     expect(d.endsWith('429 172')).toBe(true)
     for (const point of samplePath(d)) {
       const inside =

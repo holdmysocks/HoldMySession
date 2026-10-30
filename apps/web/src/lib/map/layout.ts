@@ -79,27 +79,36 @@ function sideMiddle(rect: Rect, side: Side): { x: number; y: number } {
 }
 
 /**
- * The line between two cards: from the middle of one side of `from` to the middle of the facing
- * side of `to`.
- * - A card that lies below links bottom to top, and a card above links top to bottom, however far
- *   it sits to the side. A branch reads as hanging from its parent.
- * - Otherwise, a card that lies to the right links right to left, and one to the left links left
- *   to right.
- * - When the cards overlap, the direction of the target's centre decides.
+ * The line between two cards, from the middle of one side of `from` to the middle of a side of
+ * `to`. Which sides depend on where `to` lies:
+ * - Directly below or above (the cards overlap horizontally): bottom to top, or top to bottom.
+ * - Directly beside (the cards overlap vertically): right to left, or left to right.
+ * - Diagonal, below or above and also clear of it to one side: out of the side of `from` that
+ *   faces `to`, into the top of `to` when it is below, or its bottom when it is above. The line
+ *   leaves sideways and arrives vertically.
+ * - Overlapping: the direction of the target's centre decides.
  * A side is only used when the other card is really beyond it, so a line never doubles back
  * across a card.
  */
 export function edgePath(from: Rect, to: Rect): string {
+  const below = to.y >= from.y + from.height
+  const above = to.y + to.height <= from.y
+  const right = to.x >= from.x + from.width
+  const left = to.x + to.width <= from.x
+
   let a: Side
   let b: Side
-  if (to.y >= from.y + from.height) {
-    ;[a, b] = ['bottom', 'top']
-  } else if (to.y + to.height <= from.y) {
-    ;[a, b] = ['top', 'bottom']
-  } else if (to.x >= from.x + from.width) {
-    ;[a, b] = ['right', 'left']
-  } else if (to.x + to.width <= from.x) {
-    ;[a, b] = ['left', 'right']
+  if (below || above) {
+    if (right || left) {
+      a = right ? 'right' : 'left'
+      b = below ? 'top' : 'bottom'
+    } else {
+      a = below ? 'bottom' : 'top'
+      b = below ? 'top' : 'bottom'
+    }
+  } else if (right || left) {
+    a = right ? 'right' : 'left'
+    b = right ? 'left' : 'right'
   } else {
     const dx = to.x + to.width / 2 - (from.x + from.width / 2)
     const dy = to.y + to.height / 2 - (from.y + from.height / 2)
@@ -109,12 +118,24 @@ export function edgePath(from: Rect, to: Rect): string {
 
   const p = sideMiddle(from, a)
   const q = sideMiddle(to, b)
-  if (a === 'top' || a === 'bottom') {
+  const startsVertical = a === 'top' || a === 'bottom'
+  const endsVertical = b === 'top' || b === 'bottom'
+
+  if (startsVertical && endsVertical) {
     const midY = (p.y + q.y) / 2
     return `M ${p.x} ${p.y} C ${p.x} ${midY}, ${q.x} ${midY}, ${q.x} ${q.y}`
   }
-  const midX = (p.x + q.x) / 2
-  return `M ${p.x} ${p.y} C ${midX} ${p.y}, ${midX} ${q.y}, ${q.x} ${q.y}`
+  if (!startsVertical && !endsVertical) {
+    const midX = (p.x + q.x) / 2
+    return `M ${p.x} ${p.y} C ${midX} ${p.y}, ${midX} ${q.y}, ${q.x} ${q.y}`
+  }
+  // Leaves sideways and arrives vertically: the first handle points out of the side, the second
+  // out of the target's top or bottom, so the line bends once.
+  const out = a === 'right' ? 1 : -1
+  const reach = (distance: number) => Math.max(30, Math.abs(distance) * 0.55)
+  const c1x = p.x + out * reach(q.x - p.x)
+  const c2y = q.y + (b === 'top' ? -1 : 1) * reach(q.y - p.y)
+  return `M ${p.x} ${p.y} C ${c1x} ${p.y}, ${q.x} ${c2y}, ${q.x} ${q.y}`
 }
 
 function buildEdges(edgeList: ReadonlyArray<MapEdge>, nodes: ReadonlyArray<PositionedNode>): PositionedEdge[] {
