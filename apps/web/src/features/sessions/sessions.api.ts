@@ -26,6 +26,8 @@ const paginatedSessionsInputSchema = z.object({
   project: z.string(),
   sort: z.enum(['lastActive', 'started', 'duration', 'messages']).default('lastActive'),
   sortDir: z.enum(['asc', 'desc']).default('desc'),
+  /** On a master: one machine's sessions. Left out for every machine. */
+  machineId: z.string().optional(),
 })
 
 type PaginatedSessionsInput = z.infer<typeof paginatedSessionsInputSchema>
@@ -36,6 +38,8 @@ export interface SessionStatusSignals {
   lastNotificationAt: string | null
   /** True only for active sessions with an unanswered AskUserQuestion. */
   hasOpenQuestion: boolean
+  /** Set for a session of another machine, which has no transcript here: no detail page, no live status. */
+  machine?: { id: string; name: string } | null
 }
 
 export type SessionListItem = SessionSummary & SessionStatusSignals
@@ -155,7 +159,10 @@ export const getPaginatedSessions = createServerFn({ method: 'GET' })
   .inputValidator((input: unknown) => paginatedSessionsInputSchema.parse(input))
   .handler(async ({ data }): Promise<PaginatedSessionsResponse> => {
     // Sessions with no project, and archived sessions, are left out of the list, the page and the project dropdown.
-    const all = await scanAllSessionsWithPaths()
+    // On a master the list covers the machine chosen: this computer's live sessions, and the others' from the history.
+    const { machineView } = await import('@/lib/link/scoped')
+    const view = machineView(data.machineId)
+    const all = [...(view.includeSelf ? await scanAllSessionsWithPaths() : []), ...view.remote]
     const allSessions = filterVisibleSessions(all)
     const hiddenNoProjectCount = filterHiddenSessions(all).length
     const hiddenArchivedCount = filterArchivedSessions(all).length
@@ -164,11 +171,16 @@ export const getPaginatedSessions = createServerFn({ method: 'GET' })
     // Signals are computed for the page only. The file scan for open questions runs for active sessions.
     const notifications = latestNotificationBySession(await readRecentEvents())
     const sessions = await Promise.all(
-      page.sessions.map(async ({ filePath, ...summary }): Promise<SessionListItem> => ({
-        ...summary,
-        lastNotificationAt: notifications.get(summary.sessionId) ?? null,
-        hasOpenQuestion: summary.isActive && (await findPendingQuestions(filePath)).length > 0,
-      })),
+      page.sessions.map(async (item): Promise<SessionListItem> => {
+        // Sessions of other machines carry the machine they came from, and have no file here.
+        const { filePath, machineId, machineName, ...summary } = item as typeof item & { machineId?: string; machineName?: string }
+        return {
+          ...summary,
+          machine: machineId ? { id: machineId, name: machineName ?? '' } : null,
+          lastNotificationAt: notifications.get(summary.sessionId) ?? null,
+          hasOpenQuestion: !machineId && summary.isActive && (await findPendingQuestions(filePath)).length > 0,
+        }
+      }),
     )
 
     return { ...page, sessions, hiddenNoProjectCount, hiddenArchivedCount }

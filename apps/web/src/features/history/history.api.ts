@@ -135,15 +135,16 @@ export const removePriceEntry = createServerFn({ method: 'POST' })
 
 /** Estimated cost with each day priced as it was that day. Null if the history cannot be used yet. */
 export const getHistoryCost = createServerFn({ method: 'GET' })
-  .inputValidator((input: unknown) => z.object({ projectPath: z.string().optional() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ projectPath: z.string().optional(), machineId: z.string().optional() }).parse(input))
   .handler(async ({ data }): Promise<HistoryCost | null> => {
     const { openHistoryDb } = await import('@/lib/history/history-db')
     const { historyCost } = await import('@/lib/history/history-cost')
     const { getSettings } = await import('@/features/settings/settings.api')
     const { getMergedPricing } = await import('@/features/cost-estimation/cost-calculator')
+    const { effectiveSettings } = await import('@/lib/link/shared')
     const db = openHistoryDb()
     try {
-      return historyCost(db, getMergedPricing(await getSettings()), { projectPath: data.projectPath })
+      return historyCost(db, getMergedPricing(effectiveSettings(db, await getSettings())), { projectPath: data.projectPath, machineId: data.machineId })
     } finally {
       db.close()
     }
@@ -162,10 +163,11 @@ export const getSubscription = createServerFn({ method: 'GET' }).handler(async (
   const { localDay } = await import('@/lib/history/day-allocation')
   const { getSettings } = await import('@/features/settings/settings.api')
   const { getMergedPricing } = await import('@/features/cost-estimation/cost-calculator')
+  const { effectiveSettings } = await import('@/lib/link/shared')
   const db = openHistoryDb()
   try {
     const periods = listSubscriptionPeriods(db)
-    const cost = historyCost(db, getMergedPricing(await getSettings()))
+    const cost = historyCost(db, getMergedPricing(effectiveSettings(db, await getSettings())))
     const today = localDay(new Date().toISOString()) ?? new Date().toISOString().slice(0, 10)
     return { periods, summary: summarizeSubscription(periods, cost?.byDay ?? {}, today) }
   } finally {

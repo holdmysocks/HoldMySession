@@ -6,6 +6,7 @@ import { DEFAULT_PRICING, RETIRED_PRICING } from '@/features/settings/settings.t
 import { getMergedPricing } from '@/features/cost-estimation/cost-calculator'
 import { priceOnDay, priceSegments, type Prices } from '@/lib/pricing/price-timeline'
 import { priceEntriesQuery, usePriceEntryMutations } from './price-history.queries'
+import { LinkedNote, useIsLinkedNode } from '@/features/link/LinkedNote'
 
 const FIELDS: Array<[keyof Prices, string]> = [
   ['inputPerMTok', 'Input'],
@@ -22,6 +23,7 @@ export function PriceHistoryPanel() {
   const { data: settings } = useQuery(settingsQuery)
   const { data: allEntries = [] } = useQuery(priceEntriesQuery)
   const { add, remove } = usePriceEntryMutations()
+  const readOnly = useIsLinkedNode()
 
   const [modelId, setModelId] = useState(DEFAULT_PRICING[0].modelId)
   const [kind, setKind] = useState<'from' | 'window'>('from')
@@ -71,6 +73,7 @@ export function PriceHistoryPanel() {
         also backdate a correction, or set a window for a cheaper period. The table below is the base price, used on
         days with no entry.
       </p>
+      <LinkedNote what="price changes" />
       <div className="mt-3 space-y-4 rounded-xl border border-gray-800 bg-gray-900/50 p-4 text-xs text-gray-400">
         <label className="flex items-center gap-2">
           <span>Model</span>
@@ -116,20 +119,22 @@ export function PriceHistoryPanel() {
                   </span>
                   <span className="font-mono">{priceLine(e)}</span>
                   {e.note && <span className="italic text-gray-500">{e.note}</span>}
-                  <button
-                    type="button"
-                    onClick={() => remove.mutate({ data: { id: e.id } })}
-                    className="ml-auto text-red-400 hover:text-red-300"
-                  >
-                    Delete
-                  </button>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => remove.mutate({ data: { id: e.id } })}
+                      className="ml-auto text-red-400 hover:text-red-300"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
           </div>
         )}
 
-        <form
+        {!readOnly && <form
           className="space-y-3 border-t border-gray-800 pt-3"
           onSubmit={(e) => {
             e.preventDefault()
@@ -189,7 +194,7 @@ export function PriceHistoryPanel() {
             </button>
             {error && <span role="alert" className="text-red-400">{error}</span>}
           </div>
-        </form>
+        </form>}
       </div>
     </div>
   )

@@ -11,6 +11,8 @@ import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { useTheme } from '@/features/theme/ThemeProvider'
 import { HistoryPanel } from '@/features/history/HistoryPanel'
 import { BackupPanel } from '@/features/history/BackupPanel'
+import { LinkPanel } from '@/features/link/LinkPanel'
+import { LinkedNote } from '@/features/link/LinkedNote'
 import { ClockFormatSetting } from '@/features/time/ClockFormatSetting'
 import { PriceHistoryPanel } from '@/features/history/PriceHistoryPanel'
 import { SubscriptionPanel } from '@/features/history/SubscriptionPanel'
@@ -173,6 +175,8 @@ function SettingsForm({ settings }: { settings: Settings }) {
 
       <BackupPanel />
 
+      <LinkPanel />
+
       <SubscriptionPanel />
 
       {/* Pricing Table */}
@@ -184,6 +188,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
           Default prices from Anthropic. Override any value to match your negotiated
           rates.
         </p>
+        <LinkedNote what="price overrides" />
         <div className="mt-3 rounded-xl border border-gray-800 bg-gray-900/50 p-4">
           <PricingTableEditor
             overrides={overrides}

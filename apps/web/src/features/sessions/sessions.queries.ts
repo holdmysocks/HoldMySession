@@ -21,6 +21,7 @@ interface PaginatedSessionParams {
   project: string
   sort: 'lastActive' | 'started' | 'duration' | 'messages'
   sortDir: 'asc' | 'desc'
+  machineId?: string
 }
 
 export function paginatedSessionListQuery(params: PaginatedSessionParams) {

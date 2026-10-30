@@ -4,6 +4,7 @@ import { useSyncExternalStore, type ReactNode } from 'react'
 import { ActiveSessionsBadge } from '@/features/sessions/ActiveSessionsBadge'
 import { appInfoQuery } from '@/features/settings/app-info.queries'
 import { useHistoryRefresh } from '@/features/history/useHistoryRefresh'
+import { MachineFilter } from '@/features/link/MachineFilter'
 
 const NAV_ITEMS = [
   {
@@ -168,7 +169,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Main content */}
       <main className="min-w-0 flex-1 overflow-auto">
         {/* The map fills the width it is given. Every other page keeps a readable column. */}
-        <div className={wide ? 'px-6 py-6' : 'mx-auto max-w-5xl px-6 py-6'}>{children}</div>
+        <div className={wide ? 'px-6 py-6' : 'mx-auto max-w-5xl px-6 py-6'}>
+          {/* Drawn only on a master with linked nodes. It chooses whose data every page shows. */}
+          <MachineFilter />
+          {children}
+        </div>
       </main>
     </div>
   )

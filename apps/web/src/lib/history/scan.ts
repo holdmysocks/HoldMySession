@@ -76,7 +76,7 @@ async function scanOnce(existing?: Db): Promise<ScanOutcome> {
   if (outcome.ok) {
     try {
       const { pushToMaster } = await import('@/lib/link/node-sync')
-      const { readVersionFromPackageJson } = await import('@/features/settings/app-info.api')
+      const { readVersionFromPackageJson } = await import('@/lib/app-version')
       await pushToMaster(db, readSettingsFile(), readVersionFromPackageJson())
     } catch (error) {
       console.warn('Sending to the master failed:', error)

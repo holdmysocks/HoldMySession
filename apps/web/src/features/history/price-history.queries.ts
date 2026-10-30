@@ -8,10 +8,10 @@ export const priceEntriesQuery = queryOptions({
 })
 
 /** Cost with dated prices, overall or for one project. Pass an empty path to leave it off. */
-export function historyCostQuery(projectPath?: string, enabled = true) {
+export function historyCostQuery(projectPath?: string, enabled = true, machineId?: string) {
   return queryOptions({
-    queryKey: ['history-cost', projectPath ?? null],
-    queryFn: () => getHistoryCost({ data: { projectPath } }),
+    queryKey: ['history-cost', projectPath ?? null, machineId ?? 'all'],
+    queryFn: () => getHistoryCost({ data: { projectPath, machineId } }),
     enabled,
     staleTime: 60_000,
     refetchOnWindowFocus: false,

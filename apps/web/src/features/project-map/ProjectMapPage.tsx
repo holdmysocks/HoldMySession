@@ -9,6 +9,7 @@ import { NodeDetailPanel } from './NodeDetailPanel'
 import { HookEventsPanel } from './HookEventsPanel'
 import { expiredSubagentsLabel } from './format-node'
 import { useMapLayout } from './use-map-layout'
+import { useMachineScope } from '@/features/link/useMachineScope'
 
 interface ProjectMapPageProps {
   /** Project key (directory name), from the URL. */
@@ -18,6 +19,7 @@ interface ProjectMapPageProps {
 
 export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps) {
   const { privacyMode, anonymizeProjectName, anonymizePath } = usePrivacy()
+  const scope = useMachineScope()
   const projectsQuery = useQuery(mapProjectsQuery)
   const projects = projectsQuery.data ?? []
 
@@ -77,6 +79,22 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
 
   function handleResetLayout() {
     setPositions({})
+  }
+
+  // The map draws live sessions, which only the machine running them has. Another machine's are open on that machine.
+  if (scope.isRemote) {
+    return (
+      <div>
+        <Header />
+        <div className="mt-10 rounded-xl border border-dashed border-gray-800 p-8 text-center">
+          <p className="text-sm text-gray-300">The map shows live sessions on the machine you are using</p>
+          <p className="mt-1 text-xs text-gray-500">
+            {scope.machineName ?? 'That machine'} sends its history here, but not its live sessions. Open HoldMySession on
+            that machine to see its map, or choose this machine or All machines above. Stats, Projects and Sessions show {scope.machineName ?? 'its'} history.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   if (projectsQuery.isLoading) {

@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
-import { projectAnalyticsQuery } from './project-analytics.queries'
+import { projectAnalyticsQueryFor } from './project-analytics.queries'
+import { useMachineScope } from '@/features/link/useMachineScope'
 import { ProjectTable } from './ProjectTable'
 import { formatDuration } from '@/lib/utils/format'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 
 export function ProjectAnalytics() {
   const { anonymizeProjectName } = usePrivacy()
-  const { data, isLoading } = useQuery(projectAnalyticsQuery)
+  const scope = useMachineScope()
+  const { data, isLoading } = useQuery(projectAnalyticsQueryFor(scope.machineId))
 
   if (isLoading) {
     return (

@@ -3,9 +3,10 @@ import { useMemo } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
-import { statsQuery } from '@/features/stats/stats.queries'
+import { statsQueryFor } from '@/features/stats/stats.queries'
+import { useMachineScope } from '@/features/link/useMachineScope'
 import {
-  projectAnalyticsQuery,
+  projectAnalyticsQueryFor,
   projectStatsQuery,
 } from '@/features/project-analytics/project-analytics.queries'
 import { StatsOverview } from '@/features/stats/StatsOverview'
@@ -68,15 +69,17 @@ function StatsPage() {
   const { tab, project } = Route.useSearch()
   const navigate = Route.useNavigate()
   const { anonymizeProjectName } = usePrivacy()
-  const { data: stats, isLoading } = useQuery(statsQuery)
-  const { data: projectData } = useQuery(projectAnalyticsQuery)
+  const scope = useMachineScope()
+  const machineId = scope.machineId
+  const { data: stats, isLoading } = useQuery(statsQueryFor(machineId))
+  const { data: projectData } = useQuery(projectAnalyticsQueryFor(machineId))
 
   // Convert stats.modelUsage to Record<string, TokenUsage> for cost calculation
   // All hooks must be called before any early returns
   const tokensByModel = useMemo(() => tokensByModelOf(stats), [stats])
   const { cost: sessionCost } = useSessionCost(tokensByModel)
   // Priced day by day from the history database when it can be, else all at today's prices.
-  const { data: datedCost } = useQuery(historyCostQuery())
+  const { data: datedCost } = useQuery(historyCostQuery(undefined, true, machineId))
   const cost = datedCost ?? sessionCost
   const { data: subscription } = useQuery(subscriptionQuery)
   const costNote = subscription ? savingsText(subscription.summary, formatUSD) : null
@@ -91,13 +94,13 @@ function StatsPage() {
 
   // Only asked for while the tab is open, since it parses every session of the project.
   const projectStatsResult = useQuery(
-    projectStatsQuery(tab === 'by-project' ? (selectedProject?.projectPath ?? '') : ''),
+    projectStatsQuery(tab === 'by-project' ? (selectedProject?.projectPath ?? '') : '', machineId),
   )
   const projectStats = projectStatsResult.data
   const projectTokens = useMemo(() => tokensByModelOf(projectStats), [projectStats])
   const { cost: projectSessionCost } = useSessionCost(projectTokens)
   const projectPathForCost = selectedProject?.projectPath
-  const { data: projectDatedCost } = useQuery(historyCostQuery(projectPathForCost, tab === 'by-project' && !!projectPathForCost))
+  const { data: projectDatedCost } = useQuery(historyCostQuery(projectPathForCost, tab === 'by-project' && !!projectPathForCost, machineId))
   const projectCost = projectDatedCost ?? projectSessionCost
 
   const exportable = tab === 'overview' ? stats : tab === 'by-project' ? projectStats : null

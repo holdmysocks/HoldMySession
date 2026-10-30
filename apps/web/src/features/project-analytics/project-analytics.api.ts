@@ -82,21 +82,26 @@ export function aggregateProjectAnalytics(
   return { projects }
 }
 
-export const getProjectAnalytics = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<ProjectAnalyticsResult> => {
-    const allSessions = await scanAllSessions()
-    return aggregateProjectAnalytics(allSessions)
-  },
-)
+const analyticsInputSchema = z.object({ machineId: z.string().optional() })
 
-const projectStatsInputSchema = z.object({ projectPath: z.string().min(1) })
+export const getProjectAnalytics = createServerFn({ method: 'GET' })
+  .inputValidator((input: unknown) => analyticsInputSchema.parse(input ?? {}))
+  .handler(async ({ data }): Promise<ProjectAnalyticsResult> => {
+    // On a master, projects span the machines chosen: this computer's live sessions, and the others' from the history.
+    const { machineView } = await import('@/lib/link/scoped')
+    const view = machineView(data.machineId)
+    const local = view.includeSelf ? await scanAllSessions() : []
+    return aggregateProjectAnalytics([...local, ...view.remote])
+  })
+
+const projectStatsInputSchema = z.object({ projectPath: z.string().min(1), machineId: z.string().optional() })
 
 export const getProjectStats = createServerFn({ method: 'GET' })
   .inputValidator((input: unknown) => projectStatsInputSchema.parse(input))
   .handler(async ({ data }): Promise<StatsCache | null> => {
     const { loadHistoryStats } = await import('@/lib/history/history-read')
     return (
-      (await loadHistoryStats({ projectPath: data.projectPath })) ??
-      computeProjectStats(await scanAllSessionsWithPaths(), data.projectPath)
+      (await loadHistoryStats({ projectPath: data.projectPath, machineId: data.machineId })) ??
+      (data.machineId ? null : computeProjectStats(await scanAllSessionsWithPaths(), data.projectPath))
     )
   })

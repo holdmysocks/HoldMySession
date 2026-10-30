@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createServer } from 'node:http';
+import { readFileSync } from 'node:fs';
 import { readFile, access, stat } from 'node:fs/promises';
 import { resolve, join, extname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -63,7 +64,22 @@ if (hasFlag('print-hook-config')) {
 }
 
 const port = Number(getArg('port', 'p')) || 3000;
-const host = getArg('host') || 'localhost';
+// Which addresses to listen on: --host wins, then the choice made in Settings (this computer only, or the
+// network, which covers every address of this computer, local network and tailnet alike), then this computer only.
+function listenSetting() {
+  const override = process.env.HOLDMYSESSION_DIR || process.env.CLAUDE_DASHBOARD_DIR || process.env.CLAUDE_DASHBOARD_HOME;
+  const dirs = override ? [override] : [join(homedir(), '.holdmysession'), join(homedir(), '.claude-dashboard')];
+  for (const dir of dirs) {
+    try {
+      const settings = JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf-8'));
+      return settings?.link?.listen === 'network' ? '0.0.0.0' : 'localhost';
+    } catch {
+      // Try the next folder.
+    }
+  }
+  return 'localhost';
+}
+const host = getArg('host') || listenSetting();
 const shouldOpen = hasFlag('open', 'o');
 
 // --- Pre-flight checks ---
@@ -201,11 +217,12 @@ server.on('error', (err) => {
 });
 
 server.listen(port, host, () => {
-  const url = `http://${host}:${port}`;
+  const onNetwork = host === '0.0.0.0' || host === '::';
+  const url = `http://${onNetwork ? 'localhost' : host}:${port}`;
 
   console.log(`
   HoldMySession v${pkg.version}
-  Running at ${url}
+  Running at ${url}${onNetwork ? `\n  Listening on every address of this computer (local network and tailnet), port ${port}` : ''}
   Reading sessions from ${claudeDir}
 
   Press Ctrl+C to stop

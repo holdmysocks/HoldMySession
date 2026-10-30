@@ -5,6 +5,7 @@ import { SUBSCRIPTION_TIERS } from '@/features/settings/settings.types'
 import { formatUSD } from '@/lib/utils/format'
 import { savingsText } from '@/lib/pricing/subscription'
 import { subscriptionQuery, useSubscriptionMutations } from './subscription.queries'
+import { LinkedNote, useIsLinkedNode } from '@/features/link/LinkedNote'
 
 const tierName = (id: string) => SUBSCRIPTION_TIERS.find((t) => t.id === id)?.displayName ?? id
 const input = 'rounded border border-gray-800 bg-gray-950 px-2 py-1 text-xs text-gray-100'
@@ -12,6 +13,7 @@ const input = 'rounded border border-gray-800 bg-gray-950 px-2 py-1 text-xs text
 export function SubscriptionPanel() {
   const { data } = useQuery(subscriptionQuery)
   const { add, remove } = useSubscriptionMutations()
+  const readOnly = useIsLinkedNode()
 
   const [tier, setTier] = useState('pro')
   const [price, setPrice] = useState('20')
@@ -45,6 +47,7 @@ export function SubscriptionPanel() {
         starts. The dashboard compares what the plan cost with what the same usage would have cost at API prices. A part
         month is paid for in part. Choose API Only for pay-as-you-go, which saves nothing by definition.
       </p>
+      <LinkedNote what="plan and its price" />
       <div className="mt-3 space-y-4 rounded-xl border border-gray-800 bg-gray-900/50 p-4 text-xs text-gray-400">
         {data && data.periods.length > 0 && (
           <ul className="space-y-1">
@@ -54,13 +57,15 @@ export function SubscriptionPanel() {
                 <span className="text-gray-200">{tierName(p.tier)}</span>
                 <span className="font-mono">{formatUSD(p.monthlyUSD)}/mo</span>
                 {p.note && <span className="italic text-gray-500">{p.note}</span>}
-                <button
-                  type="button"
-                  onClick={() => remove.mutate({ data: { id: p.id } })}
-                  className="ml-auto text-red-400 hover:text-red-300"
-                >
-                  Delete
-                </button>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => remove.mutate({ data: { id: p.id } })}
+                    className="ml-auto text-red-400 hover:text-red-300"
+                  >
+                    Delete
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -101,7 +106,7 @@ export function SubscriptionPanel() {
           </div>
         )}
 
-        <form
+        {!readOnly && <form
           className="space-y-3 border-t border-gray-800 pt-3"
           onSubmit={(e) => {
             e.preventDefault()
@@ -139,7 +144,7 @@ export function SubscriptionPanel() {
             </button>
             {error && <span role="alert" className="text-red-400">{error}</span>}
           </div>
-        </form>
+        </form>}
       </div>
     </div>
   )

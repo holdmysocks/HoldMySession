@@ -9,7 +9,14 @@ import { STATUS_BORDER, STATUS_PULSE } from '@/components/ui/session-status-styl
 import { StatusBadge } from './StatusBadge'
 import { RunningTimer } from './RunningTimer'
 
-export function SessionCard({ session, status }: { session: SessionSummary; status: SessionStatus }) {
+/** A session of another machine has no transcript here, so its card is not a link and shows where it ran. */
+export function SessionCard({
+  session,
+  status,
+}: {
+  session: SessionSummary & { machine?: { id: string; name: string } | null }
+  status: SessionStatus
+}) {
   const { privacyMode, anonymizePath, anonymizeProjectName, anonymizeBranch, anonymizeSessionName } =
     usePrivacy()
   const projectLabel = privacyMode
@@ -25,14 +32,10 @@ export function SessionCard({ session, status }: { session: SessionSummary; stat
     : null
   const displayBranch = session.branch ? anonymizeBranch(session.branch) : null
 
-  return (
-    <Link
-      to="/sessions/$sessionId"
-      params={{ sessionId: session.sessionId }}
-      search={{ project: session.projectKey }}
-      className={`group block rounded-xl border-2 bg-gray-900/50 p-4 transition-all hover:bg-gray-900 ${STATUS_BORDER[status]} ${STATUS_PULSE[status]}`}
-      data-status={status}
-    >
+  const cardClass = `group block rounded-xl border-2 bg-gray-900/50 p-4 transition-all hover:bg-gray-900 ${STATUS_BORDER[status]} ${STATUS_PULSE[status]}`
+
+  const body = (
+    <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -42,6 +45,11 @@ export function SessionCard({ session, status }: { session: SessionSummary; stat
               {nameLabel ?? 'Untitled session'}
             </h3>
             <StatusBadge status={status} />
+            {session.machine && (
+              <span className="shrink-0 rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-300" title="Ran on this machine">
+                {session.machine.name}
+              </span>
+            )}
             {session.sourceLabel && (
               <SourceBadge sourceLabel={session.sourceLabel} platform={session.sourcePlatform} />
             )}
@@ -80,9 +88,11 @@ export function SessionCard({ session, status }: { session: SessionSummary; stat
             {session.model.replace(/^claude-/, '').split('-202')[0]}
           </span>
         )}
-        <span title="File size" className="text-gray-500">
-          {formatBytes(session.fileSizeBytes)}
-        </span>
+        {!session.machine && (
+          <span title="File size" className="text-gray-500">
+            {formatBytes(session.fileSizeBytes)}
+          </span>
+        )}
       </div>
 
       {displayCwd && (
@@ -90,6 +100,26 @@ export function SessionCard({ session, status }: { session: SessionSummary; stat
           {displayCwd}
         </p>
       )}
+    </>
+  )
+
+  if (session.machine) {
+    return (
+      <div className={cardClass} data-status={status} data-machine={session.machine.id}>
+        {body}
+      </div>
+    )
+  }
+
+  return (
+    <Link
+      to="/sessions/$sessionId"
+      params={{ sessionId: session.sessionId }}
+      search={{ project: session.projectKey }}
+      className={cardClass}
+      data-status={status}
+    >
+      {body}
     </Link>
   )
 }

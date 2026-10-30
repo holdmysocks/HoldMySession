@@ -1,3 +1,4 @@
+import { useMachineScope } from '@/features/link/useMachineScope'
 import { useEffect, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
@@ -36,8 +37,9 @@ export function SessionList() {
     }
   }, [storedPageSize, pageSize, navigate])
 
+  const scope = useMachineScope()
   const { data: paginatedData, isLoading } = useQuery(
-    paginatedSessionListQuery({ page, pageSize, search, status, project, sort, sortDir }),
+    paginatedSessionListQuery({ page, pageSize, search, status, project, sort, sortDir, machineId: scope.machineId }),
   )
   const { data: activeSessions = [] } = useQuery(activeSessionsQuery)
   const now = useNow()
