@@ -10,8 +10,11 @@ import * as path from 'node:path'
  * counted as running even when it is quiet. The transcript records none of this.
  */
 
-/** Bytes read from the end of an output file to look for the exit line. */
-const TAIL_BYTES = 512
+/**
+ * Bytes read from the end of an output file. Long enough to hold a transcript's last record,
+ * which is one JSON line that can be long. The exit line is checked at the very end.
+ */
+const TAIL_BYTES = 64 * 1024
 
 /**
  * A task with no exit line whose output is older than this is treated as finished. It guards
@@ -20,6 +23,23 @@ const TAIL_BYTES = 512
 export const BACKGROUND_TASK_MAX_AGE_MS = 24 * 60 * 60_000
 
 const EXIT_LINE = /\[exited with code -?\d+\]\s*$/
+
+/**
+ * The tasks folder also holds subagent entries: each is an `.output` that links to the subagent's
+ * JSON transcript. Those never get an exit line, so a transcript is not a background task. The
+ * subagents are drawn on the map from their own files.
+ */
+export function isTranscriptTail(tail: string): boolean {
+  const lines = tail.split('\n').filter((line) => line.trim() !== '')
+  const last = lines[lines.length - 1]
+  if (last === undefined) return false
+  try {
+    const parsed: unknown = JSON.parse(last)
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+  } catch {
+    return false
+  }
+}
 
 /** The folder where Claude Code keeps a session's task output. Only exists on the machine that ran the session. */
 export function backgroundTaskDir(
@@ -47,7 +67,10 @@ async function readTail(file: string, size: number): Promise<string> {
   }
 }
 
-/** How many tasks in `dir` are still running: their output has no exit line and is not stale. */
+/**
+ * How many tasks in `dir` are still running: a shell task whose output has no exit line and is not
+ * stale. Subagent transcripts in the same folder are not counted.
+ */
 export async function countRunningBackgroundTasks(dir: string, nowMs: number = Date.now()): Promise<number> {
   try {
     const entries = await fs.promises.readdir(dir)
@@ -57,7 +80,8 @@ export async function countRunningBackgroundTasks(dir: string, nowMs: number = D
       const file = path.join(dir, entry)
       const stat = await fs.promises.stat(file).catch(() => null)
       if (!stat || nowMs - stat.mtimeMs > BACKGROUND_TASK_MAX_AGE_MS) continue
-      if (hasExitLine(await readTail(file, stat.size))) continue
+      const tail = await readTail(file, stat.size)
+      if (isTranscriptTail(tail) || hasExitLine(tail)) continue
       count++
     }
     return count

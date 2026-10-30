@@ -8,6 +8,7 @@ import {
   countRunningBackgroundTasks,
   hasExitLine,
   hasRunningBackgroundTask,
+  isTranscriptTail,
 } from './background-tasks'
 
 const NOW = Date.parse('2026-01-01T12:00:00.000Z')
@@ -27,6 +28,17 @@ describe('hasExitLine', () => {
   it('is false while the task has printed no exit line', () => {
     expect(hasExitLine('tick 3\n')).toBe(false)
     expect(hasExitLine('')).toBe(false)
+  })
+})
+
+describe('isTranscriptTail', () => {
+  it('is true when the last line is a JSON transcript record', () => {
+    expect(isTranscriptTail('{"type":"user"}\n{"type":"assistant","timestamp":"2026-01-01"}\n')).toBe(true)
+  })
+
+  it('is false for plain shell output, even when it contains JSON earlier', () => {
+    expect(isTranscriptTail('{"a":1}\ntick 3\n')).toBe(false)
+    expect(isTranscriptTail('')).toBe(false)
   })
 })
 
@@ -66,6 +78,11 @@ describe('countRunningBackgroundTasks', () => {
     output('finished.output', 'x\n[exited with code 0]', NOW)
     output('notes.txt', 'tick', NOW)
     expect(await countRunningBackgroundTasks(dir, NOW)).toBe(2)
+  })
+
+  it('does not count a subagent transcript kept in the tasks folder', async () => {
+    output('agent-a1.output', '{"type":"user","timestamp":"2026-01-01"}\n{"type":"assistant","timestamp":"2026-01-01"}\n', NOW)
+    expect(await countRunningBackgroundTasks(dir, NOW)).toBe(0)
   })
 
   it('treats an output older than the maximum age as finished', async () => {
