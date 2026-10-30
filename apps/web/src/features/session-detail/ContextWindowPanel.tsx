@@ -15,6 +15,19 @@ interface Props {
   tokens: TokenUsage
 }
 
+/** How the window size was found. The transcript does not record it, so it is worked out. */
+const LIMIT_SOURCE_NOTE = {
+  model: 'window set by the model',
+  observed: 'window detected from usage',
+  default: 'window assumed (unknown model)',
+} as const
+
+const LIMIT_SOURCE_HELP = {
+  model: "The model's known context window.",
+  observed: 'The session held more context than the model normally allows, so its window is larger. The size is the next whole million tokens.',
+  default: 'The model is not recognised, so a 200K window is assumed. If the session used more, the window is widened to fit.',
+} as const
+
 export function ContextWindowPanel({ contextWindow, tokens }: Props) {
   const [showTokenDetails, setShowTokenDetails] = useState(false)
 
@@ -24,6 +37,7 @@ export function ContextWindowPanel({ contextWindow, tokens }: Props) {
 
   const {
     contextLimit,
+    contextLimitSource,
     modelName,
     systemOverhead,
     currentContextSize,
@@ -68,7 +82,9 @@ export function ContextWindowPanel({ contextWindow, tokens }: Props) {
           ({usagePercent}%)
         </span>
       </div>
-      <p className="text-[10px] text-gray-500">~estimated from token usage</p>
+      <p className="text-[10px] text-gray-500" title={LIMIT_SOURCE_HELP[contextLimitSource]}>
+        ~estimated from token usage · {LIMIT_SOURCE_NOTE[contextLimitSource]}
+      </p>
 
       {/* Usage bar */}
       <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-gray-800">

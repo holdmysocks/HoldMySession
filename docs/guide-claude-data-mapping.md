@@ -251,3 +251,17 @@ Claude Code writes each background task's output to `%TEMP%\claude\<project fold
 - **Subagent tokens** come from the subagent's own file when there is one, and from its progress messages in the main transcript otherwise. The file replaces the progress figures, so they are never both counted.
 - A model ID missing from the pricing table is priced as Sonnet 4.
 - Session files are told apart by path, not session ID. The same session ID can exist under two project folders, as when a session is resumed from another directory, and both files are read. Calls they share are counted once. The two files still count as two sessions and their messages are added up, since each file really holds them.
+
+## Context window size
+
+The transcript does not record a session's context window, so the session page works it out (`src/lib/parsers/context-limit.ts`):
+
+1. **From the model of the latest reply.** The current families (Fable 5.x, Opus 5.x, Opus 4.6 to 4.8, Sonnet 5.x, Sonnet 4.6, Haiku 5.x) have 1M. Older models (Opus, Sonnet and Haiku 3 to 4.5) have 200K. A `[1m]` marker in the model name means 1M. A date suffix is ignored.
+2. **From what the session actually held.** A session cannot hold more context than its window. If its peak context (new input plus cache reads plus cache writes) is above the model's window, the window is the next whole million tokens, and the panel says "window detected from usage". This covers a user who gave an older model a larger window.
+3. **A 200K default** for a model name it does not recognise, which step 2 still widens when the session used more.
+
+The Settings page has no window setting. If a window is set to something that is neither the model's default nor visible in usage, such as a custom 500K, it cannot be seen from the transcripts.
+
+## Session timeline axis
+
+The timeline chart on the session page picks its axis from the span on screen (`timeline-scale.ts`): seconds and minutes for a short session, then hours, days, weeks, months and years as the span grows or the chart shrinks. Zooming in moves back to finer units. Ticks sit on local calendar boundaries (midnight, Monday, the 1st). A band row above the ticks names the larger unit: the day above hourly ticks, the month above day and week ticks, the year above month ticks. The midnight tick on an hourly axis is bold and says the day. Ctrl or Cmd and the wheel zoom around the pointer, up to 64 times. When zoomed in, a line under the chart says which times are on screen, and a guide follows the pointer with the exact time.

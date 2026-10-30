@@ -16,6 +16,7 @@ import type {
 } from './types'
 import * as path from 'node:path'
 import { discoverSubagentFiles } from './subagent-discovery'
+import { contextLimitFor } from './context-limit'
 import { HEAD_SCAN_LINES, findForkedFrom, parseRecord } from './session-head'
 import {
   createSessionNameState,
@@ -181,6 +182,8 @@ export async function parseDetail(
   const skills: SkillInvocation[] = []
   const tasks: TaskItem[] = []
   const modelsSet = new Set<string>()
+  // The model of the latest reply: the context window that applies now is that model's.
+  let lastModel: string | null = null
   let branch: string | null = null
   const totalTokens: TokenUsage = {
     inputTokens: 0,
@@ -383,7 +386,10 @@ export async function parseDetail(
         }
       }
 
-      if (msg.message.model) modelsSet.add(msg.message.model)
+      if (msg.message.model) {
+        modelsSet.add(msg.message.model)
+        lastModel = msg.message.model
+      }
 
       if (msg.message.usage) {
         const u = msg.message.usage
@@ -644,7 +650,7 @@ export async function parseDetail(
   }
 
   // Build context window data
-  const modelName = modelsSet.size > 0 ? Array.from(modelsSet)[0] : 'unknown'
+  const modelName = lastModel ?? (modelsSet.size > 0 ? Array.from(modelsSet)[0] : 'unknown')
   const contextWindow = buildContextWindowData(
     contextSnapshots,
     modelName,
@@ -847,17 +853,16 @@ async function parseSubagentDetail(
 
 // --- Context window helpers ---
 
-function getContextLimit(_modelName: string): number {
-  return 200_000
-}
-
 function buildContextWindowData(
   snapshots: ContextWindowSnapshot[],
   modelName: string,
 ): ContextWindowData | null {
   if (snapshots.length === 0) return null
 
-  const contextLimit = getContextLimit(modelName)
+  // The window is not in the transcript, so it comes from the model and from the most context the
+  // session ever held, which cannot exceed the window.
+  const peak = Math.max(...snapshots.map((snapshot) => snapshot.contextSize))
+  const { tokens: contextLimit, source: contextLimitSource } = contextLimitFor(modelName, peak)
   const autocompactBuffer = Math.round(contextLimit * 0.165)
   const systemOverhead = snapshots[0].contextSize
   const currentContextSize = snapshots[snapshots.length - 1].contextSize
@@ -867,6 +872,7 @@ function buildContextWindowData(
 
   return {
     contextLimit,
+    contextLimitSource,
     modelName,
     systemOverhead,
     currentContextSize,

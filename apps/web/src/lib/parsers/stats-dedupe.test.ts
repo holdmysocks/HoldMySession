@@ -341,3 +341,48 @@ describe('records without a request ID', () => {
     expect(stats!.modelUsage['claude-opus-5-5']).toMatchObject({ outputTokens: 465, cacheReadInputTokens: 120_000 })
   })
 })
+
+describe('context window from a transcript', () => {
+  let dir: string
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-limit-'))
+  })
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  const reply = (id: string, model: string, cacheRead: number) => ({
+    type: 'assistant', uuid: id, requestId: id, sessionId: 's', timestamp: '2026-03-01T10:01:00.000Z', cwd: '/w/app',
+    message: {
+      role: 'assistant', model, stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }],
+      usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: cacheRead, cache_creation_input_tokens: 0 },
+    },
+  })
+
+  async function parse(records: unknown[]) {
+    const file = path.join(dir, 's.jsonl')
+    fs.writeFileSync(file, records.map((r) => JSON.stringify(r)).join('\n') + '\n')
+    return (await parseDetail(file, 's', '/w/app', 'app')).contextWindow!
+  }
+
+  it('uses the 1M window of a current model, not 200K', async () => {
+    const context = await parse([reply('r1', 'claude-opus-5-5', 90_000)])
+    expect(context.contextLimit).toBe(1_000_000)
+    expect(context.contextLimitSource).toBe('model')
+    expect(context.usagePercent).toBe(9)
+  })
+
+  it('widens the window of an older model that was clearly given more than 200K', async () => {
+    const context = await parse([reply('r1', 'claude-sonnet-4-5', 100_000), reply('r2', 'claude-sonnet-4-5', 450_000)])
+    expect(context.contextLimit).toBe(1_000_000)
+    expect(context.contextLimitSource).toBe('observed')
+  })
+
+  it('takes the window of the model the session ended on', async () => {
+    const context = await parse([reply('r1', 'claude-opus-5-5', 50_000), reply('r2', 'claude-haiku-4-5', 60_000)])
+    expect(context.modelName).toBe('claude-haiku-4-5')
+    expect(context.contextLimit).toBe(200_000)
+  })
+})

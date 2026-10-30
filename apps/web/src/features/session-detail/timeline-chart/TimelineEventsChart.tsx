@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import type {
   Turn,
   AgentInvocation,
@@ -7,9 +7,16 @@ import type {
 } from '@/lib/parsers/types'
 import type { TooltipItem } from './timeline-types'
 import { buildTimelineChartData } from './timeline-data'
-import { TimelineChart } from './TimelineChart'
+import { TimelineChart, LEFT_MARGIN, RIGHT_MARGIN } from './TimelineChart'
+import { formatRange, formatSpan } from './timeline-scale'
 import { TimelineTooltip } from './TimelineTooltip'
 import { TimelineLegend } from './TimelineLegend'
+
+/**
+ * Zoom steps. They grow by about half each time and reach far, since a session that runs for weeks
+ * needs more than a few times magnification to read hours.
+ */
+const ZOOM_LEVELS = [1, 1.5, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64]
 
 interface Props {
   turns: Turn[]
@@ -26,7 +33,12 @@ export function TimelineEventsChart({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
-  const [zoom, setZoom] = useState(1)
+  const [zoomIndex, setZoomIndex] = useState(0)
+  const zoom = ZOOM_LEVELS[zoomIndex]
+  // The chart scrolls sideways. This is how far, so the heading can say what time is on screen.
+  const [scroll, setScroll] = useState({ left: 0, view: 0 })
+  // Where the pointer was in the chart when the wheel zoomed it, so that point stays under the pointer.
+  const zoomAnchor = useRef<{ fraction: number; offset: number } | null>(null)
   const [tooltip, setTooltip] = useState<{
     item: TooltipItem
     position: { x: number; y: number }
@@ -49,6 +61,51 @@ export function TimelineEventsChart({
     () => buildTimelineChartData(turns, agents, skills, errors),
     [turns, agents, skills, errors],
   )
+
+  const zoomBy = useCallback((direction: 1 | -1) => {
+    setZoomIndex((index) => Math.min(ZOOM_LEVELS.length - 1, Math.max(0, index + direction)))
+  }, [])
+
+  // Ctrl or Cmd and the wheel zoom around the pointer. A plain wheel still scrolls the page.
+  // The listener is added by hand because React's wheel listeners cannot stop the page scrolling.
+  useEffect(() => {
+    const element = containerRef.current
+    if (!element) return
+    function handleWheel(event: WheelEvent) {
+      if (!(event.ctrlKey || event.metaKey)) return
+      event.preventDefault()
+      const offset = event.clientX - element!.getBoundingClientRect().left
+      zoomAnchor.current = { fraction: (element!.scrollLeft + offset) / element!.scrollWidth, offset }
+      zoomBy(event.deltaY < 0 ? 1 : -1)
+    }
+    element.addEventListener('wheel', handleWheel, { passive: false })
+    return () => element.removeEventListener('wheel', handleWheel)
+  }, [zoomBy, width])
+
+  // After the chart is redrawn at the new zoom, put the remembered point back under the pointer.
+  useLayoutEffect(() => {
+    const element = containerRef.current
+    const anchor = zoomAnchor.current
+    if (!element || !anchor) return
+    element.scrollLeft = anchor.fraction * element.scrollWidth - anchor.offset
+    zoomAnchor.current = null
+  }, [zoomIndex])
+
+  function handleScroll() {
+    const element = containerRef.current
+    if (element) setScroll({ left: element.scrollLeft, view: element.clientWidth })
+  }
+
+  // The times at the edges of what is on screen, from the chart's own margins.
+  const chartWidth = Math.max(width * zoom, 400)
+  const innerWidth = chartWidth - LEFT_MARGIN - RIGHT_MARGIN
+  const span = chartData.endMs - chartData.startMs
+  const timeAt = (px: number) =>
+    chartData.startMs + Math.min(1, Math.max(0, (px - LEFT_MARGIN) / innerWidth)) * span
+  const visible =
+    zoom > 1 && span > 0 && scroll.view > 0
+      ? formatRange(timeAt(scroll.left), timeAt(scroll.left + scroll.view))
+      : null
 
   // Collect all tool names for legend (main lane + agent dots)
   const allToolNames = useMemo(() => {
@@ -135,29 +192,29 @@ export function TimelineEventsChart({
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
-            onClick={() => setZoom((z) => Math.max(1, z - 0.5))}
-            disabled={zoom <= 1}
+            onClick={() => zoomBy(-1)}
+            disabled={zoomIndex === 0}
             className="rounded bg-gray-800 px-2 py-0.5 text-xs text-gray-300 transition-colors hover:bg-gray-700 disabled:opacity-30"
             title="Zoom out"
           >
             −
           </button>
           <span className="min-w-[3rem] text-center text-[10px] tabular-nums text-gray-500">
-            {zoom === 1 ? 'Fit' : `${zoom.toFixed(1)}x`}
+            {zoom === 1 ? 'Fit' : `${zoom}x`}
           </span>
           <button
             type="button"
-            onClick={() => setZoom((z) => Math.min(8, z + 0.5))}
-            disabled={zoom >= 8}
+            onClick={() => zoomBy(1)}
+            disabled={zoomIndex === ZOOM_LEVELS.length - 1}
             className="rounded bg-gray-800 px-2 py-0.5 text-xs text-gray-300 transition-colors hover:bg-gray-700 disabled:opacity-30"
-            title="Zoom in"
+            title="Zoom in (or hold Ctrl and scroll)"
           >
             +
           </button>
           {zoom > 1 && (
             <button
               type="button"
-              onClick={() => setZoom(1)}
+              onClick={() => setZoomIndex(0)}
               className="ml-1 rounded bg-gray-800 px-2 py-0.5 text-[10px] text-gray-400 transition-colors hover:bg-gray-700"
               title="Reset zoom"
             >
@@ -167,13 +224,32 @@ export function TimelineEventsChart({
         </div>
       </div>
 
+      {/* What the chart covers, and when zoomed in, what part of it is on screen */}
+      {span > 0 && (
+        <p className="mb-2 text-xs text-gray-500">
+          <span className="text-gray-400">{formatRange(chartData.startMs, chartData.endMs)}</span>
+          <span className="mx-1.5 text-gray-700">·</span>
+          {formatSpan(span)}
+          {visible && (
+            <>
+              <span className="mx-1.5 text-gray-700">·</span>
+              <span data-visible-range>showing {visible}</span>
+            </>
+          )}
+        </p>
+      )}
+
       {/* Chart container */}
-      <div ref={containerRef} className="relative overflow-x-auto">
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="relative overflow-x-auto rounded-lg border border-gray-800/70 bg-gray-950/30 pb-1"
+      >
         {width > 0 && (
           <>
             <TimelineChart
               data={chartData}
-              width={Math.max(width * zoom, 400)}
+              width={chartWidth}
               onHover={handleHover}
             />
             {tooltip && (

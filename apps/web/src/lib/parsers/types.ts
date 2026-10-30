@@ -148,6 +148,8 @@ export interface ContextWindowSnapshot {
 
 export interface ContextWindowData {
   contextLimit: number
+  /** Where `contextLimit` came from: the model's known window, the most the session used, or the 200K default. */
+  contextLimitSource: 'model' | 'observed' | 'default'
   modelName: string
   systemOverhead: number
   currentContextSize: number

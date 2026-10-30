@@ -71,16 +71,6 @@ describe('SessionCard', () => {
     )
     expect(container.textContent).not.toContain(mockSession.sessionId)
   })
-  it('shows the project display name as the title and the session name below it', () => {
-    render(
-      <PrivacyProvider>
-        <SessionCard session={mockSession} status="idle" />
-      </PrivacyProvider>
-    )
-    expect(screen.getByRole('heading', { name: 'Checkout Service' })).toBeTruthy()
-    expect(screen.getByText('Add retry to the payment client')).toBeTruthy()
-  })
-
   it('says Untitled session when there is no session name', () => {
     render(
       <PrivacyProvider>
@@ -136,5 +126,28 @@ describe('SessionCard', () => {
     expect(link.className).toContain('border-brand-500')
     expect(link.className).not.toContain('status-pulse')
     expect(screen.getByText('Completed')).toBeTruthy()
+  })
+  it('puts the session name first as the title, and the project under it', () => {
+    render(
+      <PrivacyProvider>
+        <SessionCard session={mockSession} status="idle" />
+      </PrivacyProvider>
+    )
+    const title = screen.getByRole('heading', { level: 3 })
+    expect(title.textContent).toBe('Add retry to the payment client')
+    const project = screen.getByText('Checkout Service')
+    expect(project.tagName).toBe('P')
+    // The title comes before the project in the document.
+    expect(title.compareDocumentPosition(project) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('titles a session with no name as untitled, and still shows the project', () => {
+    render(
+      <PrivacyProvider>
+        <SessionCard session={{ ...mockSession, sessionName: null }} status="idle" />
+      </PrivacyProvider>
+    )
+    expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('Untitled session')
+    expect(screen.getByText('Checkout Service')).toBeTruthy()
   })
 })

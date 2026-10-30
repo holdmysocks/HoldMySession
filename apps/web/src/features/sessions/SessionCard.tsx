@@ -36,8 +36,10 @@ export function SessionCard({ session, status }: { session: SessionSummary; stat
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="truncate text-sm font-semibold text-gray-100">
-              {projectLabel}
+            <h3
+              className={`truncate text-sm font-semibold ${nameLabel ? 'text-gray-100' : 'italic text-gray-500'}`}
+            >
+              {nameLabel ?? 'Untitled session'}
             </h3>
             <StatusBadge status={status} />
             {session.sourceLabel && (
@@ -45,11 +47,7 @@ export function SessionCard({ session, status }: { session: SessionSummary; stat
             )}
           </div>
 
-          <p
-            className={`mt-1 truncate text-sm ${nameLabel ? 'text-gray-200' : 'italic text-gray-500'}`}
-          >
-            {nameLabel ?? 'Untitled session'}
-          </p>
+          <p className="mt-1 truncate text-sm text-gray-400">{projectLabel}</p>
 
           {displayBranch && (
             <p className="mt-0.5 truncate text-xs text-gray-500">

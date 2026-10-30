@@ -1,15 +1,17 @@
-import { useRef, useCallback } from 'react'
-import { format } from 'date-fns'
+import { useRef, useCallback, useEffect, useState } from 'react'
 import type {
   TimelineChartData,
   TooltipItem,
   AgentLaneData,
 } from './timeline-types'
 import { getToolColor } from './timeline-colors'
+import { buildTimeScale, formatCursorTime, type TimeBand } from './timeline-scale'
 
-const LEFT_MARGIN = 90
-const RIGHT_MARGIN = 16
-const TOP_MARGIN = 24
+export const LEFT_MARGIN = 90
+export const RIGHT_MARGIN = 16
+/** Room above the lanes for the axis: a row of day, month or year bands, then the tick labels. */
+const TOP_MARGIN = 44
+const BAND_HEIGHT = 16
 const LANE_HEIGHT = 32
 const LANE_GAP = 8
 const DOT_RADIUS = 4
@@ -20,45 +22,12 @@ interface Props {
   onHover: (item: TooltipItem | null, position: { x: number; y: number }) => void
 }
 
-function computeTimeTicks(
-  startMs: number,
-  endMs: number,
-  chartWidth: number,
-): Array<{ ms: number; label: string; x: number }> {
-  const durationMs = endMs - startMs
-  if (durationMs <= 0) return []
-
-  // Aim for ~1 tick per 100-150px
-  const targetTickCount = Math.max(3, Math.round(chartWidth / 120))
-
-  // Find a nice interval
-  const rawIntervalMs = durationMs / targetTickCount
-  const niceIntervals = [
-    5_000, 10_000, 15_000, 30_000, // seconds
-    60_000, 2 * 60_000, 5 * 60_000, 10 * 60_000, 15 * 60_000, 30 * 60_000, // minutes
-    60 * 60_000, 2 * 60 * 60_000, // hours
-  ]
-  const intervalMs =
-    niceIntervals.find((i) => i >= rawIntervalMs) ??
-    niceIntervals[niceIntervals.length - 1]
-
-  // Use seconds format for durations under 5 minutes
-  const useSeconds = durationMs < 5 * 60_000
-  const fmt = useSeconds ? 'HH:mm:ss' : 'HH:mm'
-
-  const firstTickMs = Math.ceil(startMs / intervalMs) * intervalMs
-  const ticks: Array<{ ms: number; label: string; x: number }> = []
-
-  for (let ms = firstTickMs; ms <= endMs; ms += intervalMs) {
-    const fraction = (ms - startMs) / durationMs
-    ticks.push({
-      ms,
-      label: format(new Date(ms), fmt),
-      x: LEFT_MARGIN + fraction * (chartWidth - LEFT_MARGIN - RIGHT_MARGIN),
-    })
-  }
-
-  return ticks
+/** The band's name if it fits in the band: the long form, then the short one, else nothing. */
+function bandText(band: TimeBand, widthPx: number): string | null {
+  const charPx = 6.1
+  if (band.label.length * charPx + 12 <= widthPx) return band.label
+  if (band.shortLabel.length * charPx + 12 <= widthPx) return band.shortLabel
+  return null
 }
 
 export function TimelineChart({ data, width, onHover }: Props) {
@@ -113,7 +82,9 @@ export function TimelineChart({ data, width, onHover }: Props) {
     [],
   )
 
-  const ticks = computeTimeTicks(data.startMs, data.endMs, chartWidth)
+  // The axis picks hours, days, weeks, months or years from the span the chart shows, so it follows zoom.
+  const scale = buildTimeScale(data.startMs, data.endMs, innerWidth)
+  const xOf = (ms: number) => toX((ms - data.startMs) / Math.max(data.endMs - data.startMs, 1))
 
   return (
     <svg
@@ -125,7 +96,28 @@ export function TimelineChart({ data, width, onHover }: Props) {
       aria-label="Session timeline showing tool calls, agent runs, and skill invocations"
       onMouseLeave={() => onHover(null, { x: 0, y: 0 })}
     >
-      {/* Time axis */}
+      {/* Time axis: a row of bands naming the day, month or year, then ticks with their labels */}
+      {scale.bands.map((band, i) => {
+        const x0 = xOf(band.startMs)
+        const bandWidth = xOf(band.endMs) - x0
+        const text = bandText(band, bandWidth)
+        return (
+          <g key={band.startMs}>
+            <rect
+              x={x0}
+              y={2}
+              width={bandWidth}
+              height={BAND_HEIGHT}
+              className={i % 2 === 0 ? 'fill-gray-800/50' : 'fill-gray-800/20'}
+            />
+            {text && (
+              <text x={x0 + 6} y={2 + BAND_HEIGHT - 5} className="fill-gray-300 text-[10px] font-medium">
+                {text}
+              </text>
+            )}
+          </g>
+        )
+      })}
       <line
         x1={LEFT_MARGIN}
         y1={TOP_MARGIN - 4}
@@ -134,26 +126,39 @@ export function TimelineChart({ data, width, onHover }: Props) {
         stroke="var(--color-gray-700)"
         strokeWidth={1}
       />
-      {ticks.map((tick) => (
-        <g key={tick.ms}>
-          <line
-            x1={tick.x}
-            y1={TOP_MARGIN - 8}
-            x2={tick.x}
-            y2={TOP_MARGIN - 4}
-            stroke="var(--color-gray-600)"
-            strokeWidth={1}
-          />
-          <text
-            x={tick.x}
-            y={TOP_MARGIN - 12}
-            textAnchor="middle"
-            className="fill-gray-500 text-[10px]"
-          >
-            {tick.label}
-          </text>
-        </g>
-      ))}
+      {scale.ticks.map((tick) => {
+        const x = xOf(tick.ms)
+        return (
+          <g key={tick.ms}>
+            {/* A faint line down through the lanes, so an event can be read against the axis. */}
+            <line
+              x1={x}
+              y1={TOP_MARGIN - 4}
+              x2={x}
+              y2={totalHeight - 4}
+              stroke={tick.major ? 'var(--color-gray-600)' : 'var(--color-gray-800)'}
+              strokeWidth={1}
+              strokeDasharray={tick.major ? undefined : '2,4'}
+            />
+            <line
+              x1={x}
+              y1={TOP_MARGIN - 9}
+              x2={x}
+              y2={TOP_MARGIN - 4}
+              stroke={tick.major ? 'var(--color-gray-400)' : 'var(--color-gray-600)'}
+              strokeWidth={1}
+            />
+            <text
+              x={x}
+              y={TOP_MARGIN - 12}
+              textAnchor="middle"
+              className={tick.major ? 'fill-gray-200 text-[10px] font-semibold' : 'fill-gray-500 text-[10px]'}
+            >
+              {tick.label}
+            </text>
+          </g>
+        )
+      })}
 
       {/* Main lane */}
       <text
@@ -326,7 +331,70 @@ export function TimelineChart({ data, width, onHover }: Props) {
           })}
         </>
       )}
+          <HoverGuide
+        svgRef={svgRef}
+        left={LEFT_MARGIN}
+        right={chartWidth - RIGHT_MARGIN}
+        top={TOP_MARGIN - 4}
+        bottom={totalHeight - 4}
+        startMs={data.startMs}
+        endMs={data.endMs}
+      />
     </svg>
+  )
+}
+
+/**
+ * A line that follows the pointer along the chart, with the exact time at that point. It keeps its
+ * own state, so moving the pointer does not redraw the chart.
+ */
+function HoverGuide({
+  svgRef,
+  left,
+  right,
+  top,
+  bottom,
+  startMs,
+  endMs,
+}: {
+  svgRef: React.RefObject<SVGSVGElement | null>
+  left: number
+  right: number
+  top: number
+  bottom: number
+  startMs: number
+  endMs: number
+}) {
+  const [x, setX] = useState<number | null>(null)
+
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    const move = (event: MouseEvent) => {
+      const px = event.clientX - svg.getBoundingClientRect().left
+      setX(px >= left && px <= right ? px : null)
+    }
+    const leave = () => setX(null)
+    svg.addEventListener('mousemove', move)
+    svg.addEventListener('mouseleave', leave)
+    return () => {
+      svg.removeEventListener('mousemove', move)
+      svg.removeEventListener('mouseleave', leave)
+    }
+  }, [svgRef, left, right])
+
+  if (x === null || !(endMs > startMs)) return null
+  const text = formatCursorTime(startMs + ((x - left) / (right - left)) * (endMs - startMs))
+  const width = text.length * 6.2 + 14
+  const boxX = Math.min(Math.max(x - width / 2, 2), right + 14 - width)
+  return (
+    <g pointerEvents="none" data-hover-guide>
+      <line x1={x} y1={top} x2={x} y2={bottom} className="stroke-brand-400/60" strokeWidth={1} strokeDasharray="3,3" />
+      <rect x={boxX} y={1} width={width} height={BAND_HEIGHT + 2} rx={4} className="fill-gray-950 stroke-brand-500/70" />
+      <text x={boxX + width / 2} y={13} textAnchor="middle" className="fill-gray-100 font-mono text-[10px]">
+        {text}
+      </text>
+    </g>
   )
 }
 
