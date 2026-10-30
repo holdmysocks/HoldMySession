@@ -1,5 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
+import { AutoScanSchema } from '@/features/settings/settings.types'
 import type { PriceEntry } from '@/lib/pricing/price-timeline'
 import type { HistoryCost } from '@/lib/history/history-cost'
 import type { SubscriptionPeriod, SubscriptionSummary } from '@/lib/pricing/subscription'
@@ -196,4 +197,12 @@ export const removeSubscriptionPeriod = createServerFn({ method: 'POST' })
     } finally {
       db.close()
     }
+  })
+
+/** Turns the automatic scan on or off and sets how often it runs. Takes effect at the scheduler's next look. */
+export const setAutoScan = createServerFn({ method: 'POST' })
+  .inputValidator((input: unknown) => AutoScanSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { readSettingsFile, writeSettingsFile } = await import('@/lib/settings-file')
+    return writeSettingsFile({ ...readSettingsFile(), autoScan: data }).autoScan
   })

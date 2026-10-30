@@ -9,11 +9,24 @@ export const ModelPricingOverrideSchema = z.object({
   cacheWritePerMTok: z.number().min(0),
 })
 
+/** How often the history database is refreshed by itself, in minutes. */
+export const AUTO_SCAN_INTERVALS = [5, 10, 15, 30, 60, 120, 360, 720, 1440] as const
+
+export const AutoScanSchema = z.object({
+  enabled: z.boolean().default(true),
+  intervalMinutes: z
+    .number()
+    .int()
+    .refine((n) => (AUTO_SCAN_INTERVALS as readonly number[]).includes(n), 'Not one of the offered intervals')
+    .default(15),
+})
+
 export const SettingsSchema = z.object({
   version: z.literal(1),
   subscriptionTier: z
     .enum(['free', 'pro', 'max-5x', 'max-20x', 'teams', 'enterprise', 'api'])
     .default('pro'),
+  autoScan: AutoScanSchema.default({ enabled: true, intervalMinutes: 15 }),
   pricingOverrides: z
     .record(z.string(), ModelPricingOverrideSchema)
     .default({}),
@@ -34,6 +47,7 @@ export const SettingsSchema = z.object({
 
 export type ModelPricingOverride = z.infer<typeof ModelPricingOverrideSchema>
 export type Settings = z.infer<typeof SettingsSchema>
+export type AutoScanSetting = z.infer<typeof AutoScanSchema>
 export type SubscriptionTierId = Settings['subscriptionTier']
 
 export interface ModelPricing {
@@ -250,6 +264,7 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
 export const DEFAULT_SETTINGS: Settings = {
   version: 1,
   subscriptionTier: 'pro',
+  autoScan: { enabled: true, intervalMinutes: 15 },
   pricingOverrides: {},
   dataSources: [],
 }

@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient, queryOptions } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { checkHistory, getHistoryStatus, rescanHistory } from './history.api'
+import { settingsQuery } from '@/features/settings/settings.queries'
+import { AUTO_SCAN_INTERVALS } from '@/features/settings/settings.types'
+import { checkHistory, getHistoryStatus, rescanHistory, setAutoScan } from './history.api'
+
+const intervalLabel = (m: number) => (m < 60 ? `${m} minutes` : m === 60 ? '1 hour' : `${m / 60} hours`)
 
 export const historyStatusQuery = queryOptions({
   queryKey: ['history-status'],
@@ -17,6 +21,12 @@ export function HistoryPanel() {
   })
 
   const check = useMutation({ mutationFn: () => checkHistory() })
+  const { data: settings } = useQuery(settingsQuery)
+  const autoScan = settings?.autoScan
+  const saveAutoScan = useMutation({
+    mutationFn: setAutoScan,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
+  })
 
   const scan = status?.lastScan
   return (
@@ -52,6 +62,45 @@ export function HistoryPanel() {
               {scan?.message && <span className="block text-amber-400">{scan.message}</span>}
             </dd>
           </dl>
+        )}
+        {autoScan && (
+          <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-gray-800 pt-3">
+            <span className="text-gray-300">Scan automatically</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoScan.enabled}
+              aria-label="Scan automatically"
+              onClick={() => saveAutoScan.mutate({ data: { ...autoScan, enabled: !autoScan.enabled } })}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+                autoScan.enabled ? 'bg-brand-600' : 'bg-gray-800'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                  autoScan.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                }`}
+              />
+            </button>
+            <label className="flex items-center gap-1.5">
+              every
+              <select
+                value={autoScan.intervalMinutes}
+                disabled={!autoScan.enabled}
+                onChange={(e) => saveAutoScan.mutate({ data: { ...autoScan, intervalMinutes: Number(e.target.value) } })}
+                className="rounded border border-gray-800 bg-gray-950 px-2 py-1 text-xs text-gray-100 disabled:opacity-50"
+              >
+                {AUTO_SCAN_INTERVALS.map((m) => <option key={m} value={m}>{intervalLabel(m)}</option>)}
+              </select>
+            </label>
+            <span className="text-gray-500">
+              {!autoScan.enabled
+                ? 'Off. Use Rescan now to refresh.'
+                : scan?.finishedAt
+                  ? `Next around ${format(new Date(new Date(scan.finishedAt).getTime() + autoScan.intervalMinutes * 60_000), 'HH:mm')}`
+                  : 'Runs when the server starts'}
+            </span>
+          </div>
         )}
         <div className="mt-3 flex items-center gap-3">
           <button

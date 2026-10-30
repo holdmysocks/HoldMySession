@@ -52,6 +52,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
       version: 1,
       // The plan is kept as dated periods in the history database now. This field is only kept for older files.
       subscriptionTier: settings.subscriptionTier,
+      autoScan: settings.autoScan,
       pricingOverrides: overrides,
       dataSources: [],
     }

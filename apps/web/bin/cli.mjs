@@ -211,6 +211,9 @@ server.listen(port, host, () => {
   Press Ctrl+C to stop
 `);
 
+  // Load the app once, so the server starts its automatic history scan now, not when the first browser arrives.
+  fetch(`http://${host === '0.0.0.0' || host === '::' ? 'localhost' : host}:${port}/`, { redirect: 'manual' }).catch(() => {});
+
   if (shouldOpen) {
     const cmd = process.platform === 'darwin'
       ? `open "${url}"`

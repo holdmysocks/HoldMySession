@@ -210,6 +210,7 @@ describe('getMergedPricing', () => {
     const settings: Settings = {
       version: 1,
       subscriptionTier: 'pro',
+      autoScan: { enabled: true, intervalMinutes: 15 },
       dataSources: [],
       pricingOverrides: {
         'claude-sonnet-4': {
@@ -258,6 +259,7 @@ describe('getMergedPricing', () => {
     const settings: Settings = {
       version: 1,
       subscriptionTier: 'pro',
+      autoScan: { enabled: true, intervalMinutes: 15 },
       pricingOverrides: overrides,
       dataSources: [],
     }

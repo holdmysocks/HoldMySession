@@ -27,7 +27,7 @@ Settings, under History database, shows the file, the session count, the days co
 
 ## Stats from the database
 
-The overall Stats and the Overview by Project tab read from the database first, and fall back to reading the session files if it cannot be used (`src/lib/history/history-read.ts`, `history-stats.ts`). Sessions that are no longer on disk are included. If the database is empty it is filled first. If the last scan is more than five minutes old, a new one starts in the background and the page answers from what is stored, so the page is at most one refresh behind. The automatic scan setting will replace that rule.
+The overall Stats and the Overview by Project tab read from the database first, and fall back to reading the session files if it cannot be used (`src/lib/history/history-read.ts`, `history-stats.ts`). Sessions that are no longer on disk are included. If the database is empty it is filled first. Keeping it fresh is the automatic scan's job, below, or the Rescan now button's.
 
 Two things differ from reading the files: tokens are counted on the day each reply happened, not all on the day the session was last active, and days are local days. Session, message and tool counts still go on the day the session was last active.
 
@@ -47,6 +47,10 @@ The plan paid for is kept as dated periods in `subscription_periods`: a plan, it
 
 `summarizeSubscription` (`src/lib/pricing/subscription.ts`) compares the cost of the plan with the cost of the same usage at API prices, from the day the first plan starts to today, using the day-by-day prices. Each day of a plan costs its monthly price divided by the days in that month, so a part month is paid for in part. Usage before the first plan is left out of both sides. API Only pays the API cost, so it saves nothing. The Subscription card shows the saving or the extra cost, with a month-by-month table, and the Stats cost card shows one line under Estimated Cost. The plan belongs to the account, so the per-project overview does not show it.
 
+## Automatic scan
+
+Settings, under History database, has a switch and an interval: 5, 10, 15, 30 minutes, or 1, 2, 6, 12, 24 hours. It is on every 15 minutes by default, and is saved as `autoScan` in `settings.json`. A scan runs inside the server process (`src/lib/history/auto-scan.ts`), so it works with no browser open. It looks at the clock every 30 seconds, scans when the last scan finished more than the interval ago, and reads the setting each time, so a change applies without a restart. A scan that is overdue runs at server start. `bin/cli.mjs` loads the app once after it starts listening so that happens at once. When it is switched off the history only refreshes with Rescan now, so Stats can be behind. A failed scan is recorded in the scan log and tried again after the interval.
+
 ## Planned
 
 Build order from here. Each step is its own commit.
@@ -56,7 +60,7 @@ Build order from here. Each step is its own commit.
 3. **Stats read from the database (done).** See below.
 4. **Dated pricing (done).** See below.
 5. **Subscription history (done).** See below.
-6. **Automatic scan.** On or off, every 5, 10, 15, 30 min, or 1, 2, 6, 12, 24 h, run by a server-side timer so it works with no tab open.
+6. **Automatic scan (done).** See below.
 7. **Backup and restore** of the database from Settings.
 8. **Linked machines**, below.
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeModelId, SettingsSchema } from './settings.types'
+import { AUTO_SCAN_INTERVALS, normalizeModelId, SettingsSchema } from './settings.types'
 
 describe('normalizeModelId', () => {
   it('strips date suffix from model ID', () => {
@@ -48,8 +48,20 @@ describe('SettingsSchema', () => {
     const result = SettingsSchema.safeParse(input)
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data).toEqual({ ...input, dataSources: [] })
+      expect(result.data).toEqual({ ...input, dataSources: [], autoScan: { enabled: true, intervalMinutes: 15 } })
     }
+  })
+
+  it('turns the automatic scan on every 15 minutes for a file that predates it', () => {
+    const result = SettingsSchema.parse({ version: 1, subscriptionTier: 'pro', pricingOverrides: {} })
+    expect(result.autoScan).toEqual({ enabled: true, intervalMinutes: 15 })
+  })
+
+  it('accepts the offered scan intervals only', () => {
+    for (const intervalMinutes of AUTO_SCAN_INTERVALS) {
+      expect(SettingsSchema.safeParse({ version: 1, autoScan: { enabled: false, intervalMinutes } }).success).toBe(true)
+    }
+    expect(SettingsSchema.safeParse({ version: 1, autoScan: { enabled: true, intervalMinutes: 7 } }).success).toBe(false)
   })
 
   it('applies defaults for missing optional fields', () => {
