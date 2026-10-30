@@ -463,8 +463,39 @@ describe('session-scanner', () => {
       mockIsSessionActive.mockResolvedValue(false)
       vi.mocked(loadDesktopSessionFlags).mockResolvedValue(
         new Map([
-          ['session-abc', flags('session-abc', { superseded: true })],
-          ['session-def', flags('session-def')],
+          ['session-abc', flags('session-abc', { superseded: true, localId: 'local_ui' })],
+          ['session-def', flags('session-def', { localId: 'local_ui' })],
+        ]),
+      )
+
+      const byId = new Map((await scanAllSessionsWithPaths()).map((s) => [s.sessionId, s]))
+      expect(byId.get('session-abc')).toMatchObject({ isSuperseded: true, desktopRecordId: 'local_ui' })
+      expect(byId.get('session-def')).toMatchObject({ isSuperseded: false, desktopRecordId: 'local_ui' })
+    })
+
+    it('still shows a session whose current transcript is not on disk, using its newest older transcript', async () => {
+      const {
+        scanAllSessionsWithPaths,
+        mockScanProjects,
+        mockParseSummary,
+        mockIsSessionActive,
+        mockStat,
+      } = await importScanner()
+      const { loadDesktopSessionFlags } = await import('../desktop/desktop-records')
+
+      mockScanProjects.mockResolvedValue([
+        makeProject({ sessionFiles: ['session-abc.jsonl', 'session-def.jsonl'] }),
+      ])
+      mockStat.mockResolvedValue({ mtimeMs: 1000, size: 1024 })
+      mockParseSummary.mockImplementation(async (_path: string, sessionId: string) =>
+        makeSummary({ sessionId, lastActiveAt: sessionId === 'session-def' ? '2026-03-05T10:00:00.000Z' : '2026-03-01T10:00:00.000Z' }),
+      )
+      mockIsSessionActive.mockResolvedValue(false)
+      // The record's current transcript is not one of the files. Both older ones are listed.
+      vi.mocked(loadDesktopSessionFlags).mockResolvedValue(
+        new Map([
+          ['session-abc', flags('session-abc', { superseded: true, localId: 'local_ui' })],
+          ['session-def', flags('session-def', { superseded: true, localId: 'local_ui' })],
         ]),
       )
 

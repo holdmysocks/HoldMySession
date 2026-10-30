@@ -189,6 +189,7 @@ describe('desktopFlagsFor', () => {
       desktopActivityAt: null,
       desktopParentId: null,
       isSuperseded: false,
+      desktopRecordId: null,
     })
   })
 
@@ -216,6 +217,7 @@ describe('desktopFlagsFor', () => {
       desktopActivityAt: new Date(1793280587490).toISOString(),
       desktopParentId: 'cli-parent',
       isSuperseded: false,
+      desktopRecordId: 'local_child',
     })
   })
 })

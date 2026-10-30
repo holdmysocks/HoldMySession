@@ -49,6 +49,8 @@ export interface SessionSummary {
    * `priorCliSessionIds`). It is a former version, not a session, so it is hidden everywhere.
    */
   isSuperseded?: boolean
+  /** The desktop app's ID for the session this transcript belongs to, or null when it has no record. */
+  desktopRecordId?: string | null
   /**
    * Split from its parent in the Claude desktop app (`lineageDetached`). The map draws no parent
    * link for it, even though its transcript still names the parent.

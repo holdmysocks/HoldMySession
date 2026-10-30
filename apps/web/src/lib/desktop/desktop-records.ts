@@ -205,6 +205,8 @@ export function desktopFlagsFor(
   desktopActivityAt: string | null
   desktopParentId: string | null
   isSuperseded: boolean
+  /** The app's ID for the session this transcript belongs to (local_<uuid>), or null with no record. */
+  desktopRecordId: string | null
 } {
   const record = flags.get(sessionId)
   return {
@@ -214,5 +216,6 @@ export function desktopFlagsFor(
       record?.lastActivityAt != null ? new Date(record.lastActivityAt).toISOString() : null,
     desktopParentId: record?.parentCliSessionId ?? null,
     isSuperseded: record?.superseded ?? false,
+    desktopRecordId: record?.localId ? record.localId : null,
   }
 }

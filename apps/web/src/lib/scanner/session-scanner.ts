@@ -10,6 +10,7 @@ import type { SessionSummary } from '../parsers/types'
 import { truncateSessionName } from '../parsers/session-name'
 import { resolveProjectDisplayName } from './project-display-name'
 import { desktopFlagsFor, loadDesktopSessionFlags } from '../desktop/desktop-records'
+import { keepOneTranscriptPerSession } from '../desktop/superseded'
 import { uniqueOutputByFile } from './unique-output'
 
 /** Extended summary that includes the absolute JSONL file path (server-side only). */
@@ -154,11 +155,13 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
   // Desktop app flags (archived, split). Added to copies, so the summary cache is not changed.
   // A session whose transcript has no working directory takes the desktop record's, so it keeps its project.
   const desktopFlags = await loadDesktopSessionFlags()
-  return summaries.map((summary) => ({
+  const flagged = summaries.map((summary) => ({
     ...summary,
     ...desktopFlagsFor(desktopFlags, summary.sessionId),
     cwd: summary.cwd ?? desktopFlags.get(summary.sessionId)?.cwd ?? null,
   }))
+  // Older transcripts are hidden, but a session whose current transcript is not on disk keeps one.
+  return keepOneTranscriptPerSession(flagged)
 }
 
 /** Public API: returns SessionSummary[] without filePath -- used by server functions that serialize to client. */
