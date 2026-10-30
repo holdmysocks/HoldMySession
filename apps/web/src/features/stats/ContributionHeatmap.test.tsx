@@ -256,4 +256,29 @@ describe('ContributionHeatmap', () => {
       expect(container.textContent).toContain('Activity')
     })
   })
+
+  describe('range', () => {
+    const cells = (c: HTMLElement) => c.querySelectorAll('[style*="grid-row"]').length
+    const daysAgo = (n: number) => {
+      const d = new Date()
+      d.setDate(d.getDate() - n)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+    const usage = (date: string): [DailyActivity[], DailyModelTokens[]] => [
+      [{ date, messageCount: 1, sessionCount: 1, toolCallCount: 1 }],
+      [{ date, tokensByModel: { m: 100 } }],
+    ]
+
+    it('starts at the first day of use when that is less than a year ago', () => {
+      const [a, t] = usage(daysAgo(9))
+      const { container } = render(<ContributionHeatmap dailyActivity={a} dailyModelTokens={t} />)
+      expect(cells(container)).toBe(10)
+    })
+
+    it('shows only the past year once usage is older than that', () => {
+      const [a, t] = usage(daysAgo(800))
+      const { container } = render(<ContributionHeatmap dailyActivity={a} dailyModelTokens={t} />)
+      expect(cells(container)).toBe(365)
+          })
+  })
 })

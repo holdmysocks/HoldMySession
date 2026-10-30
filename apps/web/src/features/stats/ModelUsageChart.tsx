@@ -12,7 +12,10 @@ import { formatTokenCount } from '@/lib/utils/format'
 const COLORS = ['#d97757', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#b07cc5']
 
 export function ModelUsageChart({ data }: { data: ModelUsage }) {
-  const chartData = Object.entries(data).map(([model, usage]) => ({
+  // "<synthetic>" is a placeholder Claude Code writes for messages it made itself, not a model.
+  const chartData = Object.entries(data)
+    .filter(([model, usage]) => !model.startsWith('<') && usage.inputTokens + usage.outputTokens > 0)
+    .map(([model, usage]) => ({
     name: model.replace(/^claude-/, '').split('-202')[0],
     fullName: model,
     totalTokens: usage.inputTokens + usage.outputTokens,

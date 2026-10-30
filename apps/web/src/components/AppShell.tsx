@@ -6,13 +6,13 @@ import { appInfoQuery } from '@/features/settings/app-info.queries'
 
 const NAV_ITEMS = [
   {
-    to: '/sessions',
-    label: 'Sessions',
+    to: '/stats',
+    label: 'Stats',
     icon: (
-      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <line x1="2" y1="4" x2="14" y2="4" />
-        <line x1="2" y1="8" x2="14" y2="8" />
-        <line x1="2" y1="12" x2="14" y2="12" />
+      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
+        <rect x="1" y="8" width="3" height="7" rx="0.5" />
+        <rect x="6.5" y="4" width="3" height="11" rx="0.5" />
+        <rect x="12" y="1" width="3" height="14" rx="0.5" />
       </svg>
     ),
   },
@@ -29,13 +29,13 @@ const NAV_ITEMS = [
     ),
   },
   {
-    to: '/stats',
-    label: 'Stats',
+    to: '/sessions',
+    label: 'Sessions',
     icon: (
-      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
-        <rect x="1" y="8" width="3" height="7" rx="0.5" />
-        <rect x="6.5" y="4" width="3" height="11" rx="0.5" />
-        <rect x="12" y="1" width="3" height="14" rx="0.5" />
+      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <line x1="2" y1="4" x2="14" y2="4" />
+        <line x1="2" y1="8" x2="14" y2="8" />
+        <line x1="2" y1="12" x2="14" y2="12" />
       </svg>
     ),
   },

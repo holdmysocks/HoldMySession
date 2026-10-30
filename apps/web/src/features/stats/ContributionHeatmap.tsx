@@ -104,16 +104,29 @@ export function ContributionHeatmap({
     // Step 2: Calculate start date (today - 364 days, adjusted to previous Monday)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    // The grid covers the past year at most, and starts at the first day with usage when that is later.
     let startDate = addDays(today, -364)
-    const startDayOfWeek = toMondayFirst(getDay(startDate))
-    if (startDayOfWeek !== 0) {
-      startDate = addDays(startDate, -startDayOfWeek)
+    let rangeStart = startDate
+    let firstUse: string | null = null
+    for (const [date, d] of dataMap) {
+      if ((d.sessionCount > 0 || d.totalTokens > 0) && (firstUse === null || date < firstUse)) firstUse = date
     }
+    if (firstUse !== null) {
+      const first = parseISO(firstUse)
+      if (first > rangeStart && first <= today) rangeStart = first
+    }
+    // Columns are whole weeks from a Monday. Days before the range start leave their cells empty and undrawn.
+    const startDayOfWeek = toMondayFirst(getDay(rangeStart))
+    startDate = addDays(rangeStart, -startDayOfWeek)
 
     // Step 3: Generate all days in range
     const allDays: DayData[] = []
     let currentDate = startDate
     while (currentDate <= today) {
+      if (currentDate < rangeStart) {
+        currentDate = addDays(currentDate, 1)
+        continue
+      }
       const dateStr = format(currentDate, 'yyyy-MM-dd')
       const dayOfWeek = toMondayFirst(getDay(currentDate))
       const daysSinceStart = Math.floor(
@@ -148,7 +161,7 @@ export function ContributionHeatmap({
     const labels: MonthLabel[] = []
     let lastMonth = -1
     for (const day of allDays) {
-      if (day.dayOfWeek === 0) {
+      if (day.dayOfWeek === 0 || day === allDays[0]) {
         const parsed = parseISO(day.date)
         const month = parsed.getMonth()
         if (month !== lastMonth) {
@@ -178,7 +191,7 @@ export function ContributionHeatmap({
   return (
     <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
       <h3 className="text-sm font-semibold text-gray-300">Activity</h3>
-      <p className="mt-1 text-xs text-gray-500">Token usage intensity over the past year</p>
+      <p className="mt-1 text-xs text-gray-500">Token usage intensity over the past year, or since your first day of use</p>
 
       <div className="mt-4 overflow-x-auto">
         <div className="relative w-full">

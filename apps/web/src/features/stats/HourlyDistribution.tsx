@@ -12,7 +12,7 @@ export function HourlyDistribution({
   const maxCount = Math.max(...hours.map((h) => h.count), 1)
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="flex flex-col rounded-xl border border-gray-800 bg-gray-900/50 p-4">
       <h3 className="text-sm font-semibold text-gray-300">
         Hourly Distribution
       </h3>
@@ -20,7 +20,7 @@ export function HourlyDistribution({
         Session starts by hour of day
       </p>
 
-      <div className="mt-4 flex items-end gap-0.5" style={{ height: '120px' }}>
+      <div className="mt-4 flex min-h-[120px] flex-1 items-stretch gap-0.5">
         {hours.map((h) => {
           const height = h.count > 0 ? Math.max((h.count / maxCount) * 100, 4) : 0
           const intensity = h.count / maxCount
@@ -29,7 +29,6 @@ export function HourlyDistribution({
             <div
               key={h.hour}
               className="group relative flex-1"
-              style={{ height: '100%' }}
             >
               <div
                 className="absolute bottom-0 w-full rounded-t transition-colors"
