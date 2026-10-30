@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render } from '@testing-library/react'
 import { ContributionHeatmap } from './ContributionHeatmap'
 import type { DailyActivity, DailyModelTokens } from '@/lib/parsers/types'
@@ -280,5 +280,26 @@ describe('ContributionHeatmap', () => {
       const { container } = render(<ContributionHeatmap dailyActivity={a} dailyModelTokens={t} />)
       expect(cells(container)).toBe(365)
           })
+
+    describe('cell size', () => {
+      afterEach(() => vi.unstubAllGlobals())
+      const sizeFor = (daysBack: number) => {
+        vi.stubGlobal('ResizeObserver', class {
+          constructor(private cb: () => void) {}
+          observe() { this.cb() }
+          disconnect() {}
+        })
+        vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(900)
+        const [a, t] = usage(daysAgo(daysBack))
+        const { container } = render(<ContributionHeatmap dailyActivity={a} dailyModelTokens={t} />)
+        return parseInt((container.querySelector('[style*="grid-row"]') as HTMLElement).style.width)
+      }
+
+      it('draws big squares for a short history and small ones for a year', () => {
+        expect(sizeFor(30)).toBe(26)
+        expect(sizeFor(400)).toBeLessThan(sizeFor(30))
+        expect(sizeFor(400)).toBeGreaterThanOrEqual(10)
+      })
+    })
   })
 })

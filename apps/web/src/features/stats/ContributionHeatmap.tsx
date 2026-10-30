@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { format, addDays, getDay, parseISO } from 'date-fns'
 import type { DailyActivity, DailyModelTokens } from '@/lib/parsers/types'
@@ -13,7 +13,8 @@ const INTENSITY_COLORS = [
 ] as const
 
 const DAY_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', ''] as const
-const CELL_SIZE = 10
+const MIN_CELL = 10
+const MAX_CELL = 26
 const CELL_GAP = 2
 const DAY_LABEL_WIDTH = 28
 
@@ -84,6 +85,17 @@ export function ContributionHeatmap({
   dailyModelTokens: DailyModelTokens[]
 }) {
   const [tooltip, setTooltip] = useState<TooltipData | null>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const [gridWidth, setGridWidth] = useState(0)
+
+  // Squares grow to fill the card when there are few weeks, and shrink to a year's worth as it fills.
+  useEffect(() => {
+    const el = gridRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => setGridWidth(el.clientWidth))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   const { days, monthLabels } = useMemo(() => {
     // Step 1: Build a lookup map joining both data sources by date
@@ -177,6 +189,10 @@ export function ContributionHeatmap({
     return { days: allDays, monthLabels: labels }
   }, [dailyActivity, dailyModelTokens])
 
+  const weeks = days.length > 0 ? days[days.length - 1].weekIndex + 1 : 1
+  const fit = Math.floor((gridWidth - DAY_LABEL_WIDTH - (weeks - 1) * CELL_GAP) / weeks)
+  const CELL_SIZE = gridWidth > 0 ? Math.min(MAX_CELL, Math.max(MIN_CELL, fit)) : MIN_CELL
+
   if (days.length === 0) {
     return (
       <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
@@ -194,7 +210,7 @@ export function ContributionHeatmap({
       <p className="mt-1 text-xs text-gray-500">Token usage intensity over the past year, or since your first day of use</p>
 
       <div className="mt-4 overflow-x-auto">
-        <div className="relative w-full">
+        <div ref={gridRef} className="relative w-full">
           {/* Grid container with day labels */}
           <div className="flex">
             {/* Day labels column (spacer for month row + labels for grid rows) */}
@@ -222,7 +238,7 @@ export function ContributionHeatmap({
                 className="grid text-[10px] text-gray-500"
                 style={{
                   gridAutoFlow: 'column',
-                  gridAutoColumns: `minmax(${CELL_SIZE}px, 1fr)`,
+                  gridAutoColumns: `${CELL_SIZE}px`,
                   gap: CELL_GAP,
                   height: 16,
                   marginBottom: CELL_GAP,
@@ -245,7 +261,7 @@ export function ContributionHeatmap({
                 style={{
                   gridTemplateRows: `repeat(7, ${CELL_SIZE}px)`,
                   gridAutoFlow: 'column',
-                  gridAutoColumns: `minmax(${CELL_SIZE}px, 1fr)`,
+                  gridAutoColumns: `${CELL_SIZE}px`,
                   gap: CELL_GAP,
                 }}
               >
