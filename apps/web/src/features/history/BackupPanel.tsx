@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient, queryOptions } from '@tanstack/r
 import { format } from 'date-fns'
 import { clockPattern } from '@/lib/utils/time-format'
 import { GUARD_HEADER } from '@/lib/history/request-guard'
-import { backUpNow, getBackups } from './history.api'
+import { backUpNow, getBackups, removeBackup } from './history.api'
 
 const backupsQuery = queryOptions({
   queryKey: ['history-backups'],
@@ -23,6 +23,15 @@ export function BackupPanel() {
     mutationFn: () => backUpNow(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['history-backups'] }),
   })
+
+  const remove = useMutation({
+    mutationFn: (name: string) => removeBackup({ data: { name } }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['history-backups'] }),
+  })
+
+  function confirmDelete(name: string, when: string) {
+    if (window.confirm(`Delete the backup from ${when}?\n\nThis cannot be undone.`)) remove.mutate(name)
+  }
 
   const restore = useMutation({
     mutationFn: async (file: File) => {
@@ -114,6 +123,14 @@ export function BackupPanel() {
                 >
                   Download
                 </a>
+                <button
+                  type="button"
+                  onClick={() => confirmDelete(b.name, format(new Date(b.createdAt), clockPattern('MMM d, yyyy HH:mm')))}
+                  disabled={remove.isPending}
+                  className="text-red-400 hover:text-red-300 disabled:opacity-50"
+                >
+                  Delete
+                </button>
               </li>
             ))}
           </ul>

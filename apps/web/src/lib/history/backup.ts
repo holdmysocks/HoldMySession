@@ -58,6 +58,14 @@ export function createBackup(db: Db, label: string = 'manual', now: Date = new D
   return { name, sizeBytes: stat.size, createdAt: stat.mtime.toISOString() }
 }
 
+/** Deletes one backup by name. False if there is no such backup. Only files in the backups folder can be named. */
+export function deleteBackup(name: string): boolean {
+  const file = backupPath(name)
+  if (!file || !fs.existsSync(file)) return false
+  fs.rmSync(file)
+  return true
+}
+
 export interface BackupCheck {
   schemaVersion: number
   sessions: number

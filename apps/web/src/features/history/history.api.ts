@@ -235,3 +235,10 @@ export const backUpNow = createServerFn({ method: 'POST' }).handler(async (): Pr
     db.close()
   }
 })
+
+export const removeBackup = createServerFn({ method: 'POST' })
+  .inputValidator((input: unknown) => z.object({ name: z.string().min(1).max(200) }).parse(input))
+  .handler(async ({ data }): Promise<boolean> => {
+    const { deleteBackup } = await import('@/lib/history/backup')
+    return deleteBackup(data.name)
+  })

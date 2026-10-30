@@ -1,62 +1,52 @@
 ---
 name: dashboard
-description: Open the HoldMySession in the browser. Starts it first if not already running. Checks for and installs updates before starting.
+description: Open HoldMySession in the browser. Starts it from this checkout first if it is not already running.
 user-invocable: true
 ---
 
-# Open Dashboard
+# Open HoldMySession
 
 ## Steps
 
-### 1. Check if dashboard is running
-
-Run: `lsof -i :3000 -sTCP:LISTEN`
-
-- If output is non-empty → dashboard is already running, skip to step 4
-- If empty → go to step 2
-
-### 2. Check for updates
-
-Check whether the dashboard is installed globally or via npx, then compare versions:
+### 1. Check if it is running
 
 ```bash
-INSTALLED=$(npm list -g claude-session-dashboard --depth=0 --json 2>/dev/null | node -p "try{JSON.parse(require('fs').readFileSync(0,'utf8')).dependencies?.['claude-session-dashboard']?.version||''}catch(e){''}" 2>/dev/null)
-LATEST=$(npm view claude-session-dashboard version 2>/dev/null)
-echo "installed=${INSTALLED} latest=${LATEST}"
+(exec 3<>/dev/tcp/127.0.0.1/3000) 2>/dev/null && echo running || echo stopped
 ```
 
-- If `INSTALLED` is empty → using npx (always fetches latest automatically, no update needed)
-- If `INSTALLED` is non-empty and differs from `LATEST` → update is available, go to step 3
-- If versions match → skip to step 4
+If it prints `running`, skip to step 4.
 
-### 3. Install update
+### 2. Check it is built
 
-A newer version is available. Install it:
+The app is run from this checkout, never from npm. It needs `apps/web/dist/server/server.js`.
 
 ```bash
-npm install -g claude-session-dashboard@latest
+test -f apps/web/dist/server/server.js && echo built || echo "not built"
 ```
 
-Report to the user: "Updated claude-session-dashboard from vX.X.X to vY.Y.Y."
-
-### 4. Start the dashboard
-
-If not already running, start in background:
+If it is not built, build it:
 
 ```bash
-nohup npx claude-session-dashboard --port 3000 >> "$HOME/.claude/dashboard.log" 2>&1 & disown
+cd apps/web && npm run build
 ```
 
-Wait for it to be ready:
+### 3. Start it
 
 ```bash
-npx wait-on http://localhost:3000 --timeout 15000 2>/dev/null || sleep 5
+mkdir -p ~/.holdmysession
+nohup node apps/web/bin/cli.mjs --port 3000 >> ~/.holdmysession/dashboard.log 2>&1 & disown
 ```
 
-### 5. Open in browser
+Wait until port 3000 answers (try for up to 15 seconds):
 
 ```bash
-open http://localhost:3000
+for i in $(seq 1 15); do (exec 3<>/dev/tcp/127.0.0.1/3000) 2>/dev/null && break; sleep 1; done
 ```
 
-Report to the user that the dashboard is open at http://localhost:3000.
+### 4. Open it in the browser
+
+```bash
+open http://localhost:3000 2>/dev/null || xdg-open http://localhost:3000 2>/dev/null || start http://localhost:3000
+```
+
+Tell the user HoldMySession is open at http://localhost:3000.

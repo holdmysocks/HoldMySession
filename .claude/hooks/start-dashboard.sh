@@ -1,22 +1,28 @@
 #!/bin/bash
 
-# Auto-start claude-session-dashboard on session start
-# Runs in background, logs to $HOME/.claude/dashboard.log
-# Idempotent: exits silently if already running
+# Starts HoldMySession from this checkout when a session starts, if it is not already running.
+# Uses the built app in apps/web (run `npm run build` there first), never npm or npx.
+# Runs in the background and logs to ~/.holdmysession/dashboard.log. Idempotent, and always exits 0.
 
-set -e
+PORT="${HOLDMYSESSION_PORT:-3000}"
+APP="$CLAUDE_PROJECT_DIR/apps/web"
+LOG_DIR="${HOLDMYSESSION_DIR:-$HOME/.holdmysession}"
 
-LOG_FILE="$HOME/.claude/dashboard.log"
-
-# Check if port 3000 is already in use
-if lsof -i :3000 -sTCP:LISTEN -t >/dev/null 2>&1; then
-  # Dashboard already running, exit silently
+# Already running: nothing to do.
+if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; then
   exit 0
 fi
 
-# Start dashboard in background, detached
-nohup npx claude-session-dashboard --open >> "$LOG_FILE" 2>&1 &
+# Not built yet: say so in the log and leave it to the user.
+if [ ! -f "$APP/dist/server/server.js" ]; then
+  mkdir -p "$LOG_DIR"
+  echo "$(date) HoldMySession is not built. Run 'npm run build' in apps/web." >> "$LOG_DIR/dashboard.log"
+  exit 0
+fi
+
+mkdir -p "$LOG_DIR"
+nohup node "$APP/bin/cli.mjs" --port "$PORT" --open >> "$LOG_DIR/dashboard.log" 2>&1 &
 disown
 
-# Exit immediately (hook must complete within 5s timeout)
+# The hook must finish within its timeout.
 exit 0

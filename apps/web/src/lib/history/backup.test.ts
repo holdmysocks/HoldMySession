@@ -4,7 +4,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { openHistoryDb, historyDbPath, migrate, schemaVersion, LATEST_SCHEMA_VERSION, getMeta } from './history-db'
 import { openSqlite } from './sqlite'
-import { KEEP_BACKUPS, backupPath, backupsDir, checkBackupFile, createBackup, listBackups, restoreFromFile } from './backup'
+import { KEEP_BACKUPS, backupPath, backupsDir, checkBackupFile, createBackup, deleteBackup, listBackups, restoreFromFile } from './backup'
 
 describe('backup and restore', () => {
   let dir: string
@@ -42,6 +42,18 @@ describe('backup and restore', () => {
     const db = openHistoryDb()
     for (let i = 0; i < KEEP_BACKUPS + 3; i++) createBackup(db, 'manual', new Date(2026, 0, 1, 0, 0, i))
     expect(listBackups()).toHaveLength(KEEP_BACKUPS)
+    db.close()
+  })
+
+  it('deletes a backup by name, and nothing else', () => {
+    const db = openHistoryDb()
+    const info = createBackup(db)
+    fs.writeFileSync(path.join(dir, 'settings.json'), '{}')
+    expect(deleteBackup('../settings.json')).toBe(false)
+    expect(fs.existsSync(path.join(dir, 'settings.json'))).toBe(true)
+    expect(deleteBackup(info.name)).toBe(true)
+    expect(deleteBackup(info.name)).toBe(false)
+    expect(listBackups()).toHaveLength(0)
     db.close()
   })
 
