@@ -8,11 +8,11 @@ test.describe('Settings Page', () => {
     await expect(page.locator('h1')).toContainText('Settings')
   })
 
-  test('Given I visit /settings, Then I see the subscription tier selector', async ({
+  test('Given I visit /settings, Then I see the subscription card', async ({
     page,
   }) => {
     await expect(
-      page.locator('h2').filter({ hasText: 'Subscription Tier' }),
+      page.locator('h2').filter({ hasText: 'Subscription' }),
     ).toBeVisible()
     await page.screenshot({
       path: 'e2e/screenshots/settings-page-full.png',
@@ -28,17 +28,15 @@ test.describe('Settings Page', () => {
     ).toBeVisible()
   })
 
-  test('Given I am on settings, When I select a different tier, Then the Save button becomes enabled', async ({
+  test('Given I am on settings, When I change a price, Then the Save button becomes enabled', async ({
     page,
   }) => {
     // The Save button should initially be disabled
     const saveButton = page.locator('button:has-text("Save")')
     await expect(saveButton).toBeDisabled()
 
-    // Click a different tier card (e.g., "Free" or "Max 5x")
-    // The tier cards are clickable elements showing tier names
-    const freeTier = page.getByText('Free', { exact: true }).first()
-    await freeTier.click()
+    // Change a price in the API pricing table
+    await page.locator('h2:has-text("API Pricing")').locator('xpath=..').locator('input').first().fill('9')
 
     // Save button should now be enabled
     await expect(saveButton).toBeEnabled()
@@ -48,15 +46,14 @@ test.describe('Settings Page', () => {
     page,
   }) => {
     // First change something to make form dirty
-    const freeTier = page.getByText('Free', { exact: true }).first()
-    await freeTier.click()
+    await page.locator('h2:has-text("API Pricing")').locator('xpath=..').locator('input').first().fill('9')
 
     // Now click Reset to Defaults
     await page.click('button:has-text("Reset")')
 
-    // After reset, the Subscription Tier heading should still be visible
+    // After reset, the Subscription heading should still be visible
     await expect(
-      page.locator('h2').filter({ hasText: 'Subscription Tier' }),
+      page.locator('h2').filter({ hasText: 'Subscription' }),
     ).toBeVisible()
   })
 })

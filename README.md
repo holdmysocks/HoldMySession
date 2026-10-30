@@ -63,7 +63,7 @@ Everything runs entirely on your machine. Read-only — it never modifies any Cl
 
 **Cost estimation**
 - Configurable API pricing per model. Defaults cover Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5, and earlier Opus, Sonnet and Haiku models. Haiku 5.5 uses its rate for prompts up to 100K tokens; override it for longer prompts
-- Subscription tier support (Free, Pro, Max 5x/20x) with appropriate rate adjustments
+- Subscription tier support (Free, Pro, Max, Ultra) with appropriate rate adjustments
 - Settings persisted to `~/.holdmysession/settings.json`
 
 ![Settings Page](screenshots/settings-page.png)

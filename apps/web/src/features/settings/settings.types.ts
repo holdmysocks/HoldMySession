@@ -254,8 +254,10 @@ export const RETIRED_PRICING: ModelPricing[] = [
 export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
   { id: 'free', displayName: 'Free', monthlyUSD: 0 },
   { id: 'pro', displayName: 'Pro', monthlyUSD: 20 },
-  { id: 'max-5x', displayName: 'Max 5x', monthlyUSD: 100 },
-  { id: 'max-20x', displayName: 'Max 20x', monthlyUSD: 200 },
+  // Anthropic renamed Max 5x to Max and Max 20x to Ultra. The ids stay as they are, because they are saved in
+  // settings and in the history database, and only the names shown change.
+  { id: 'max-5x', displayName: 'Max', monthlyUSD: 100 },
+  { id: 'max-20x', displayName: 'Ultra', monthlyUSD: 200 },
   { id: 'teams', displayName: 'Teams', monthlyUSD: 150 },
   { id: 'enterprise', displayName: 'Enterprise', monthlyUSD: null },
   { id: 'api', displayName: 'API Only', monthlyUSD: null },

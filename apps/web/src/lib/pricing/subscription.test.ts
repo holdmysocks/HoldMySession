@@ -25,7 +25,7 @@ describe('summarizeSubscription', () => {
     expect([daysInMonth('2026-02-10'), daysInMonth('2026-10-10'), daysInMonth('2028-02-01')]).toEqual([28, 31, 29])
   })
 
-  it('pays a part month in part: Pro until Oct 9 then Max 20x from Oct 10', () => {
+  it('pays a part month in part: Pro until Oct 9 then Ultra from Oct 10', () => {
     const periods = [period('pro', 20, '2026-10-01'), period('max-20x', 200, '2026-10-10')]
     const s = summarizeSubscription(periods, {}, '2026-10-31')
     const oct = s.months[0]

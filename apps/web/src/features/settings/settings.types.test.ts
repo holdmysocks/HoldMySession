@@ -240,4 +240,10 @@ describe('SettingsSchema', () => {
     const result = SettingsSchema.safeParse(input)
     expect(result.success).toBe(false)
   })
+
+  it('names the $100 plan Max and the $200 plan Ultra, keeping their saved ids', async () => {
+    const { SUBSCRIPTION_TIERS } = await import('./settings.types')
+    expect(SUBSCRIPTION_TIERS.find((t) => t.id === 'max-5x')).toMatchObject({ displayName: 'Max', monthlyUSD: 100 })
+    expect(SUBSCRIPTION_TIERS.find((t) => t.id === 'max-20x')).toMatchObject({ displayName: 'Ultra', monthlyUSD: 200 })
+  })
 })

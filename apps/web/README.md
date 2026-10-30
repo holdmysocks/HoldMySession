@@ -59,7 +59,7 @@ This dashboard gives you answers. It reads your local session files, parses the 
 
 **Cost estimation**
 - Configurable API pricing per model (Claude Sonnet 4, Opus 4, Haiku, etc.)
-- Subscription tier support (Free, Pro, Max 5x/20x) with appropriate rate adjustments
+- Subscription tier support (Free, Pro, Max, Ultra) with appropriate rate adjustments
 - Settings persisted to `~/.holdmysession/settings.json`
 
 ![Settings Page](screenshots/settings-page.png)
