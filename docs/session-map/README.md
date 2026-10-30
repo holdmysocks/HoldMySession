@@ -32,17 +32,23 @@ The dashboard reads the Claude config directory on Windows, which is `%USERPROFI
 
 - **Session nodes.** The session name sits next to the status dot. The project is not shown on the card, because the map is already for one project. Short id and message count come next, then the branch, then the model. The text is 11 to 15 px.
 - **Fork nodes.** A fork of a session in the same project hangs off that session, joined by a dashed edge. The node says "Forked session" in the details panel.
-- **Subagent cards.** Small cards (180 by 44) under the session or fork that dispatched them. The label is the subagent type, then its description. Only running subagents are drawn (see the subagent rule under Status).
+- **Subagent cards.** Small cards (190 by 50) below the session or fork that dispatched them, side by side. The label is the subagent type, then its description. Only running subagents are drawn (see the subagent rule under Status).
 - **Expired subagents.** A subagent quiet for more than 5 minutes is not drawn and takes no space. Its session node shows a small **+N** chip with the count, and the page info line gives the project total.
-- **Layout.** Each depth is a column: top-level sessions, then their forks and subagents, then forks of forks. A parent is centred on its children. Top-level sessions are in the desktop app's activity order, newest first, and the map follows the app's order as it changes. See [Moving around and editing the layout](#moving-around-and-editing-the-layout) for how the canvas is shown.
+- **Layout.** Each depth is a row, so branches grow downward: top-level sessions side by side in the first row, then their forks and subagents below them, then forks of forks. A parent is centred above its children. Top-level sessions are in the desktop app's activity order, newest first, and the map follows the app's order as it changes. See [Moving around and editing the layout](#moving-around-and-editing-the-layout) for how the canvas is shown.
 - **Every session in the project is shown, except sessions with no project and archived sessions.** There is no cap. See [Sessions with no project](#sessions-with-no-project) and [Archived and split sessions](#archived-and-split-sessions).
 
 ### Moving around and editing the layout
 
 - **The map fills the page.** On the Map page the content is not held to a narrow column. The map panel takes the width the window gives it, minus the side panels, and about the height of the window. **Hide panels** gives the map the full width. Nothing scrolls sideways.
 - **Pan and zoom.** Drag empty space to pan, in any direction. The wheel zooms around the pointer, and a pinch gesture on a trackpad does too. The corner buttons zoom in and out and show the zoom level. **Fit** shows the whole map. When the page opens, the map is fitted to the panel, but never smaller than 50%, so the text stays readable. The view follows the panel size until you first pan or zoom.
+- **Links join the closest sides.** A link runs from the middle of one card's side to the middle of the facing side of the other card, and follows the cards when they move. A card below its parent links bottom to top. Only sides the other card is really beyond are used, so a link never doubles back over a card. Where several pairs qualify, the shortest wins.
 - **Edit layout.** The **Edit layout** button turns on the editor. Drag a card to move it anywhere. Dragging empty space still pans, and a focused card moves 10 units per arrow key. Edges follow the cards. Outside the editor, dragging a card pans the map, and a click still selects it.
-- **Positions are saved in this browser**, per project, in local storage under `session-map-offsets:<project folder>`. Each card is saved as how far it was moved from its automatic place. A new session that shifts the automatic layout therefore moves the cards you placed with it. **Reset layout** clears the project's saved positions. If storage is blocked, the positions last until the page is closed. Nothing is written to `~/.claude`, so the map stays read-only.
+- **The layout is saved on the server**, per project, in `~/.claude-dashboard/map-layouts.json`, next to `settings.json`. Anyone who opens the dashboard from another device sees the same arrangement. Moves show at once and are saved about half a second after the last one. A failed save is kept and retried, and a notice shows meanwhile. The last save wins if two devices edit at the same time. Nothing is written to `~/.claude`, so the map stays read-only. Positions saved in a browser by an earlier version are not used.
+- **The first move saves where every card is**, so the arrangement stays put. After that:
+  - A **new top-level session** goes to the right of everything, level with the top row, and brings its own forks and subagents with it.
+  - A **new subagent or fork of a session already on the map** lands at its normal automatic position, even if that overlaps another card. Move it if you want it elsewhere.
+  - Saved places for archived sessions are kept, in case they come back.
+- **Reset layout** clears the project's saved layout on the server and returns to the automatic one. A project with no saved layout always uses the automatic one, newest session first.
 
 ### Sessions with no project
 
@@ -157,7 +163,7 @@ The hook is the only writer of this file. It always exits 0 and swallows errors,
 | Sessions with no project hidden | Built | Map and Sessions list. Stats and project analytics still count them. |
 | Archived sessions hidden | Built | From the desktop app's session record (`isArchived`). Counted as "archived hidden". |
 | Pan, zoom and fit | Built | Drag, wheel, pinch, corner buttons. The map fills the panel. |
-| Layout editor | Built | Drag cards, arrow keys nudge. Saved per project in the browser. Reset layout clears it. |
+| Layout editor | Built | Drag cards, arrow keys nudge. Saved per project on the server, so it follows you across devices. Reset layout clears it. |
 | Subagent transcripts as their own sessions | Not built | Used only to judge running state. |
 | Project name from package.json, git, or folder | Built | From the transcripts' `cwd`. Windows paths read only on Windows. |
 | Session name from `custom-title`, summary, first prompt | Built | Newest `custom-title` wins. |
@@ -268,3 +274,9 @@ Fixes for problems a Windows user reported with real data.
 - **The map fills the window.** The Map page is no longer held to a 1024 px column, and the panel is sized to the window instead of a fixed height with scrollbars.
 - **Pan and zoom replace scrolling.** Drag to pan freely, wheel to zoom, **Fit** to see everything.
 - **Edit layout mode.** Drag cards to where you want them. Positions are kept per project in the browser, and **Reset layout** clears them. Code: `src/features/project-map/MapCanvas.tsx`, `src/lib/map/viewport.ts`, `applyNodeOffsets` in `src/lib/map/layout.ts`.
+
+### Horizontal layout, saved layouts and dynamic links (2026-10-30, latest)
+
+- **Branches grow downward.** The automatic layout is now rows instead of columns: top-level sessions side by side, forks and subagents below.
+- **Layouts are saved on the server** in `~/.claude-dashboard/map-layouts.json`, not in the browser. New top-level sessions go to the right, and new subagents and forks land at their normal position. Code: `src/lib/map/layout-store.ts`, `src/features/project-map/use-map-layout.ts`, `applyCustomPositions` in `src/lib/map/layout.ts`.
+- **Links join the middle of the closest sides** of the two cards, and follow them when moved.

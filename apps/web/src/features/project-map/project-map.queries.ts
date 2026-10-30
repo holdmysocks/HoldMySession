@@ -1,5 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 import { getMapProjects, getProjectMap, getHookEvents } from './project-map.api'
+import { getMapLayout } from './map-layout.api'
 
 export const mapProjectsQuery = queryOptions({
   queryKey: ['map', 'projects'],
@@ -21,3 +22,14 @@ export const hookEventsQuery = queryOptions({
   queryFn: () => getHookEvents(),
   refetchInterval: 5_000,
 })
+
+/** The layout the user arranged by hand for a project, saved on the server. */
+export function mapLayoutQuery(projectKey: string) {
+  return queryOptions({
+    queryKey: ['map', 'layout', projectKey],
+    queryFn: () => getMapLayout({ data: { projectKey } }),
+    enabled: projectKey.length > 0,
+    // Another device may have changed it, so look again when this tab is focused after a while.
+    staleTime: 15_000,
+  })
+}

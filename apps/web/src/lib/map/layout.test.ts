@@ -2,13 +2,16 @@ import { describe, it, expect } from 'vitest'
 import type { AgentInvocation, SessionSummary } from '../parsers/types'
 import { buildProjectMap, type MapSessionInput, type ProjectMap } from './project-map'
 import {
-  applyNodeOffsets,
+  applyCustomPositions,
+  BLOCK_GAP,
+  edgePath,
   layoutProjectMap,
+  ROW_GAP,
   SESSION_HEIGHT,
   SESSION_WIDTH,
+  SIBLING_GAP,
   SUBAGENT_HEIGHT,
   SUBAGENT_WIDTH,
-  SUBAGENT_X,
 } from './layout'
 
 function summary(sessionId: string, forkOf?: string): SessionSummary {
@@ -92,6 +95,8 @@ function expectNoOverlaps(nodes: Array<{ x: number; y: number; width: number; he
   }
 }
 
+const ROW_STEP = SESSION_HEIGHT + ROW_GAP
+
 describe('layoutProjectMap: expired subagents', () => {
   // Geometry only. The session node also carries its expired count, which differs by design.
   const geometry = (layout: ReturnType<typeof layoutProjectMap>) =>
@@ -109,15 +114,15 @@ describe('layoutProjectMap: expired subagents', () => {
     const mixed = layoutProjectMap(mapOf([input('s0', 2, undefined, 3)]))
     const running = layoutProjectMap(mapOf([input('s0', 2)]))
     expect(geometry(mixed)).toEqual(geometry(running))
-    expect(mixed.height).toBe(running.height)
+    expect(mixed.width).toBe(running.width)
   })
 
   it('leaves no gap between top-level blocks when a session has only expired subagents', () => {
     const layout = layoutProjectMap(mapOf([input('s0', 0, undefined, 4), input('s1', 0)]))
     const sessions = layout.nodes.filter((n) => n.kind === 'session')
-    expect(sessions[0].y).toBe(0)
-    expect(sessions[1].y).toBe(SESSION_HEIGHT + 24)
-    expect(layout.height).toBe(SESSION_HEIGHT * 2 + 24)
+    expect(sessions[0].x).toBe(0)
+    expect(sessions[1].x).toBe(SESSION_WIDTH + BLOCK_GAP)
+    expect(layout.width).toBe(SESSION_WIDTH * 2 + BLOCK_GAP)
   })
 
   it('draws no node or edge for an expired subagent', () => {
@@ -136,59 +141,61 @@ describe('layoutProjectMap', () => {
     expect(layout.height).toBe(0)
   })
 
-  it('places a childless session as a single block of session height', () => {
+  it('places a childless session as a single block of session size', () => {
     const layout = layoutProjectMap(mapOf([input('s0', 0)]))
     const [session] = layout.nodes
     expect(session.x).toBe(0)
     expect(session.y).toBe(0)
     expect(session.width).toBe(SESSION_WIDTH)
     expect(session.height).toBe(SESSION_HEIGHT)
+    expect(layout.width).toBe(SESSION_WIDTH)
     expect(layout.height).toBe(SESSION_HEIGHT)
   })
 
-  it('puts subagent cards in the child column as smaller cards', () => {
+  it('puts top-level sessions side by side in one row, in order', () => {
+    const layout = layoutProjectMap(mapOf([input('s0', 0), input('s1', 0), input('s2', 0)]))
+    const sessions = layout.nodes.filter((n) => n.kind === 'session')
+    expect(sessions.map((s) => s.y)).toEqual([0, 0, 0])
+    expect(sessions.map((s) => s.x)).toEqual([0, SESSION_WIDTH + BLOCK_GAP, (SESSION_WIDTH + BLOCK_GAP) * 2])
+  })
+
+  it('hangs subagent cards in a row below their session, as smaller cards', () => {
     const layout = layoutProjectMap(mapOf([input('s0', 2)]))
     const children = layout.nodes.filter((n) => n.kind === 'subagent')
     expect(children).toHaveLength(2)
     for (const child of children) {
-      expect(child.x).toBe(SUBAGENT_X)
       expect(child.width).toBe(SUBAGENT_WIDTH)
       expect(child.height).toBe(SUBAGENT_HEIGHT)
+      expect(child.y).toBe(ROW_STEP)
     }
   })
 
-  it('stacks subagent cards 60px apart and sizes the block to fit them', () => {
+  it('spaces subagent cards side by side and sizes the block to fit them', () => {
     const layout = layoutProjectMap(mapOf([input('s0', 3)]))
     const children = layout.nodes.filter((n) => n.kind === 'subagent')
-    // card 50 + gap 10
-    expect(children.map((c) => c.y)).toEqual([0, 60, 120])
-    // 3 * 60 - 10 = 170, taller than the session node
-    expect(layout.height).toBe(170)
+    const step = SUBAGENT_WIDTH + SIBLING_GAP
+    expect(children.map((c) => c.x - children[0].x)).toEqual([0, step, step * 2])
+    // 3 cards and 2 gaps, wider than the session node.
+    expect(layout.width).toBe(SUBAGENT_WIDTH * 3 + SIBLING_GAP * 2)
   })
 
-  it('centres the session node vertically in its block', () => {
+  it('centres the session node over its subagent cards', () => {
     const layout = layoutProjectMap(mapOf([input('s0', 3)]))
     const session = layout.nodes.find((n) => n.kind === 'session')!
-    // (170 - 92) / 2 = 39
-    expect(session.y).toBe(39)
+    const children = layout.nodes.filter((n) => n.kind === 'subagent')
+    const childrenCentre = (children[0].x + children[2].x + SUBAGENT_WIDTH) / 2
+    expect(session.x + session.width / 2).toBe(childrenCentre)
+    expect(session.y).toBe(0)
   })
 
-  it('keeps top-level blocks separated by a 24px gap', () => {
-    const layout = layoutProjectMap(mapOf([input('s0', 0), input('s1', 0)]))
-    const sessions = layout.nodes.filter((n) => n.kind === 'session')
-    expect(sessions[0].y).toBe(0)
-    expect(sessions[1].y).toBe(SESSION_HEIGHT + 24)
-    expect(layout.height).toBe(SESSION_HEIGHT * 2 + 24)
-  })
-
-  it('places a fork in the column after its parent, centred on its own block', () => {
+  it('places a fork in the row below its parent, centred under it', () => {
     const layout = layoutProjectMap(mapOf([input('parent', 0), input('fork', 0, 'parent')]))
     const parent = layout.nodes.find((n) => n.sessionId === 'parent')!
     const fork = layout.nodes.find((n) => n.sessionId === 'fork')!
-    expect(parent.x).toBe(0)
-    expect(fork.x).toBe(SUBAGENT_X)
+    expect(parent.y).toBe(0)
+    expect(fork.y).toBe(ROW_STEP)
     expect(fork.width).toBe(SESSION_WIDTH)
-    expect(fork.y).toBe(0)
+    expect(fork.x).toBe(parent.x)
   })
 
   it('draws a fork edge and a dispatch edge with the right kinds', () => {
@@ -200,14 +207,14 @@ describe('layoutProjectMap', () => {
     }
   })
 
-  it('nests a fork of a fork one column further right', () => {
+  it('nests a fork of a fork one row further down', () => {
     const layout = layoutProjectMap(
       mapOf([input('a', 0), input('b', 0, 'a'), input('c', 0, 'b')]),
     )
-    const x = (id: string) => layout.nodes.find((n) => n.sessionId === id)!.x
-    expect(x('a')).toBe(0)
-    expect(x('b')).toBe(SUBAGENT_X)
-    expect(x('c')).toBe(SUBAGENT_X + SESSION_WIDTH + 60)
+    const y = (id: string) => layout.nodes.find((n) => n.sessionId === id)!.y
+    expect(y('a')).toBe(0)
+    expect(y('b')).toBe(ROW_STEP)
+    expect(y('c')).toBe(ROW_STEP * 2)
   })
 
   it('places a fork before its parent sibling blocks, without overlap, with subagents in between', () => {
@@ -221,9 +228,9 @@ describe('layoutProjectMap', () => {
     )
     expectNoOverlaps(layout.nodes)
     for (const node of layout.nodes) {
-      expect(node.y).toBeGreaterThanOrEqual(0)
-      expect(node.y + node.height).toBeLessThanOrEqual(layout.height)
+      expect(node.x).toBeGreaterThanOrEqual(0)
       expect(node.x + node.width).toBeLessThanOrEqual(layout.width)
+      expect(node.y + node.height).toBeLessThanOrEqual(layout.height)
     }
   })
 
@@ -235,45 +242,135 @@ describe('layoutProjectMap', () => {
     expect(layout.nodes).toHaveLength(4 + 5 + 4 + 2)
   })
 
-  it('reports a canvas width that covers the deepest column', () => {
+  it('reports a canvas height that covers the deepest row', () => {
     const layout = layoutProjectMap(mapOf([input('a', 0), input('b', 0, 'a'), input('c', 0, 'b')]))
-    expect(layout.width).toBe(SUBAGENT_X + SESSION_WIDTH + 60 + SESSION_WIDTH)
+    expect(layout.height).toBe(SESSION_HEIGHT * 3 + ROW_GAP * 2)
   })
 })
 
-describe('applyNodeOffsets', () => {
-  const base = layoutProjectMap(mapOf([input('a', 1), input('b', 0, 'a')]))
-  const session = base.nodes.find((n) => n.kind === 'session' && n.id.includes('a'))!
-  const child = base.nodes.find((n) => n.id.includes('b'))!
+describe('edgePath', () => {
+  const card = { x: 0, y: 0, width: 280, height: 92 }
 
-  it('returns the same layout when there are no offsets, or only zero ones', () => {
-    expect(applyNodeOffsets(base, {})).toBe(base)
-    expect(applyNodeOffsets(base, { [session.id]: { dx: 0, dy: 0 } })).toBe(base)
+  it('links bottom to top when the other card is below', () => {
+    const below = { x: 0, y: 200, width: 280, height: 92 }
+    expect(edgePath(card, below)).toBe('M 140 92 C 140 146, 140 146, 140 200')
   })
 
-  it('moves only the offset node and leaves the others where they were', () => {
-    const moved = applyNodeOffsets(base, { [child.id]: { dx: 40, dy: -15 } })
-    const next = moved.nodes.find((n) => n.id === child.id)!
-    expect(next.x).toBe(child.x + 40)
-    expect(next.y).toBe(child.y - 15)
-    expect(moved.nodes.find((n) => n.id === session.id)).toEqual(session)
+  it('links top to bottom when the other card is above', () => {
+    const above = { x: 0, y: -200, width: 280, height: 92 }
+    expect(edgePath(card, above)).toBe('M 140 0 C 140 -54, 140 -54, 140 -108')
   })
 
-  it('redraws the edge to end at the moved node', () => {
-    const edge = base.edges.find((e) => e.to === child.id)!
-    const moved = applyNodeOffsets(base, { [child.id]: { dx: 100, dy: 200 } })
-    const next = moved.edges.find((e) => e.to === child.id)!
-    expect(next.d).not.toBe(edge.d)
-    expect(next.d.endsWith(`${child.x + 100} ${child.y + 200 + child.height / 2}`)).toBe(true)
+  it('links right to left when the other card is to the right', () => {
+    const right = { x: 400, y: 0, width: 280, height: 92 }
+    expect(edgePath(card, right)).toBe('M 280 46 C 340 46, 340 46, 400 46')
   })
 
-  it('ignores offsets for nodes that no longer exist', () => {
-    expect(applyNodeOffsets(base, { gone: { dx: 50, dy: 50 } })).toBe(base)
+  it('links left to right when the other card is to the left', () => {
+    const left = { x: -400, y: 0, width: 280, height: 92 }
+    expect(edgePath(card, left)).toBe('M 0 46 C -60 46, -60 46, -120 46')
   })
 
-  it('grows the reported size to cover a node moved outside the original area', () => {
-    const moved = applyNodeOffsets(base, { [child.id]: { dx: 500, dy: 300 } })
-    expect(moved.width).toBe(child.x + 500 + child.width)
-    expect(moved.height).toBe(child.y + 300 + child.height)
+  it('uses the closest facing sides when the other card is below and to the side', () => {
+    // Far to the right and a little below: the sides are much closer than top and bottom.
+    const diagonal = { x: 330, y: 110, width: 190, height: 50 }
+    expect(edgePath(card, diagonal).startsWith('M 280 46')).toBe(true)
+    // Below and overlapping horizontally: only bottom to top faces it.
+    const under = { x: 150, y: 140, width: 190, height: 50 }
+    expect(edgePath(card, under).startsWith('M 140 92')).toBe(true)
+  })
+
+  it('never doubles back to a side the target is not beyond', () => {
+    // The target is below, and its left edge is left of the card's right edge: no side-to-side link.
+    const below = { x: 250, y: 162, width: 190, height: 50 }
+    expect(edgePath(card, below).startsWith('M 140 92')).toBe(true)
+  })
+
+  it('falls back to the dominant direction when the cards overlap', () => {
+    const overlapping = { x: 20, y: 40, width: 280, height: 92 }
+    expect(edgePath(card, overlapping).startsWith('M 140 92')).toBe(true)
+  })
+})
+
+describe('applyCustomPositions', () => {
+  // Two top-level sessions, the first with two subagents.
+  const base = layoutProjectMap(mapOf([input('a', 2), input('b', 0)]))
+  const nodeOf = (layout: typeof base, id: string) => layout.nodes.find((n) => n.id === id)!
+  const sessionA = base.nodes.find((n) => n.sessionId === 'a')!
+  const sessionB = base.nodes.find((n) => n.sessionId === 'b')!
+  const agents = base.nodes.filter((n) => n.kind === 'subagent')
+  const saveAll = (extra: Record<string, { x: number; y: number }> = {}) => ({
+    ...Object.fromEntries(base.nodes.map((n) => [n.id, { x: n.x, y: n.y }])),
+    ...extra,
+  })
+
+  it('returns the same layout when nothing is saved, or only unknown nodes', () => {
+    expect(applyCustomPositions(base, {})).toBe(base)
+    expect(applyCustomPositions(base, { gone: { x: 5, y: 5 } })).toBe(base)
+  })
+
+  it('puts a saved node exactly where it was saved and leaves the others', () => {
+    const moved = applyCustomPositions(base, saveAll({ [sessionB.id]: { x: 900, y: 300 } }))
+    expect(nodeOf(moved, sessionB.id)).toMatchObject({ x: 900, y: 300 })
+    expect(nodeOf(moved, sessionA.id)).toMatchObject({ x: sessionA.x, y: sessionA.y })
+  })
+
+  it('redraws an edge to follow the moved card, attached to the closest sides', () => {
+    const edgeBefore = base.edges.find((e) => e.to === agents[0].id)!
+    const moved = applyCustomPositions(base, saveAll({ [agents[0].id]: { x: 2000, y: 0 } }))
+    const edgeAfter = moved.edges.find((e) => e.to === agents[0].id)!
+    expect(edgeAfter.d).not.toBe(edgeBefore.d)
+    // Far to the right of its parent and level with it: right side to left side.
+    expect(edgeAfter.d.startsWith(`M ${sessionA.x + SESSION_WIDTH} ${sessionA.y + SESSION_HEIGHT / 2}`)).toBe(true)
+  })
+
+  it('puts a new top-level session to the right of everything saved, level with the saved top row', () => {
+    const saved = { [sessionA.id]: { x: 100, y: 40 }, [agents[0].id]: { x: 600, y: 500 } }
+    const result = applyCustomPositions(base, saved)
+    const right = 600 + SUBAGENT_WIDTH
+    expect(nodeOf(result, sessionB.id).x).toBe(right + BLOCK_GAP)
+    expect(nodeOf(result, sessionB.id).y).toBe(40)
+  })
+
+  it('moves a new top-level session together with its new subagents', () => {
+    const withChild = layoutProjectMap(mapOf([input('a', 0), input('b', 2)]))
+    const a = withChild.nodes.find((n) => n.sessionId === 'a')!
+    const b = withChild.nodes.find((n) => n.sessionId === 'b')!
+    const bAgents = withChild.nodes.filter((n) => n.kind === 'subagent')
+    const result = applyCustomPositions(withChild, { [a.id]: { x: 10, y: 20 } })
+    const dx = nodeOf(result, b.id).x - b.x
+    const dy = nodeOf(result, b.id).y - b.y
+    expect(nodeOf(result, b.id).x).toBeGreaterThanOrEqual(10 + SESSION_WIDTH + BLOCK_GAP)
+    for (const agent of bAgents) {
+      expect(nodeOf(result, agent.id)).toMatchObject({ x: agent.x + dx, y: agent.y + dy })
+    }
+  })
+
+  it('lays several new top-level sessions out left to right without overlap', () => {
+    const three = layoutProjectMap(mapOf([input('a', 0), input('b', 2), input('c', 1)]))
+    const a = three.nodes.find((n) => n.sessionId === 'a')!
+    const result = applyCustomPositions(three, { [a.id]: { x: 0, y: 0 } })
+    expectNoOverlaps(result.nodes)
+  })
+
+  it('lands a new subagent of a saved session at its normal position, even if that overlaps', () => {
+    // Everything is saved except the second subagent. The saved session now sits right on top of
+    // where that subagent normally goes, and the subagent is not moved out of the way.
+    const { [agents[1].id]: _unsaved, ...saved } = saveAll({
+      [sessionA.id]: { x: agents[1].x, y: agents[1].y },
+    })
+    const result = applyCustomPositions(base, saved)
+    expect(nodeOf(result, agents[1].id)).toMatchObject({ x: agents[1].x, y: agents[1].y })
+    expect(overlaps(nodeOf(result, sessionA.id), nodeOf(result, agents[1].id))).toBe(true)
+  })
+
+  it('ignores a saved entry that is not a position', () => {
+    expect(applyCustomPositions(base, { [sessionA.id]: undefined as never })).toBe(base)
+    expect(applyCustomPositions(base, { [sessionA.id]: null as never })).toBe(base)
+  })
+
+  it('ignores a saved position that is not a finite number', () => {
+    const result = applyCustomPositions(base, { [sessionA.id]: { x: Number.NaN, y: 0 } })
+    expect(result).toBe(base)
   })
 })

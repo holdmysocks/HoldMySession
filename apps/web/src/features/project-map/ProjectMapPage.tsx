@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { applyNodeOffsets, layoutProjectMap } from '@/lib/map/layout'
+import { applyCustomPositions, layoutProjectMap, type NodePositions } from '@/lib/map/layout'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { mapProjectsQuery, projectMapQuery, hookEventsQuery } from './project-map.queries'
 import { MapCanvas } from './MapCanvas'
@@ -8,7 +8,7 @@ import { NeedsYouPanel } from './NeedsYouPanel'
 import { NodeDetailPanel } from './NodeDetailPanel'
 import { HookEventsPanel } from './HookEventsPanel'
 import { expiredSubagentsLabel } from './format-node'
-import { useNodeOffsets } from './use-node-offsets'
+import { useMapLayout } from './use-map-layout'
 
 interface ProjectMapPageProps {
   /** Project key (directory name), from the URL. */
@@ -29,8 +29,8 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [panelsHidden, setPanelsHidden] = useState(false)
-  // Card positions from the editor. They belong to a project and are kept in this browser's storage.
-  const [offsets, setOffsets] = useNodeOffsets(selectedKey)
+  // Card positions from the editor. They belong to a project and are saved on the server.
+  const { positions, setPositions, isLoading: layoutLoading, saveFailed } = useMapLayout(selectedKey)
 
   const nodes = useMemo(() => mapQuery.data?.nodes ?? [], [mapQuery.data])
   const baseLayout = useMemo(
@@ -38,10 +38,10 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
     [mapQuery.data],
   )
   const layout = useMemo(
-    () => (baseLayout ? applyNodeOffsets(baseLayout, offsets) : null),
-    [baseLayout, offsets],
+    () => (baseLayout ? applyCustomPositions(baseLayout, positions) : null),
+    [baseLayout, positions],
   )
-  const movedCount = layout && baseLayout ? layout.nodes.filter((n) => Object.hasOwn(offsets, n.id)).length : 0
+  const hasCustomLayout = layout ? layout.nodes.some((n) => Object.hasOwn(positions, n.id)) : false
   const selectedNode = nodes.find((n) => n.id === selectedId) ?? null
   // Counted from the map's own session nodes, so the line matches the borders on screen.
   const sessionNodes = nodes.filter((n) => n.kind === 'session')
@@ -58,15 +58,22 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
     onProjectChange(projectKey)
   }
 
-  // The editor reports where a card should now be. Store it as the distance from its automatic spot.
+  // The editor reports where a card should now be. The first move saves where every card is now,
+  // so the arrangement stays as it is. Cards that are not on the map now (archived sessions) keep
+  // their saved place, and a new session or subagent is placed afresh each time it appears.
   function handleNodeMove(nodeId: string, x: number, y: number) {
-    const home = baseLayout?.nodes.find((n) => n.id === nodeId)
-    if (!home) return
-    setOffsets({ ...offsets, [nodeId]: { dx: x - home.x, dy: y - home.y } })
+    if (!layout) return
+    const next: NodePositions = {}
+    for (const [id, position] of Object.entries(positions)) {
+      if (id.startsWith('session:')) next[id] = position
+    }
+    for (const node of layout.nodes) next[node.id] = { x: node.x, y: node.y }
+    next[nodeId] = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 }
+    setPositions(next)
   }
 
   function handleResetLayout() {
-    setOffsets({})
+    setPositions({})
   }
 
   if (projectsQuery.isLoading) {
@@ -152,7 +159,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
           <button
             type="button"
             onClick={handleResetLayout}
-            disabled={movedCount === 0}
+            disabled={!hasCustomLayout}
             className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-300 hover:text-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Reset layout
@@ -168,9 +175,14 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
         </button>
         <p className="text-xs text-gray-500">
           {editMode
-            ? 'Drag a card to move it, drag empty space to pan, scroll to zoom. Arrow keys nudge a focused card.'
+            ? 'Drag a card to move it, drag empty space to pan, scroll to zoom. Arrow keys nudge a focused card. Your layout is saved on the server and follows you to other devices.'
             : 'Drag to pan, scroll to zoom.'}
         </p>
+        {saveFailed && (
+          <p role="alert" className="text-xs text-red-400">
+            Could not save the layout. Trying again.
+          </p>
+        )}
       </div>
 
       <div className={`mt-3 grid gap-4 ${panelsHidden ? '' : 'lg:grid-cols-[minmax(0,1fr)_320px]'}`}>
@@ -178,7 +190,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
           aria-label="Project map"
           className="h-[calc(100vh-18rem)] min-h-[28rem] min-w-0 overflow-hidden rounded-xl border border-gray-800 bg-gray-950"
         >
-          {mapQuery.isLoading ? (
+          {mapQuery.isLoading || layoutLoading ? (
             <div className="h-64 animate-pulse rounded-xl bg-gray-900/50" />
           ) : mapQuery.error ? (
             <p className="py-12 text-center text-sm text-red-400">
@@ -217,7 +229,7 @@ function Header() {
     <div>
       <h1 className="text-2xl font-bold text-gray-100">Session Map</h1>
       <p className="mt-1 text-sm text-gray-400">
-        Sessions in a project, with the subagents they dispatched. Read-only: the editor only moves cards in this browser.
+        Sessions in a project, with the subagents they dispatched. Read-only: the editor only moves cards, and the arrangement is saved by the dashboard, not in your Claude config.
       </p>
       <p className="mt-2 text-xs text-gray-500">
         Messaging and linking sessions: Phase 2, see docs/session-map/README.md
