@@ -61,11 +61,13 @@ Everything runs entirely on your machine. Read-only — it never modifies any Cl
 - Dedicated "Projects" tab with sortable table
 - Sessions, messages, tokens, and duration aggregated per project
 - Drill-down links to filtered session lists
+- Sessions with no project, and sessions that ran in a folder named `scratch`, are grouped into one **Unlinked Sessions** row with a count tag. It is not counted as a project
+- **Overview by Project** tab: the same overview as the Overview tab (cards, heatmap, charts, cost), filtered to one project or to the Unlinked Sessions group
 
 ![Per-Project Analytics](screenshots/stats-projects.png)
 
 **Cost estimation**
-- Configurable API pricing per model (Claude Sonnet 4, Opus 4, Haiku, etc.)
+- Configurable API pricing per model. Defaults cover Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5, and earlier Opus, Sonnet and Haiku models. Haiku 5.5 uses its rate for prompts up to 100K tokens; override it for longer prompts
 - Subscription tier support (Free, Pro, Max 5x/20x) with appropriate rate adjustments
 - Settings persisted to `~/.claude-dashboard/settings.json`
 

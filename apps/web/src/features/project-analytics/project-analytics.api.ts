@@ -1,10 +1,16 @@
 import { createServerFn } from '@tanstack/react-start'
-import { scanAllSessions } from '@/lib/scanner/session-scanner'
-import type { SessionSummary } from '@/lib/parsers/types'
+import { z } from 'zod'
+import { scanAllSessions, scanAllSessionsWithPaths } from '@/lib/scanner/session-scanner'
+import { computeProjectStats } from '@/lib/projects/project-stats'
+import { UNLINKED_PROJECT_KEY, UNLINKED_PROJECT_NAME, projectGroupKey } from '@/lib/projects/unlinked'
+import type { SessionSummary, StatsCache } from '@/lib/parsers/types'
 
 export interface ProjectAnalytics {
+  /** The project's path, or UNLINKED_PROJECT_KEY for the group of unlinked sessions. */
   projectPath: string
   projectName: string
+  /** True for the one entry that groups sessions with no project (and scratch folders). */
+  isUnlinked: boolean
   totalSessions: number
   activeSessions: number
   totalMessages: number
@@ -25,12 +31,13 @@ export interface ProjectAnalyticsResult {
 export function aggregateProjectAnalytics(
   allSessions: SessionSummary[],
 ): ProjectAnalyticsResult {
-  // Group sessions by projectPath
+  // Group sessions by project path. Sessions with no project all share one group.
   const projectMap = new Map<string, SessionSummary[]>()
   for (const session of allSessions) {
-    const existing = projectMap.get(session.projectPath) ?? []
+    const key = projectGroupKey(session)
+    const existing = projectMap.get(key) ?? []
     existing.push(session)
-    projectMap.set(session.projectPath, existing)
+    projectMap.set(key, existing)
   }
 
   // Aggregate per project
@@ -39,9 +46,13 @@ export function aggregateProjectAnalytics(
     if (sessions.length === 0) continue
 
     const firstSession = sessions[0]
+    const isUnlinked = projectPath === UNLINKED_PROJECT_KEY
     projects.push({
       projectPath,
-      projectName: firstSession.projectName ?? projectPath.split('/').pop() ?? 'Unknown',
+      isUnlinked,
+      projectName: isUnlinked
+        ? UNLINKED_PROJECT_NAME
+        : (firstSession.projectName ?? projectPath.split('/').pop() ?? 'Unknown'),
       totalSessions: sessions.length,
       activeSessions: sessions.filter((s) => s.isActive).length,
       totalMessages: sessions.reduce((sum, s) => sum + s.messageCount, 0),
@@ -70,3 +81,11 @@ export const getProjectAnalytics = createServerFn({ method: 'GET' }).handler(
     return aggregateProjectAnalytics(allSessions)
   },
 )
+
+const projectStatsInputSchema = z.object({ projectPath: z.string().min(1) })
+
+export const getProjectStats = createServerFn({ method: 'GET' })
+  .inputValidator((input: unknown) => projectStatsInputSchema.parse(input))
+  .handler(async ({ data }): Promise<StatsCache | null> => {
+    return computeProjectStats(await scanAllSessionsWithPaths(), data.projectPath)
+  })

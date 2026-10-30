@@ -37,16 +37,18 @@ export function ProjectAnalytics() {
   const totalSessions = projects.reduce((sum, p) => sum + p.totalSessions, 0)
   const totalDurationMs = projects.reduce((sum, p) => sum + p.totalDurationMs, 0)
 
-  // Most active project by session count
-  const mostActive = projects.reduce((max, p) =>
-    p.totalSessions > max.totalSessions ? p : max,
-  )
+  // The unlinked group is not a project: it is left out of the project count and of "most active".
+  const linkedProjects = projects.filter((p) => !p.isUnlinked)
+  const mostActive =
+    linkedProjects.length > 0
+      ? linkedProjects.reduce((max, p) => (p.totalSessions > max.totalSessions ? p : max))
+      : null
 
   return (
     <div className="space-y-6">
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <SummaryCard label="Total Projects" value={String(projects.length)} />
+        <SummaryCard label="Total Projects" value={String(linkedProjects.length)} />
         <SummaryCard
           label="Total Sessions"
           value={totalSessions.toLocaleString()}
@@ -57,8 +59,8 @@ export function ProjectAnalytics() {
         />
         <SummaryCard
           label="Most Active"
-          value={anonymizeProjectName(mostActive.projectName)}
-          sub={`${mostActive.totalSessions} sessions`}
+          value={mostActive ? anonymizeProjectName(mostActive.projectName) : '-'}
+          sub={mostActive ? `${mostActive.totalSessions} sessions` : undefined}
         />
       </div>
 

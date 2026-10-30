@@ -53,7 +53,44 @@ export interface SubscriptionTier {
 
 // --- Constants ---
 
+/**
+ * USD per million tokens. Cache write is the 5-minute rate (1.25x input). The Claude 5 models
+ * are listed first. Haiku 5.5 is priced for prompts up to 100K tokens; longer prompts are billed
+ * at $0.50 input / $2.50 output, which the table cannot express, so edit the override for those.
+ */
 export const DEFAULT_PRICING: ModelPricing[] = [
+  {
+    modelId: 'claude-fable-5-1',
+    displayName: 'Claude Fable 5.1',
+    inputPerMTok: 10.0,
+    outputPerMTok: 50.0,
+    cacheReadPerMTok: 0.25,
+    cacheWritePerMTok: 12.5,
+  },
+  {
+    modelId: 'claude-opus-5-5',
+    displayName: 'Claude Opus 5.5',
+    inputPerMTok: 4.0,
+    outputPerMTok: 20.0,
+    cacheReadPerMTok: 0.2,
+    cacheWritePerMTok: 5.0,
+  },
+  {
+    modelId: 'claude-sonnet-5-5',
+    displayName: 'Claude Sonnet 5.5',
+    inputPerMTok: 2.0,
+    outputPerMTok: 10.0,
+    cacheReadPerMTok: 0.2,
+    cacheWritePerMTok: 2.5,
+  },
+  {
+    modelId: 'claude-haiku-5-5',
+    displayName: 'Claude Haiku 5.5',
+    inputPerMTok: 0.1,
+    outputPerMTok: 0.5,
+    cacheReadPerMTok: 0.01,
+    cacheWritePerMTok: 0.125,
+  },
   {
     modelId: 'claude-opus-4-6',
     displayName: 'Claude Opus 4.6',

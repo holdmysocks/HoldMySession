@@ -254,6 +254,7 @@ describe('project-analytics', () => {
       expect(result.projects).toHaveLength(1)
       expect(result.projects[0]).toEqual({
         projectPath: '/project-a',
+        isUnlinked: false,
         projectName: 'project-a',
         totalSessions: 1,
         activeSessions: 1,
@@ -303,6 +304,7 @@ describe('project-analytics', () => {
       // project-b should be first (most recent)
       expect(result.projects[0]).toEqual({
         projectPath: '/project-b',
+        isUnlinked: false,
         projectName: 'project-b',
         totalSessions: 1,
         activeSessions: 1,
@@ -316,6 +318,7 @@ describe('project-analytics', () => {
       // project-a should be second
       expect(result.projects[1]).toEqual({
         projectPath: '/project-a',
+        isUnlinked: false,
         projectName: 'project-a',
         totalSessions: 2,
         activeSessions: 1,
@@ -326,5 +329,53 @@ describe('project-analytics', () => {
         lastSessionAt: '2026-01-03T00:00:00Z',
       })
     })
+  })
+})
+
+describe('unlinked sessions in project analytics', () => {
+  const session = (overrides: Partial<SessionSummary>): SessionSummary => ({
+    sessionId: `s-${Math.random()}`,
+    projectPath: '/work/app',
+    projectKey: 'app',
+    forkedFrom: null,
+    projectName: 'app',
+    branch: null,
+    cwd: '/work/app',
+    startedAt: '2026-01-01T10:00:00Z',
+    lastActiveAt: '2026-01-01T11:00:00Z',
+    durationMs: 1000,
+    messageCount: 2,
+    userMessageCount: 1,
+    assistantMessageCount: 1,
+    isActive: false,
+    toolCallCount: 0,
+    model: null,
+    version: null,
+    fileSizeBytes: 1,
+    projectDisplayName: 'App',
+    sessionName: null,
+    lastStopReason: null,
+    ...overrides,
+  })
+
+  it('groups scratch folders and sessions with no working directory into one entry, with their count', () => {
+    const result = aggregateProjectAnalytics([
+      session({}),
+      session({ projectPath: '/a/scratch', projectName: 'scratch', cwd: '/a/scratch' }),
+      session({ projectPath: '/b/scratch', projectName: 'scratch', cwd: '/b/scratch' }),
+      session({ projectPath: 'dir-name', projectName: 'dir-name', cwd: null }),
+    ])
+    expect(result.projects).toHaveLength(2)
+    const unlinked = result.projects.find((p) => p.isUnlinked)!
+    expect(unlinked.projectName).toBe('Unlinked Sessions')
+    expect(unlinked.projectPath).toBe('__unlinked__')
+    expect(unlinked.totalSessions).toBe(3)
+    expect(unlinked.totalMessages).toBe(6)
+    expect(result.projects.find((p) => !p.isUnlinked)?.totalSessions).toBe(1)
+  })
+
+  it('adds no unlinked entry when every session is in a project', () => {
+    const result = aggregateProjectAnalytics([session({})])
+    expect(result.projects.some((p) => p.isUnlinked)).toBe(false)
   })
 })

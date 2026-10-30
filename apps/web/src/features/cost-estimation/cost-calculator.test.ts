@@ -273,3 +273,62 @@ describe('getMergedPricing', () => {
     }
   })
 })
+
+describe('Claude 5 model pricing', () => {
+  const oneMillionOfEach: TokenUsage = {
+    inputTokens: 1_000_000,
+    outputTokens: 1_000_000,
+    cacheReadInputTokens: 1_000_000,
+    cacheCreationInputTokens: 1_000_000,
+  }
+  const pricing = getMergedPricing(DEFAULT_SETTINGS)
+
+  const expected: Array<[string, string, number]> = [
+    // [model ID, display name, input + output + cache read + cache write, in USD]
+    ['claude-fable-5-1', 'Claude Fable 5.1', 10 + 50 + 0.25 + 12.5],
+    ['claude-opus-5-5', 'Claude Opus 5.5', 4 + 20 + 0.2 + 5],
+    ['claude-sonnet-5-5', 'Claude Sonnet 5.5', 2 + 10 + 0.2 + 2.5],
+    ['claude-haiku-5-5', 'Claude Haiku 5.5', 0.1 + 0.5 + 0.01 + 0.125],
+  ]
+
+  it.each(expected)('prices %s from its own table row, not the fallback', (modelId, displayName, total) => {
+    const result = calculateSessionCost({ [modelId]: oneMillionOfEach }, pricing)
+    expect(result.byModel[modelId]?.displayName).toBe(displayName)
+    expect(result.totalUSD).toBeCloseTo(total, 6)
+  })
+
+  it('matches a model ID that carries a date suffix', () => {
+    const result = calculateSessionCost({ 'claude-opus-5-5-20261001': oneMillionOfEach }, pricing)
+    expect(result.byModel['claude-opus-5-5']).toBeDefined()
+    expect(result.totalUSD).toBeCloseTo(4 + 20 + 0.2 + 5, 6)
+  })
+
+  it('splits one session across the new models', () => {
+    const result = calculateSessionCost(
+      {
+        'claude-haiku-5-5': { ...oneMillionOfEach, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+        'claude-sonnet-5-5': { ...oneMillionOfEach, inputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+      },
+      pricing,
+    )
+    expect(result.byModel['claude-haiku-5-5'].totalCost).toBeCloseTo(0.1, 6)
+    expect(result.byModel['claude-sonnet-5-5'].totalCost).toBeCloseTo(10, 6)
+  })
+
+  it('applies a user override on top of a new model', () => {
+    const settings: Settings = {
+      ...DEFAULT_SETTINGS,
+      pricingOverrides: {
+        'claude-haiku-5-5': { inputPerMTok: 0.5, outputPerMTok: 2.5, cacheReadPerMTok: 0.05, cacheWritePerMTok: 0.625 },
+      },
+    }
+    const result = calculateSessionCost({ 'claude-haiku-5-5': oneMillionOfEach }, getMergedPricing(settings))
+    expect(result.totalUSD).toBeCloseTo(0.5 + 2.5 + 0.05 + 0.625, 6)
+  })
+
+  it('has one row per model ID in the default table', () => {
+    const ids = DEFAULT_PRICING.map((m) => m.modelId)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const [modelId] of expected) expect(ids).toContain(modelId)
+  })
+})

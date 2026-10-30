@@ -484,8 +484,21 @@ export function mergeStatsCaches(caches: StatsCache[]): StatsCache | null {
  */
 async function computeStatsFromSessions(): Promise<StatsCache | null> {
   try {
-    const summaries = await scanAllSessionsWithPaths()
+    return await computeStatsFromSummaries(await scanAllSessionsWithPaths())
+  } catch {
+    return null
+  }
+}
 
+/**
+ * Stats for exactly the given sessions, built the same way as the from-scratch fallback: each
+ * session counts on the day it was last active. Used for the per-project overview. Null when the
+ * parse fails.
+ */
+export async function computeStatsFromSummaries(
+  summaries: SessionSummaryWithPath[],
+): Promise<StatsCache | null> {
+  try {
     // Parse full details for token and tool data
     const detailMap = await parseDetailsInBatches(summaries)
 

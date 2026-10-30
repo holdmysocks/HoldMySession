@@ -54,6 +54,12 @@ export function ProjectTable({ projects }: ProjectTableProps) {
     return copy
   }, [projects, sortField, sortDir])
 
+  // The unlinked group is not a project, so it stays at the bottom whatever the sort.
+  const rows = useMemo(
+    () => [...sorted.filter((p) => !p.isUnlinked), ...sorted.filter((p) => p.isUnlinked)],
+    [sorted],
+  )
+
   function handleSort(field: SortField) {
     if (field === sortField) {
       setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
@@ -88,19 +94,31 @@ export function ProjectTable({ projects }: ProjectTableProps) {
           </tr>
         </thead>
         <tbody>
-          {sorted.map((project) => (
+          {rows.map((project) => (
             <tr
               key={project.projectPath}
               className="border-b border-gray-800/50 transition-colors hover:bg-gray-800/30"
             >
               <td className="px-4 py-3">
-                <Link
-                  to="/sessions"
-                  search={{ project: project.projectName }}
-                  className="text-sm text-brand-500 hover:underline"
-                >
-                  {anonymizeProjectName(project.projectName)}
-                </Link>
+                {project.isUnlinked ? (
+                  <>
+                    <span className="text-sm text-gray-200">{project.projectName}</span>
+                    <span
+                      title="Sessions with no project, grouped into one row"
+                      className="ml-2 rounded-full bg-gray-700/60 px-1.5 py-0.5 text-[10px] font-medium text-gray-300"
+                    >
+                      {project.totalSessions} {project.totalSessions === 1 ? 'session' : 'sessions'}
+                    </span>
+                  </>
+                ) : (
+                  <Link
+                    to="/sessions"
+                    search={{ project: project.projectName }}
+                    className="text-sm text-brand-500 hover:underline"
+                  >
+                    {anonymizeProjectName(project.projectName)}
+                  </Link>
+                )}
                 {project.activeSessions > 0 && (
                   <span className="ml-2 rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
                     {project.activeSessions} active
