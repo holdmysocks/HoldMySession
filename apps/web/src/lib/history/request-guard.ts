@@ -6,7 +6,7 @@ export const GUARD_HEADER = 'x-holdmysession'
  * that is this same server. The dashboard has no login, so this keeps other websites open in the
  * same browser from replacing the history through localhost.
  */
-export function isSameOriginRequest(request: Request): boolean {
+export function isSameOriginRequest(request: { url: string; headers: { get(name: string): string | null } }): boolean {
   if (request.headers.get(GUARD_HEADER) !== '1') return false
   const origin = request.headers.get('origin')
   if (origin === null) return true
