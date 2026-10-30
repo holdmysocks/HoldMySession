@@ -287,8 +287,15 @@ describe('Claude 5 model pricing', () => {
     // [model ID, display name, input + output + cache read + cache write, in USD]
     ['claude-fable-5-1', 'Claude Fable 5.1', 10 + 50 + 0.25 + 12.5],
     ['claude-opus-5-5', 'Claude Opus 5.5', 4 + 20 + 0.2 + 5],
-    ['claude-sonnet-5-5', 'Claude Sonnet 5.5', 2 + 10 + 0.2 + 2.5],
+    ['claude-sonnet-5-5', 'Claude Sonnet 5.5', 2 + 10 + 0.1 + 2.5],
     ['claude-haiku-5-5', 'Claude Haiku 5.5', 0.1 + 0.5 + 0.01 + 0.125],
+    ['claude-mythos-5-1', 'Claude Mythos 5.1', 10 + 50 + 0.25 + 12.5],
+    ['claude-fable-5', 'Claude Fable 5', 10 + 50 + 1 + 12.5],
+    ['claude-mythos-5', 'Claude Mythos 5', 10 + 50 + 1 + 12.5],
+    ['claude-sonnet-5', 'Claude Sonnet 5', 2 + 10 + 0.2 + 2.5],
+    ['claude-opus-4-8', 'Claude Opus 4.8', 5 + 25 + 0.5 + 6.25],
+    ['claude-opus-4-7', 'Claude Opus 4.7', 5 + 25 + 0.5 + 6.25],
+    ['claude-sonnet-4-6', 'Claude Sonnet 4.6', 3 + 15 + 0.3 + 3.75],
   ]
 
   it.each(expected)('prices %s from its own table row, not the fallback', (modelId, displayName, total) => {
