@@ -220,13 +220,13 @@ export function ContributionHeatmap({
       <h3 className="text-sm font-semibold text-gray-300">Activity</h3>
       <p className="mt-1 text-xs text-gray-500">Token usage intensity over the past year, or since your first day of use</p>
 
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-4 overflow-x-auto overflow-y-hidden">
         <div ref={gridRef} className="relative w-full">
           {flavor && (
             <p
               data-flavor
               className="absolute text-sm italic leading-relaxed text-gray-500"
-              style={{ left: textLeft, width: textWidth, top: 18 + 2, height: 7 * CELL_SIZE + 6 * CELL_GAP }}
+              style={{ left: textLeft, width: textWidth, top: 16 + CELL_GAP, height: 7 * CELL_SIZE + 6 * CELL_GAP }}
             >
               <span className="flex h-full items-center">{flavor}</span>
             </p>
