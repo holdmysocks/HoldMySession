@@ -107,14 +107,9 @@ export function TimelineEventsChart({
       ? formatRange(timeAt(scroll.left), timeAt(scroll.left + scroll.view))
       : null
 
-  // Collect all tool names for legend (main lane + agent dots)
+  // Collect all tool names for legend (main lane)
   const allToolNames = useMemo(() => {
     const names: string[] = chartData.mainLane.map((e) => e.toolName)
-    for (const lane of chartData.agentLanes) {
-      for (const dot of lane.toolDots) {
-        names.push(dot.toolName)
-      }
-    }
     // Count frequency and return sorted by most common
     const freq: Record<string, number> = {}
     for (const n of names) {
@@ -190,6 +185,16 @@ export function TimelineEventsChart({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {zoom > 1 && (
+            <button
+              type="button"
+              onClick={() => setZoomIndex(0)}
+              className="mr-1 rounded bg-gray-800 px-2 py-0.5 text-[10px] text-gray-400 transition-colors hover:bg-gray-700"
+              title="Reset zoom"
+            >
+              Reset
+            </button>
+          )}
           <button
             type="button"
             onClick={() => zoomBy(-1)}
@@ -211,16 +216,6 @@ export function TimelineEventsChart({
           >
             +
           </button>
-          {zoom > 1 && (
-            <button
-              type="button"
-              onClick={() => setZoomIndex(0)}
-              className="ml-1 rounded bg-gray-800 px-2 py-0.5 text-[10px] text-gray-400 transition-colors hover:bg-gray-700"
-              title="Reset zoom"
-            >
-              Reset
-            </button>
-          )}
         </div>
       </div>
 

@@ -2,7 +2,6 @@ import { useRef, useCallback, useEffect, useState } from 'react'
 import type {
   TimelineChartData,
   TooltipItem,
-  AgentLaneData,
 } from './timeline-types'
 import { getToolColor } from './timeline-colors'
 import { buildTimeScale, formatCursorTime, type TimeBand } from './timeline-scale'
@@ -43,10 +42,12 @@ export function TimelineChart({ data, width, onHover }: Props) {
   const mainLaneY = currentY
   currentY += LANE_HEIGHT
 
-  const agentLaneYs: number[] = []
-  for (let i = 0; i < data.agentLanes.length; i++) {
+  // Every dispatch shares one lane, so many agents do not stack into many rows.
+  const agentRuns = data.agentLanes.filter((a) => Number.isFinite(a.startX) && Number.isFinite(a.endX))
+  let agentRowY = 0
+  if (agentRuns.length > 0) {
     currentY += LANE_GAP
-    agentLaneYs.push(currentY)
+    agentRowY = currentY
     currentY += LANE_HEIGHT
   }
 
@@ -203,18 +204,46 @@ export function TimelineChart({ data, width, onHover }: Props) {
         </circle>
       ))}
 
-      {/* Agent swim lanes */}
-      {data.agentLanes.map((lane, i) => (
-        <AgentLaneSVG
-          key={`${lane.subagentType}-${i}`}
-          lane={lane}
-          y={agentLaneYs[i]}
-          toX={toX}
-          laneHeight={LANE_HEIGHT}
-          onHover={onHover}
-          getPosition={getPosition}
-        />
-      ))}
+      {/* Agents: one lane, one translucent bar per dispatch */}
+      {agentRuns.length > 0 && (
+        <>
+          <text x={4} y={agentRowY + LANE_HEIGHT / 2 + 4} className="fill-indigo-400/70 text-[11px] font-medium">
+            Agents
+          </text>
+          <line
+            x1={LEFT_MARGIN}
+            y1={agentRowY + LANE_HEIGHT / 2}
+            x2={chartWidth - RIGHT_MARGIN}
+            y2={agentRowY + LANE_HEIGHT / 2}
+            stroke="var(--color-gray-800)"
+            strokeWidth={1}
+            strokeDasharray="2,4"
+          />
+          {agentRuns.map((lane, i) => {
+            const barX = toX(lane.startX)
+            return (
+              <rect
+                key={`${lane.subagentType}-${i}`}
+                x={barX}
+                y={agentRowY + 8}
+                width={Math.max(toX(lane.endX) - barX, 6)}
+                height={LANE_HEIGHT - 16}
+                rx={4}
+                fill="rgba(99, 102, 241, 0.25)"
+                stroke="rgba(99, 102, 241, 0.5)"
+                strokeWidth={1}
+                className="cursor-pointer hover:fill-indigo-500/40"
+                onMouseEnter={(e) => onHover({ kind: 'agent', agent: lane }, getPosition(e))}
+                onMouseLeave={() => onHover(null, { x: 0, y: 0 })}
+              >
+                <title>
+                  {lane.subagentType}: {lane.description}
+                </title>
+              </rect>
+            )
+          })}
+        </>
+      )}
 
       {/* Skill markers row */}
       {hasSkills && (
@@ -398,138 +427,3 @@ function HoverGuide({
   )
 }
 
-function AgentLaneSVG({
-  lane,
-  y,
-  toX,
-  laneHeight,
-  onHover,
-  getPosition,
-}: {
-  lane: AgentLaneData
-  y: number
-  toX: (relX: number) => number
-  laneHeight: number
-  onHover: Props['onHover']
-  getPosition: (e: React.MouseEvent) => { x: number; y: number }
-}) {
-  const barX = toX(lane.startX)
-  const barWidth = Math.max(toX(lane.endX) - barX, 8) // Minimum 8px width
-  const midY = y + laneHeight / 2
-
-  // Truncate label to fit in left margin
-  const label =
-    lane.subagentType.length > 10
-      ? lane.subagentType.slice(0, 10) + '...'
-      : lane.subagentType
-
-  return (
-    <g>
-      {/* Label */}
-      <text
-        x={4}
-        y={midY + 4}
-        className="fill-indigo-400/70 text-[11px] font-medium"
-      >
-        {label}
-      </text>
-
-      {/* Lane background bar */}
-      <rect
-        x={barX}
-        y={y + 2}
-        width={barWidth}
-        height={laneHeight - 4}
-        rx={6}
-        fill="rgba(99, 102, 241, 0.08)"
-        stroke="rgba(99, 102, 241, 0.2)"
-        strokeWidth={1}
-        className="cursor-pointer hover:fill-indigo-500/15"
-        onMouseEnter={(e) =>
-          onHover({ kind: 'agent', agent: lane }, getPosition(e))
-        }
-        onMouseLeave={() => onHover(null, { x: 0, y: 0 })}
-      >
-        <title>
-          {lane.subagentType}: {lane.description}
-        </title>
-      </rect>
-
-      {/* Baseline within lane */}
-      <line
-        x1={barX + 4}
-        y1={midY}
-        x2={barX + barWidth - 4}
-        y2={midY}
-        stroke="rgba(99, 102, 241, 0.15)"
-        strokeWidth={1}
-      />
-
-      {/* Tool dots within agent */}
-      {lane.toolDots.map((dot, i) => (
-        <circle
-          key={`${dot.toolName}-${i}`}
-          cx={toX(dot.relativeX)}
-          cy={midY}
-          r={DOT_RADIUS - 0.5}
-          fill={getToolColor(dot.toolName)}
-          opacity={0.75}
-          className="cursor-pointer hover:opacity-100"
-          onMouseEnter={(e) =>
-            onHover(
-              {
-                kind: 'tool',
-                toolName: dot.toolName,
-                timestamp: new Date(
-                  lane.startMs +
-                    (dot.relativeX - lane.startX) /
-                      (lane.endX - lane.startX) *
-                      (lane.endMs - lane.startMs),
-                ).toISOString(),
-                toolUseId: `${lane.subagentType}-${dot.toolName}-${i}`,
-              },
-              getPosition(e),
-            )
-          }
-          onMouseLeave={() => onHover(null, { x: 0, y: 0 })}
-        >
-          <title>
-            {dot.toolName} ({lane.subagentType})
-          </title>
-        </circle>
-      ))}
-
-      {/* Skill diamonds within agent lane */}
-      {lane.skills && lane.skills.length > 0 && lane.skills.map((skill, i) => {
-        // Distribute skills evenly across the agent's time span
-        const skillRelX = lane.startX + ((lane.endX - lane.startX) / (lane.skills!.length + 1)) * (i + 1)
-        const cx = toX(skillRelX)
-        const cy = y + 6 // Position near top edge of lane
-        const size = 3
-        return (
-          <polygon
-            key={`skill-${skill.skill}-${i}`}
-            points={`${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size} ${cx - size},${cy}`}
-            fill="#fbbf24"
-            opacity={0.85}
-            className="cursor-pointer hover:opacity-100"
-            onMouseEnter={(e) =>
-              onHover(
-                {
-                  kind: 'skill',
-                  skill: skill.skill,
-                  args: skill.args,
-                  timestamp: new Date(lane.startMs).toISOString(),
-                },
-                getPosition(e),
-              )
-            }
-            onMouseLeave={() => onHover(null, { x: 0, y: 0 })}
-          >
-            <title>/{skill.skill} ({lane.subagentType})</title>
-          </polygon>
-        )
-      })}
-    </g>
-  )
-}

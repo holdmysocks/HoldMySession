@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { AgentInvocation, SkillInvocation, TokenUsage } from '@/lib/parsers/types'
 import { formatTokenCount, formatDuration, formatUSD } from '@/lib/utils/format'
@@ -14,6 +14,15 @@ function computeAgentTokens(agent: AgentInvocation): number | undefined {
     agent.tokens.cacheReadInputTokens +
     agent.tokens.cacheCreationInputTokens
   )
+}
+
+interface DispatchRow {
+  key: string
+  agent: AgentInvocation
+  count: number
+  tokens: number
+  cost: number
+  tools: number | null
 }
 
 export function AgentDispatchesPanel({
@@ -46,6 +55,8 @@ export function AgentDispatchesPanel({
     return { agentCosts: costs, totalAgentCost: total }
   }, [settings, agents])
 
+  const [open, setOpen] = useState(false)
+
   if (agents.length === 0) return null
 
   const totalAgentTokens = agents.reduce(
@@ -53,68 +64,102 @@ export function AgentDispatchesPanel({
     0,
   )
 
+  // Dispatches with no known type (a subagent file with no matching call) are merged by model into one row.
+  const rows: DispatchRow[] = []
+  const unknownByModel = new Map<string, DispatchRow>()
+  agents.forEach((a, i) => {
+    const tokens = a.totalTokens ?? computeAgentTokens(a) ?? 0
+    const cost = agentCosts.get(i) ?? 0
+    if (a.subagentType !== 'unknown') {
+      rows.push({ key: `a-${i}`, agent: a, count: 1, tokens, cost, tools: a.totalToolUseCount ?? null })
+      return
+    }
+    const modelKey = a.model ?? ''
+    const existing = unknownByModel.get(modelKey)
+    if (existing) {
+      existing.count += 1
+      existing.tokens += tokens
+      existing.cost += cost
+      if (a.totalToolUseCount != null) existing.tools = (existing.tools ?? 0) + a.totalToolUseCount
+      return
+    }
+    const row: DispatchRow = { key: `u-${modelKey}`, agent: a, count: 1, tokens, cost, tools: a.totalToolUseCount ?? null }
+    unknownByModel.set(modelKey, row)
+    rows.push(row)
+  })
+
   return (
     <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
-      <h3 className="text-sm font-semibold text-gray-300">Agent Dispatches</h3>
-      <p className="mt-1 text-xs text-gray-500">
-        {agents.length} agent dispatch{agents.length !== 1 ? 'es' : ''}
-        {totalAgentTokens > 0 && (
-          <span className="ml-1 text-indigo-400">
-            ({formatTokenCount(totalAgentTokens)} tokens
-            {totalAgentCost > 0 && ` · ~${formatUSD(totalAgentCost)}`})
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-start justify-between gap-2 text-left"
+      >
+        <span>
+          <span className="block text-sm font-semibold text-gray-300">Agent Dispatches</span>
+          <span className="mt-1 block text-xs text-gray-500">
+            {agents.length} agent dispatch{agents.length !== 1 ? 'es' : ''}
+            {totalAgentTokens > 0 && (
+              <span className="ml-1 text-indigo-400">
+                ({formatTokenCount(totalAgentTokens)} tokens
+                {totalAgentCost > 0 && ` · ~${formatUSD(totalAgentCost)}`})
+              </span>
+            )}
           </span>
-        )}
-      </p>
+        </span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          className={`mt-0.5 h-4 w-4 shrink-0 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="currentColor"
+        >
+          <path d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z" />
+        </svg>
+      </button>
 
-      <div className="mt-3 space-y-1">
-        {agents.map((a, i) => {
-          const tokenCount =
-            a.totalTokens ?? computeAgentTokens(a)
-          const agentCost = agentCosts.get(i)
-          return (
-            <div key={`a-${i}`} className="flex items-start gap-2 rounded bg-gray-950/40 px-2 py-1.5">
-              <span className="shrink-0 rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-300">
-                {a.subagentType}
-              </span>
-              {a.model && (
-                <span className="shrink-0 rounded bg-gray-800 px-1.5 py-0.5 text-[10px] font-mono text-gray-400">
-                  {a.model.replace(/^claude-/, '').replace(/-\d{8}$/, '')}
+      {open && (
+        <div className="mt-3 space-y-1">
+          {rows.map((row) => {
+            const a = row.agent
+            return (
+              <div key={row.key} className="flex items-start gap-2 rounded bg-gray-950/40 px-2 py-1.5">
+                <span className="shrink-0 rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-300">
+                  {a.subagentType}
                 </span>
-              )}
-              <span className="min-w-0 flex-1 truncate text-xs text-gray-400">
-                {a.description}
-              </span>
-              <div className="flex shrink-0 items-center gap-2">
-                {tokenCount != null && tokenCount > 0 && (
-                  <span className="text-[10px] font-mono text-indigo-400/80">
-                    {formatTokenCount(tokenCount)}
+                {row.count > 1 && (
+                  <span className="shrink-0 rounded bg-indigo-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-200">
+                    x{row.count}
                   </span>
                 )}
-                {agentCost != null && agentCost > 0 && (
-                  <span className="text-[10px] font-mono text-emerald-400/80">
-                    ~{formatUSD(agentCost)}
+                {a.model && (
+                  <span className="shrink-0 rounded bg-gray-800 px-1.5 py-0.5 text-[10px] font-mono text-gray-400">
+                    {a.model.replace(/^claude-/, '').replace(/-\d{8}$/, '')}
                   </span>
                 )}
-                {a.totalToolUseCount != null && (
-                  <span className="text-[10px] text-gray-500">
-                    {a.totalToolUseCount} tools
-                  </span>
-                )}
-                {a.durationMs != null && (
-                  <span className="text-[10px] text-gray-600">
-                    {formatDuration(a.durationMs)}
-                  </span>
-                )}
-                {a.timestamp && (
-                  <span className="text-[10px] text-gray-600">
-                    {format(new Date(a.timestamp), 'HH:mm:ss')}
-                  </span>
-                )}
+                <span className="min-w-0 flex-1 truncate text-xs text-gray-400">
+                  {row.count > 1 ? '' : a.description}
+                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  {row.tokens > 0 && (
+                    <span className="text-[10px] font-mono text-indigo-400/80">{formatTokenCount(row.tokens)}</span>
+                  )}
+                  {row.cost > 0 && (
+                    <span className="text-[10px] font-mono text-emerald-400/80">~{formatUSD(row.cost)}</span>
+                  )}
+                  {row.tools != null && <span className="text-[10px] text-gray-500">{row.tools} tools</span>}
+                  {row.count === 1 && a.durationMs != null && (
+                    <span className="text-[10px] text-gray-600">{formatDuration(a.durationMs)}</span>
+                  )}
+                  {row.count === 1 && a.timestamp && (
+                    <span className="text-[10px] text-gray-600">{format(new Date(a.timestamp), 'HH:mm:ss')}</span>
+                  )}
+                </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

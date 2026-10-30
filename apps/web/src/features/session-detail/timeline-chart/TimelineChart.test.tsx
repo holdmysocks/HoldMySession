@@ -69,3 +69,27 @@ describe('TimelineChart hover guide', () => {
     expect(late).toContain('Fri 6 Mar')
   })
 })
+
+describe('TimelineChart agents', () => {
+  it('draws every dispatch on one Agents lane instead of a lane each', () => {
+    const start = at(2026, 3, 3, 10)
+    const end = at(2026, 3, 3, 12)
+    const lane = (i: number) => ({
+      subagentType: 'general-purpose',
+      description: `job ${i}`,
+      startMs: start + i * 600000,
+      endMs: start + i * 600000 + 300000,
+      startX: (i * 600000) / (end - start),
+      endX: (i * 600000 + 300000) / (end - start),
+      durationMs: 300000,
+      totalTokens: null,
+      totalToolUseCount: null,
+      toolDots: [],
+    })
+    const chart = { ...data(start, end), agentLanes: [lane(0), lane(1), lane(2)] }
+    const { svg, texts } = render900(chart)
+    expect(texts().filter((t) => t === 'Agents')).toHaveLength(1)
+    expect(texts().some((t) => t?.startsWith('general-pu'))).toBe(false)
+    expect(svg.querySelectorAll('rect.cursor-pointer')).toHaveLength(3)
+  })
+})
