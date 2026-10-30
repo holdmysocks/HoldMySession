@@ -271,17 +271,30 @@ describe('edgePath', () => {
     expect(edgePath(card, left)).toBe('M 0 46 C -60 46, -60 46, -120 46')
   })
 
-  it('uses the closest facing sides when the other card is below and to the side', () => {
-    // Far to the right and a little below: the sides are much closer than top and bottom.
-    const diagonal = { x: 330, y: 110, width: 190, height: 50 }
-    expect(edgePath(card, diagonal).startsWith('M 280 46')).toBe(true)
-    // Below and overlapping horizontally: only bottom to top faces it.
-    const under = { x: 150, y: 140, width: 190, height: 50 }
-    expect(edgePath(card, under).startsWith('M 140 92')).toBe(true)
+  it('links bottom to top for a card below, even one far to the side', () => {
+    // Below the card, and entirely to its right: the vertical link still wins.
+    const belowRight = { x: 330, y: 110, width: 190, height: 50 }
+    expect(edgePath(card, belowRight).startsWith('M 140 92')).toBe(true)
+    expect(edgePath(card, belowRight).endsWith('425 110')).toBe(true)
+    // Below and far to the left.
+    const belowLeft = { x: -600, y: 200, width: 190, height: 50 }
+    expect(edgePath(card, belowLeft).startsWith('M 140 92')).toBe(true)
+  })
+
+  it('links top to bottom for a card above, even one far to the side', () => {
+    const aboveRight = { x: 500, y: -200, width: 190, height: 50 }
+    expect(edgePath(card, aboveRight).startsWith('M 140 0')).toBe(true)
+  })
+
+  it('uses the sides only when the other card is level with this one', () => {
+    const levelRight = { x: 400, y: 30, width: 190, height: 50 }
+    expect(edgePath(card, levelRight).startsWith('M 280 46')).toBe(true)
+    const levelLeft = { x: -400, y: 30, width: 190, height: 50 }
+    expect(edgePath(card, levelLeft).startsWith('M 0 46')).toBe(true)
   })
 
   it('never doubles back to a side the target is not beyond', () => {
-    // The target is below, and its left edge is left of the card's right edge: no side-to-side link.
+    // The target is below, and its left edge is left of the card's right edge.
     const below = { x: 250, y: 162, width: 190, height: 50 }
     expect(edgePath(card, below).startsWith('M 140 92')).toBe(true)
   })
@@ -315,13 +328,17 @@ describe('applyCustomPositions', () => {
     expect(nodeOf(moved, sessionA.id)).toMatchObject({ x: sessionA.x, y: sessionA.y })
   })
 
-  it('redraws an edge to follow the moved card, attached to the closest sides', () => {
+  it('redraws an edge to follow the moved card, attached to the facing sides', () => {
     const edgeBefore = base.edges.find((e) => e.to === agents[0].id)!
     const moved = applyCustomPositions(base, saveAll({ [agents[0].id]: { x: 2000, y: 0 } }))
     const edgeAfter = moved.edges.find((e) => e.to === agents[0].id)!
     expect(edgeAfter.d).not.toBe(edgeBefore.d)
     // Far to the right of its parent and level with it: right side to left side.
     expect(edgeAfter.d.startsWith(`M ${sessionA.x + SESSION_WIDTH} ${sessionA.y + SESSION_HEIGHT / 2}`)).toBe(true)
+    // Moved below the parent, still far to the right: bottom to top.
+    const below = applyCustomPositions(base, saveAll({ [agents[0].id]: { x: 2000, y: 400 } }))
+    const edgeBelow = below.edges.find((e) => e.to === agents[0].id)!
+    expect(edgeBelow.d.startsWith(`M ${sessionA.x + SESSION_WIDTH / 2} ${sessionA.y + SESSION_HEIGHT}`)).toBe(true)
   })
 
   it('puts a new top-level session to the right of everything saved, level with the saved top row', () => {
@@ -372,5 +389,37 @@ describe('applyCustomPositions', () => {
   it('ignores a saved position that is not a finite number', () => {
     const result = applyCustomPositions(base, { [sessionA.id]: { x: Number.NaN, y: 0 } })
     expect(result).toBe(base)
+  })
+})
+
+describe('edgePath next to another card', () => {
+  /** Points along the cubic bezier in an `M x y C x1 y1, x2 y2, x3 y3` path. */
+  function samplePath(d: string): Array<{ x: number; y: number }> {
+    const [x0, y0, x1, y1, x2, y2, x3, y3] = d.match(/-?\d+(\.\d+)?/g)!.map(Number)
+    return Array.from({ length: 41 }, (_, i) => {
+      const t = i / 40
+      const u = 1 - t
+      return {
+        x: u ** 3 * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t ** 3 * x3,
+        y: u ** 3 * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t ** 3 * y3,
+      }
+    })
+  }
+
+  it('hangs from the top of a subagent below and to the right without crossing the card between them', () => {
+    // A session, a sub-session under it, and a subagent card placed below and to the right of the
+    // session, with the sub-session's card sitting just to the left of that subagent.
+    const session = { x: 0, y: 0, width: 280, height: 92 }
+    const subSession = { x: 48, y: 161, width: 280, height: 92 }
+    const subagent = { x: 334, y: 172, width: 190, height: 50 }
+    const d = edgePath(session, subagent)
+    expect(d.startsWith('M 140 92')).toBe(true)
+    expect(d.endsWith('429 172')).toBe(true)
+    for (const point of samplePath(d)) {
+      const inside =
+        point.x > subSession.x && point.x < subSession.x + subSession.width &&
+        point.y > subSession.y && point.y < subSession.y + subSession.height
+      expect(inside).toBe(false)
+    }
   })
 })

@@ -15,6 +15,7 @@ import type { MapSessionInput, ProjectMap } from '@/lib/map/project-map'
 import { latestNotificationBySession, readRecentEvents } from '@/lib/events/event-inbox'
 import type { HookEvent } from '@/lib/events/event-inbox'
 import { filterArchivedSessions, filterHiddenSessions, filterVisibleSessions } from '@/lib/map/session-visibility'
+import { isUnlinkedSession } from '@/lib/projects/unlinked'
 
 const HOOK_EVENTS_SHOWN = 100
 
@@ -107,11 +108,19 @@ export async function resolveSessionDetail(
   return detail
 }
 
-/** The project dropdown lists only projects with at least one session that has a working directory. */
+/**
+ * The sessions the project dropdown is built from: visible ones (a working directory, not archived),
+ * without the unlinked ones, since a scratch folder is not a project worth picking.
+ */
+export function dropdownSessions<T extends SessionSummary>(sessions: T[]): T[] {
+  return filterVisibleSessions(sessions).filter((session) => !isUnlinkedSession(session))
+}
+
+/** The project dropdown lists projects with at least one real session: a working directory, and not scratch. */
 export const getMapProjects = createServerFn({ method: 'GET' }).handler(
   async (): Promise<MapProject[]> => {
     const sessions = await scanAllSessionsWithPaths()
-    return groupMapProjects(filterVisibleSessions(sessions))
+    return groupMapProjects(dropdownSessions(sessions))
   },
 )
 

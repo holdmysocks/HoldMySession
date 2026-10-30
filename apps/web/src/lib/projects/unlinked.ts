@@ -1,7 +1,8 @@
 /**
  * "Unlinked" sessions are the ones that do not belong to a real project: no working directory was
- * recorded, or they ran in a folder named "scratch". Stats group them into one entry instead of one
- * row per scratch folder. Pure, so the server and the browser agree.
+ * recorded, or they ran in a folder whose name starts with "scratch" (scratch, scratch-1a2b, ...).
+ * Stats group them into one entry instead of one row per scratch folder, and the map's project
+ * dropdown leaves them out. Pure, so the server and the browser agree.
  */
 
 /** Stands in for a project path when asking for the unlinked group. Cannot clash with a real path. */
@@ -9,8 +10,8 @@ export const UNLINKED_PROJECT_KEY = '__unlinked__'
 
 export const UNLINKED_PROJECT_NAME = 'Unlinked Sessions'
 
-/** Folder names that mark a session as not being in a project. Compared in lower case. */
-const SCRATCH_NAMES = new Set(['scratch'])
+/** A folder name starting with this marks a session as not being in a project. Compared in lower case. */
+const SCRATCH_PREFIX = 'scratch'
 
 export interface UnlinkedCandidate {
   cwd: string | null
@@ -21,7 +22,7 @@ export interface UnlinkedCandidate {
 export function isUnlinkedSession(session: UnlinkedCandidate): boolean {
   if (typeof session.cwd !== 'string' || session.cwd.trim() === '') return true
   return [session.projectName, session.projectDisplayName].some(
-    (name) => typeof name === 'string' && SCRATCH_NAMES.has(name.trim().toLowerCase()),
+    (name) => typeof name === 'string' && name.trim().toLowerCase().startsWith(SCRATCH_PREFIX),
   )
 }
 

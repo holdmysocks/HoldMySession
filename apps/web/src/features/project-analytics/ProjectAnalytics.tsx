@@ -59,7 +59,7 @@ export function ProjectAnalytics() {
         />
         <SummaryCard
           label="Most Active"
-          value={mostActive ? anonymizeProjectName(mostActive.projectName) : '-'}
+          value={mostActive ? anonymizeProjectName(mostActive.displayName) : '-'}
           sub={mostActive ? `${mostActive.totalSessions} sessions` : undefined}
         />
       </div>

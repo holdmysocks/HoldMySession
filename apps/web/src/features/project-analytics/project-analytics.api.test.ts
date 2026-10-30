@@ -256,6 +256,7 @@ describe('project-analytics', () => {
         projectPath: '/project-a',
         isUnlinked: false,
         projectName: 'project-a',
+        displayName: 'Test Project',
         totalSessions: 1,
         activeSessions: 1,
         totalMessages: 10,
@@ -306,6 +307,7 @@ describe('project-analytics', () => {
         projectPath: '/project-b',
         isUnlinked: false,
         projectName: 'project-b',
+        displayName: 'Test Project',
         totalSessions: 1,
         activeSessions: 1,
         totalMessages: 5,
@@ -320,6 +322,7 @@ describe('project-analytics', () => {
         projectPath: '/project-a',
         isUnlinked: false,
         projectName: 'project-a',
+        displayName: 'Test Project',
         totalSessions: 2,
         activeSessions: 1,
         totalMessages: 30,
@@ -377,5 +380,35 @@ describe('unlinked sessions in project analytics', () => {
   it('adds no unlinked entry when every session is in a project', () => {
     const result = aggregateProjectAnalytics([session({})])
     expect(result.projects.some((p) => p.isUnlinked)).toBe(false)
+  })
+})
+
+describe('project display names', () => {
+  const session = (overrides: Partial<SessionSummary>): SessionSummary => ({
+    sessionId: `s-${Math.random()}`, projectPath: '/work/app', projectKey: 'app', forkedFrom: null, projectName: 'app-folder',
+    branch: null, cwd: '/work/app', startedAt: '2026-01-01T10:00:00Z', lastActiveAt: '2026-01-01T11:00:00Z', durationMs: 1,
+    messageCount: 1, userMessageCount: 1, assistantMessageCount: 0, isActive: false, toolCallCount: 0, model: null,
+    version: null, fileSizeBytes: 1, projectDisplayName: 'My App', sessionName: null, lastStopReason: null, ...overrides,
+  })
+
+  it('shows the display name, and keeps the folder name for the Sessions list filter', () => {
+    const [project] = aggregateProjectAnalytics([session({})]).projects
+    expect(project.displayName).toBe('My App')
+    expect(project.projectName).toBe('app-folder')
+  })
+
+  it('falls back to the folder name when there is no display name', () => {
+    const [project] = aggregateProjectAnalytics([session({ projectDisplayName: '' })]).projects
+    expect(project.displayName).toBe('app-folder')
+  })
+
+  it('groups scratch-prefixed folders with the unlinked sessions', () => {
+    const { projects } = aggregateProjectAnalytics([
+      session({}),
+      session({ projectPath: '/a/scratch-1a2b', projectName: 'scratch-1a2b', cwd: '/a/scratch-1a2b' }),
+      session({ projectPath: '/b/scratch-9z', projectName: 'scratch-9z', cwd: '/b/scratch-9z' }),
+    ])
+    expect(projects).toHaveLength(2)
+    expect(projects.find((p) => p.isUnlinked)?.totalSessions).toBe(2)
   })
 })

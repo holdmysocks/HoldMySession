@@ -61,8 +61,8 @@ Everything runs entirely on your machine. Read-only — it never modifies any Cl
 - Dedicated "Projects" tab with sortable table
 - Sessions, messages, tokens, and duration aggregated per project
 - Drill-down links to filtered session lists
-- Sessions with no project, and sessions that ran in a folder named `scratch`, are grouped into one **Unlinked Sessions** row with a count tag. It is not counted as a project
-- **Overview by Project** tab: the same overview as the Overview tab (cards, heatmap, charts, cost), filtered to one project or to the Unlinked Sessions group
+- Sessions with no project, and sessions that ran in a folder whose name starts with `scratch`, are grouped into one **Unlinked Sessions** row with a count tag. It is not counted as a project
+- **Overview by Project** tab: the same overview as the Overview tab (cards, heatmap, charts, cost), filtered to one project or to the Unlinked Sessions group. Projects are listed by their display name. The Total Tokens card shows the total, and an arrow opens the input, cache, output and reasoning breakdown
 
 ![Per-Project Analytics](screenshots/stats-projects.png)
 

@@ -80,39 +80,36 @@ function sideMiddle(rect: Rect, side: Side): { x: number; y: number } {
 
 /**
  * The line between two cards: from the middle of one side of `from` to the middle of the facing
- * side of `to`. Of the four facing pairs (bottom to top, top to bottom, right to left, left to
- * right), only those where the target really lies in that direction are considered, so a line
- * never doubles back across a card, and the pair with the shortest line wins. A card below its
- * parent therefore links bottom to top. When the cards overlap, the direction of the target's
- * centre decides.
+ * side of `to`.
+ * - A card that lies below links bottom to top, and a card above links top to bottom, however far
+ *   it sits to the side. A branch reads as hanging from its parent.
+ * - Otherwise, a card that lies to the right links right to left, and one to the left links left
+ *   to right.
+ * - When the cards overlap, the direction of the target's centre decides.
+ * A side is only used when the other card is really beyond it, so a line never doubles back
+ * across a card.
  */
 export function edgePath(from: Rect, to: Rect): string {
-  const candidates: Array<[Side, Side, boolean]> = [
-    ['bottom', 'top', to.y >= from.y + from.height],
-    ['top', 'bottom', to.y + to.height <= from.y],
-    ['right', 'left', to.x >= from.x + from.width],
-    ['left', 'right', to.x + to.width <= from.x],
-  ]
-  let best: { a: Side; b: Side; length: number } | null = null
-  for (const [a, b, valid] of candidates) {
-    if (!valid) continue
-    const p = sideMiddle(from, a)
-    const q = sideMiddle(to, b)
-    const length = Math.hypot(q.x - p.x, q.y - p.y)
-    if (best === null || length < best.length) best = { a, b, length }
-  }
-  if (best === null) {
+  let a: Side
+  let b: Side
+  if (to.y >= from.y + from.height) {
+    ;[a, b] = ['bottom', 'top']
+  } else if (to.y + to.height <= from.y) {
+    ;[a, b] = ['top', 'bottom']
+  } else if (to.x >= from.x + from.width) {
+    ;[a, b] = ['right', 'left']
+  } else if (to.x + to.width <= from.x) {
+    ;[a, b] = ['left', 'right']
+  } else {
     const dx = to.x + to.width / 2 - (from.x + from.width / 2)
     const dy = to.y + to.height / 2 - (from.y + from.height / 2)
-    best =
-      Math.abs(dy) >= Math.abs(dx)
-        ? { a: dy >= 0 ? 'bottom' : 'top', b: dy >= 0 ? 'top' : 'bottom', length: 0 }
-        : { a: dx >= 0 ? 'right' : 'left', b: dx >= 0 ? 'left' : 'right', length: 0 }
+    if (Math.abs(dy) >= Math.abs(dx)) [a, b] = dy >= 0 ? ['bottom', 'top'] : ['top', 'bottom']
+    else [a, b] = dx >= 0 ? ['right', 'left'] : ['left', 'right']
   }
 
-  const p = sideMiddle(from, best.a)
-  const q = sideMiddle(to, best.b)
-  if (best.a === 'top' || best.a === 'bottom') {
+  const p = sideMiddle(from, a)
+  const q = sideMiddle(to, b)
+  if (a === 'top' || a === 'bottom') {
     const midY = (p.y + q.y) / 2
     return `M ${p.x} ${p.y} C ${p.x} ${midY}, ${q.x} ${midY}, ${q.x} ${q.y}`
   }

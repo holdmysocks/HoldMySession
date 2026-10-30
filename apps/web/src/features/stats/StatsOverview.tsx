@@ -3,9 +3,10 @@ import { ContributionHeatmap } from '@/features/stats/ContributionHeatmap'
 import { TokenTrendChart } from '@/features/stats/TokenTrendChart'
 import { ModelUsageChart } from '@/features/stats/ModelUsageChart'
 import { HourlyDistribution } from '@/features/stats/HourlyDistribution'
-import { formatDuration, formatTokenCount, formatUSD } from '@/lib/utils/format'
+import { formatDuration, formatUSD } from '@/lib/utils/format'
 import type { StatsCache } from '@/lib/parsers/types'
-import { tokenBreakdown, type TokenBreakdown } from './token-breakdown'
+import { tokenBreakdown } from './token-breakdown'
+import { TokenCard } from './TokenCard'
 
 interface StatsOverviewProps {
   stats: StatsCache | null | undefined
@@ -142,50 +143,6 @@ function StatCard({
       <p className="text-xs text-gray-400">{label}</p>
       <p className="mt-1 text-xl font-bold text-gray-100">{value}</p>
       {sub && <p className="mt-0.5 text-xs text-gray-500">{sub}</p>}
-    </div>
-  )
-}
-
-/**
- * Every token processed: the prompt (new input plus what was read from or written to the cache),
- * the answer, and the reasoning the model did before answering. The three add up to the total.
- */
-function TokenCard({ breakdown }: { breakdown: TokenBreakdown }) {
-  return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
-      <p className="text-xs text-gray-400">Total Tokens</p>
-      <p className="mt-1 text-xl font-bold text-gray-100">{formatTokenCount(breakdown.total)}</p>
-      <dl className="mt-2 space-y-0.5 text-xs text-gray-500">
-        <TokenRow label="Input (prompt)" value={breakdown.input} />
-        <TokenRow label="new" value={breakdown.uncachedInput} indent />
-        <TokenRow label="cache read" value={breakdown.cacheRead} indent />
-        <TokenRow label="cache write" value={breakdown.cacheWrite} indent />
-        <TokenRow label="Output (answer)" value={breakdown.output} />
-        <TokenRow
-          label="Reasoning"
-          value={breakdown.reasoning}
-          title="Internal reasoning before the answer. Billed as output. Read from session transcripts."
-        />
-      </dl>
-    </div>
-  )
-}
-
-function TokenRow({
-  label,
-  value,
-  indent,
-  title,
-}: {
-  label: string
-  value: number
-  indent?: boolean
-  title?: string
-}) {
-  return (
-    <div className={`flex justify-between gap-2 ${indent ? 'pl-3 text-gray-600' : ''}`} title={title}>
-      <dt>{label}</dt>
-      <dd className="font-mono text-gray-300">{formatTokenCount(value)}</dd>
     </div>
   )
 }

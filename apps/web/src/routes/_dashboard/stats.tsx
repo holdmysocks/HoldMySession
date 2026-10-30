@@ -144,7 +144,7 @@ function StatsPage() {
                 >
                   {projects.map((p) => (
                     <option key={p.projectPath} value={p.projectPath}>
-                      {p.isUnlinked ? p.projectName : anonymizeProjectName(p.projectName)} ({p.totalSessions})
+                      {p.isUnlinked ? p.displayName : anonymizeProjectName(p.displayName)} ({p.totalSessions})
                     </option>
                   ))}
                 </select>

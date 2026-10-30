@@ -21,7 +21,8 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   const projectsQuery = useQuery(mapProjectsQuery)
   const projects = projectsQuery.data ?? []
 
-  const selectedKey = project || projects[0]?.projectKey || ''
+  // A project in the URL that is not in the dropdown (a scratch folder, or one that is gone) shows the first one.
+  const selectedKey = projects.some((p) => p.projectKey === project) ? project! : (projects[0]?.projectKey ?? '')
   const selectedProject = projects.find((p) => p.projectKey === selectedKey) ?? null
   const mapQuery = useQuery(projectMapQuery(selectedKey))
   const eventsQuery = useQuery(hookEventsQuery)

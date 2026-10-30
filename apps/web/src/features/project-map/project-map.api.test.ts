@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SessionSummary } from '@/lib/parsers/types'
 import {
+  dropdownSessions,
   groupMapProjects,
   orderByActivity,
   resolveSessionDetail,
@@ -202,5 +203,23 @@ describe('resolveSessionDetail', () => {
     await resolveSessionDetail(cache, { filePath: '/x.jsonl', isActive: false }, 150, load)
 
     expect(load).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('dropdownSessions', () => {
+  it('leaves out scratch folders, whatever follows the word, and sessions with no working directory', () => {
+    const real = session({ projectKey: 'real', projectName: 'real', projectPath: '/work/real', cwd: '/work/real' })
+    const sessions = [
+      real,
+      session({ projectKey: 'a', projectName: 'scratch', projectPath: '/a/scratch', cwd: '/a/scratch' }),
+      session({ projectKey: 'b', projectName: 'scratch-1a2b3c', projectPath: '/b/scratch-1a2b3c', cwd: '/b/scratch-1a2b3c' }),
+      session({ projectKey: 'c', projectName: 'dir', projectPath: 'dir', cwd: null }),
+    ]
+    expect(dropdownSessions(sessions)).toEqual([real])
+    expect(groupMapProjects(dropdownSessions(sessions)).map((p) => p.projectKey)).toEqual(['real'])
+  })
+
+  it('also leaves out archived sessions, as before', () => {
+    expect(dropdownSessions([session({ isArchived: true })])).toEqual([])
   })
 })

@@ -41,7 +41,7 @@ The dashboard reads the Claude config directory on Windows, which is `%USERPROFI
 
 - **The map fills the page.** On the Map page the content is not held to a narrow column. The map panel takes the width the window gives it, minus the side panels, and about the height of the window. **Hide panels** gives the map the full width. Nothing scrolls sideways.
 - **Pan and zoom.** Drag empty space to pan, in any direction. The wheel zooms around the pointer, and a pinch gesture on a trackpad does too. The corner buttons zoom in and out and show the zoom level. **Fit** shows the whole map. When the page opens, the map is fitted to the panel, but never smaller than 50%, so the text stays readable. The view follows the panel size until you first pan or zoom.
-- **Links join the closest sides.** A link runs from the middle of one card's side to the middle of the facing side of the other card, and follows the cards when they move. A card below its parent links bottom to top. Only sides the other card is really beyond are used, so a link never doubles back over a card. Where several pairs qualify, the shortest wins.
+- **Links join the middle of facing sides.** A link runs from the middle of one card's side to the middle of the facing side of the other card, and follows the cards when they move. A card below links bottom to top and a card above links top to bottom, however far it sits to the side, so a branch hangs from its parent. Only a card level with the other one links side to side. Only sides the other card is really beyond are used, so a link never doubles back over a card.
 - **Edit layout.** The **Edit layout** button turns on the editor. Drag a card to move it anywhere. Dragging empty space still pans, and a focused card moves 10 units per arrow key. Edges follow the cards. Outside the editor, dragging a card pans the map, and a click still selects it.
 - **The layout is saved on the server**, per project, in `~/.claude-dashboard/map-layouts.json`, next to `settings.json`. Anyone who opens the dashboard from another device sees the same arrangement. Moves show at once and are saved about half a second after the last one. A failed save is kept and retried, and a notice shows meanwhile. The last save wins if two devices edit at the same time. Nothing is written to `~/.claude`, so the map stays read-only. Positions saved in a browser by an earlier version are not used.
 - **The first move saves where every card is**, so the arrangement stays put. After that:
@@ -56,7 +56,7 @@ A session has a project when its transcript records a working directory (`cwd`) 
 
 - the map, including its subagents,
 - the Sessions list: the page, the totals, the Active filter count and the sidebar badge,
-- the project dropdown on the map, so a directory that holds only such sessions does not appear.
+- the project dropdown on the map, so a directory that holds only such sessions does not appear. The dropdown also leaves out projects in a folder whose name starts with `scratch`, which Stats groups as Unlinked Sessions.
 
 The map info line and the Sessions page each show the count, as **N hidden (no project)**. The rule is one pure function, `src/lib/map/session-visibility.ts`.
 
@@ -279,4 +279,4 @@ Fixes for problems a Windows user reported with real data.
 
 - **Branches grow downward.** The automatic layout is now rows instead of columns: top-level sessions side by side, forks and subagents below.
 - **Layouts are saved on the server** in `~/.claude-dashboard/map-layouts.json`, not in the browser. New top-level sessions go to the right, and new subagents and forks land at their normal position. Code: `src/lib/map/layout-store.ts`, `src/features/project-map/use-map-layout.ts`, `applyCustomPositions` in `src/lib/map/layout.ts`.
-- **Links join the middle of the closest sides** of the two cards, and follow them when moved.
+- **Links join the middle of facing sides** of the two cards, bottom to top for a card below, and follow them when moved.

@@ -8,7 +8,10 @@ import type { SessionSummary, StatsCache } from '@/lib/parsers/types'
 export interface ProjectAnalytics {
   /** The project's path, or UNLINKED_PROJECT_KEY for the group of unlinked sessions. */
   projectPath: string
+  /** The project's folder name. The Sessions list filters on it. */
   projectName: string
+  /** What to show: package.json name, git repo name, or the folder name. "Unlinked Sessions" for the group. */
+  displayName: string
   /** True for the one entry that groups sessions with no project (and scratch folders). */
   isUnlinked: boolean
   totalSessions: number
@@ -53,6 +56,9 @@ export function aggregateProjectAnalytics(
       projectName: isUnlinked
         ? UNLINKED_PROJECT_NAME
         : (firstSession.projectName ?? projectPath.split('/').pop() ?? 'Unknown'),
+      displayName: isUnlinked
+        ? UNLINKED_PROJECT_NAME
+        : (firstSession.projectDisplayName || firstSession.projectName || projectPath.split('/').pop() || 'Unknown'),
       totalSessions: sessions.length,
       activeSessions: sessions.filter((s) => s.isActive).length,
       totalMessages: sessions.reduce((sum, s) => sum + s.messageCount, 0),

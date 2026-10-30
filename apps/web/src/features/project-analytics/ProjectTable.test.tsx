@@ -14,6 +14,7 @@ function project(overrides: Partial<ProjectAnalytics>): ProjectAnalytics {
     projectPath: '/work/app',
     isUnlinked: false,
     projectName: 'app',
+    displayName: 'app',
     totalSessions: 2,
     activeSessions: 0,
     totalMessages: 10,
@@ -39,13 +40,14 @@ describe('ProjectTable unlinked group', () => {
     projectPath: '__unlinked__',
     isUnlinked: true,
     projectName: 'Unlinked Sessions',
+    displayName: 'Unlinked Sessions',
     totalSessions: 47,
     lastSessionAt: '2026-02-01T10:00:00Z',
   })
   const projects = [
     unlinked,
-    project({ projectPath: '/work/a', projectName: 'alpha' }),
-    project({ projectPath: '/work/b', projectName: 'beta', lastSessionAt: '2026-01-01T10:00:00Z' }),
+    project({ projectPath: '/work/a', projectName: 'alpha', displayName: 'alpha' }),
+    project({ projectPath: '/work/b', projectName: 'beta', displayName: 'beta', lastSessionAt: '2026-01-01T10:00:00Z' }),
   ]
 
   it('keeps the unlinked row last, whichever way the table is sorted', () => {
@@ -65,5 +67,13 @@ describe('ProjectTable unlinked group', () => {
     renderTable([{ ...unlinked, totalSessions: 1 }])
     expect(screen.getByText('1 session')).toBeTruthy()
     expect(screen.queryByRole('link')).toBeNull()
+  })
+})
+
+describe('ProjectTable names', () => {
+  it('shows the display name, not the folder name', () => {
+    renderTable([project({ projectName: 'my-folder-7f3a', displayName: 'People Traffic' })])
+    expect(screen.getByText('People Traffic')).toBeTruthy()
+    expect(screen.queryByText('my-folder-7f3a')).toBeNull()
   })
 })

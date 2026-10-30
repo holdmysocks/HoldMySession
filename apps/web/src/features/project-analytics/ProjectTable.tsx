@@ -4,7 +4,7 @@ import { formatDuration, formatRelativeTime, formatTokenCount } from '@/lib/util
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import type { ProjectAnalytics } from './project-analytics.api'
 
-type SortField = 'projectName' | 'totalSessions' | 'totalMessages' | 'outputTokens' | 'totalDurationMs' | 'lastSessionAt'
+type SortField = 'displayName' | 'totalSessions' | 'totalMessages' | 'outputTokens' | 'totalDurationMs' | 'lastSessionAt'
 type SortDir = 'asc' | 'desc'
 
 interface ProjectTableProps {
@@ -12,7 +12,7 @@ interface ProjectTableProps {
 }
 
 const COLUMNS: { key: SortField; label: string; align?: 'right' }[] = [
-  { key: 'projectName', label: 'Project' },
+  { key: 'displayName', label: 'Project' },
   { key: 'totalSessions', label: 'Sessions', align: 'right' },
   { key: 'totalMessages', label: 'Messages', align: 'right' },
   { key: 'outputTokens', label: 'Output Tokens', align: 'right' },
@@ -30,8 +30,8 @@ export function ProjectTable({ projects }: ProjectTableProps) {
     copy.sort((a, b) => {
       let cmp = 0
       switch (sortField) {
-        case 'projectName':
-          cmp = a.projectName.localeCompare(b.projectName)
+        case 'displayName':
+          cmp = a.displayName.localeCompare(b.displayName)
           break
         case 'totalSessions':
           cmp = a.totalSessions - b.totalSessions
@@ -102,7 +102,7 @@ export function ProjectTable({ projects }: ProjectTableProps) {
               <td className="px-4 py-3">
                 {project.isUnlinked ? (
                   <>
-                    <span className="text-sm text-gray-200">{project.projectName}</span>
+                    <span className="text-sm text-gray-200">{project.displayName}</span>
                     <span
                       title="Sessions with no project, grouped into one row"
                       className="ml-2 rounded-full bg-gray-700/60 px-1.5 py-0.5 text-[10px] font-medium text-gray-300"
@@ -116,7 +116,7 @@ export function ProjectTable({ projects }: ProjectTableProps) {
                     search={{ project: project.projectName }}
                     className="text-sm text-brand-500 hover:underline"
                   >
-                    {anonymizeProjectName(project.projectName)}
+                    {anonymizeProjectName(project.displayName)}
                   </Link>
                 )}
                 {project.activeSessions > 0 && (

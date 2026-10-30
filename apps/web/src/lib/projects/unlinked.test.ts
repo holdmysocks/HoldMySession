@@ -13,14 +13,17 @@ describe('isUnlinkedSession', () => {
     expect(isUnlinkedSession({ ...linked, cwd: '   ' })).toBe(true)
   })
 
-  it('is true for a scratch folder, whatever its case, by folder or display name', () => {
+  it('is true for a folder starting with scratch, whatever its case, by folder or display name', () => {
     expect(isUnlinkedSession({ ...linked, projectName: 'scratch' })).toBe(true)
     expect(isUnlinkedSession({ ...linked, projectName: 'Scratch' })).toBe(true)
+    expect(isUnlinkedSession({ ...linked, projectName: 'scratch-1a2b3c' })).toBe(true)
+    expect(isUnlinkedSession({ ...linked, projectName: 'scratchpad' })).toBe(true)
     expect(isUnlinkedSession({ ...linked, projectDisplayName: ' SCRATCH ' })).toBe(true)
   })
 
-  it('is false for a project that only contains the word', () => {
-    expect(isUnlinkedSession({ ...linked, projectName: 'scratchpad-app' })).toBe(false)
+  it('is false for a project that only contains the word, not at the start', () => {
+    expect(isUnlinkedSession({ ...linked, projectName: 'my-scratch-app' })).toBe(false)
+    expect(isUnlinkedSession({ ...linked, projectName: 'app', projectDisplayName: 'Not Scratch' })).toBe(false)
   })
 })
 
