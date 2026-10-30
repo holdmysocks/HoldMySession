@@ -1,4 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
+import { z } from 'zod'
+import type { PriceEntry } from '@/lib/pricing/price-timeline'
+import type { HistoryCost } from '@/lib/history/history-cost'
 
 export interface HistoryStatus {
   path: string
@@ -71,3 +74,68 @@ export const rescanHistory = createServerFn({ method: 'POST' }).handler(async ()
   const { runHistoryScan } = await import('@/lib/history/scan')
   return runHistoryScan()
 })
+
+const newEntrySchema = z.object({
+  modelId: z.string().min(1),
+  kind: z.enum(['from', 'window']),
+  startDay: z.string(),
+  endDay: z.string().nullable(),
+  inputPerMTok: z.number(),
+  outputPerMTok: z.number(),
+  cacheReadPerMTok: z.number(),
+  cacheWritePerMTok: z.number(),
+  note: z.string().max(200).nullable(),
+})
+
+export const getPriceEntries = createServerFn({ method: 'GET' }).handler(async (): Promise<PriceEntry[]> => {
+  const { openHistoryDb } = await import('@/lib/history/history-db')
+  const { listPriceEntries } = await import('@/lib/history/price-store')
+  const db = openHistoryDb()
+  try {
+    return listPriceEntries(db)
+  } finally {
+    db.close()
+  }
+})
+
+export const createPriceEntry = createServerFn({ method: 'POST' })
+  .inputValidator((input: unknown) => newEntrySchema.parse(input))
+  .handler(async ({ data }): Promise<PriceEntry> => {
+    const { openHistoryDb } = await import('@/lib/history/history-db')
+    const { addPriceEntry } = await import('@/lib/history/price-store')
+    const db = openHistoryDb()
+    try {
+      return addPriceEntry(db, data)
+    } finally {
+      db.close()
+    }
+  })
+
+export const removePriceEntry = createServerFn({ method: 'POST' })
+  .inputValidator((input: unknown) => z.object({ id: z.number().int() }).parse(input))
+  .handler(async ({ data }): Promise<boolean> => {
+    const { openHistoryDb } = await import('@/lib/history/history-db')
+    const { deletePriceEntry } = await import('@/lib/history/price-store')
+    const db = openHistoryDb()
+    try {
+      return deletePriceEntry(db, data.id)
+    } finally {
+      db.close()
+    }
+  })
+
+/** Estimated cost with each day priced as it was that day. Null if the history cannot be used yet. */
+export const getHistoryCost = createServerFn({ method: 'GET' })
+  .inputValidator((input: unknown) => z.object({ projectPath: z.string().optional() }).parse(input))
+  .handler(async ({ data }): Promise<HistoryCost | null> => {
+    const { openHistoryDb } = await import('@/lib/history/history-db')
+    const { historyCost } = await import('@/lib/history/history-cost')
+    const { getSettings } = await import('@/features/settings/settings.api')
+    const { getMergedPricing } = await import('@/features/cost-estimation/cost-calculator')
+    const db = openHistoryDb()
+    try {
+      return historyCost(db, getMergedPricing(await getSettings()), { projectPath: data.projectPath })
+    } finally {
+      db.close()
+    }
+  })

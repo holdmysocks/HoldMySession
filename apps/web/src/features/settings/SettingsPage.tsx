@@ -12,6 +12,7 @@ import { PricingTableEditor } from './PricingTableEditor'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { useTheme } from '@/features/theme/ThemeProvider'
 import { HistoryPanel } from '@/features/history/HistoryPanel'
+import { PriceHistoryPanel } from '@/features/history/PriceHistoryPanel'
 
 export function SettingsPage() {
   const { data: settings, isLoading } = useQuery(settingsQuery)
@@ -199,6 +200,8 @@ function SettingsForm({ settings }: { settings: Settings }) {
           />
         </div>
       </div>
+
+      <PriceHistoryPanel />
 
       {/* Actions */}
       <div className="mt-6 flex items-center justify-between">

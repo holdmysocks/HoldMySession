@@ -35,6 +35,12 @@ Migration 3 added the working folder and folder name to `sessions`, which the pr
 
 **Check against session files** in Settings, under History database, rescans and shows the totals from the files next to the totals from the database, row by row, for sessions, messages, every token kind and each model.
 
+## Dated pricing
+
+A model's base price is the built-in one with the user's override from Settings. On top of it sit dated entries in the `price_entries` table, each for one model and either **from a day onward** or **a window of days**, with an optional note. To price a day, the entries are replayed in the order they were made and the latest one covering the day wins, so a later entry overwrites an earlier one wherever they overlap (`src/lib/pricing/price-timeline.ts`). For example: $1, then $2 from day 12, then $3 from day 6 gives $1 for days 1 to 5 and $3 from day 6 on. A window changes only its own days.
+
+Cost is worked out when read, from the stored tokens and the price in force on each day (`src/lib/history/history-cost.ts`), so a backdated entry or a deleted one changes the past immediately and nothing needs recalculating. Stats' Estimated Cost, overall and per project, uses it, and falls back to today's prices if the history cannot be used. A session's own cost on its detail page still uses today's prices. Settings has a Price history panel to see a model's price over time, add entries and delete them.
+
 ## Planned
 
 Build order from here. Each step is its own commit.
@@ -42,7 +48,7 @@ Build order from here. Each step is its own commit.
 1. **Data folder rename (done).** Move the dashboard's own data from `~/.claude-dashboard` to `~/.holdmysession`. One function decides the folder, and the settings, map layouts, cache, hook log and history database all use it. `HOLDMYSESSION_DIR` overrides it, and the older `CLAUDE_DASHBOARD_DIR` and `CLAUDE_DASHBOARD_HOME` still work. On first start the old folder is copied across, not moved, and left in place. The hook script uses the same rule, so notifications keep working.
 2. **Keys that include the machine (done).** A migration makes `machine_id` part of the keys of `sessions` and `usage_daily`, so rows from two machines can never collide. Done before anything else is stored, while there is only one machine's data.
 3. **Stats read from the database (done).** See below.
-4. **Dated pricing.** An append-only list of price entries per model, each either "from date D onward" or "window D1 to D2". To price a day, replay the entries in the order they were made, each painting its range over the ones before. A note can be attached to an entry.
+4. **Dated pricing (done).** See below.
 5. **Subscription history.** Tier, monthly price and start date as dated rows (Pro $20, then Max 20x $200 from October 10 as the first test case), the savings against API cost, a monthly view, and a second number on the cost card.
 6. **Automatic scan.** On or off, every 5, 10, 15, 30 min, or 1, 2, 6, 12, 24 h, run by a server-side timer so it works with no tab open.
 7. **Backup and restore** of the database from Settings.

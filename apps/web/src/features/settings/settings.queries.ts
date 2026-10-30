@@ -17,6 +17,8 @@ export function useSettingsMutation() {
       saveSettings({ data: settings }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] })
+      // Overridden prices change what the history costs.
+      queryClient.invalidateQueries({ queryKey: ['history-cost'] })
     },
   })
 }

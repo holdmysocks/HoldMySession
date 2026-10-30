@@ -123,6 +123,24 @@ const MIGRATIONS: string[] = [
   ALTER TABLE sessions ADD COLUMN cwd TEXT;
   ALTER TABLE sessions ADD COLUMN project_name TEXT;
   `,
+  // 4: dated price entries. The built-in and overridden prices are the base; these sit on top of them.
+  `
+  CREATE TABLE price_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    model_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('from', 'window')),
+    start_day TEXT NOT NULL,
+    end_day TEXT,
+    input_per_mtok REAL NOT NULL,
+    output_per_mtok REAL NOT NULL,
+    cache_read_per_mtok REAL NOT NULL,
+    cache_write_per_mtok REAL NOT NULL,
+    note TEXT,
+    created_at TEXT NOT NULL,
+    CHECK ((kind = 'from' AND end_day IS NULL) OR (kind = 'window' AND end_day IS NOT NULL AND end_day >= start_day))
+  );
+  CREATE INDEX price_entries_model ON price_entries (model_id);
+  `,
 ]
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length

@@ -20,6 +20,7 @@ import {
 } from '@/lib/utils/export-utils'
 import { ExportDropdown } from '@/components/ExportDropdown'
 import { useSessionCost } from '@/features/cost-estimation/useSessionCost'
+import { historyCostQuery } from '@/features/history/price-history.queries'
 import type { StatsCache } from '@/lib/parsers/types'
 
 const statsSearchSchema = z.object({
@@ -70,7 +71,10 @@ function StatsPage() {
   // Convert stats.modelUsage to Record<string, TokenUsage> for cost calculation
   // All hooks must be called before any early returns
   const tokensByModel = useMemo(() => tokensByModelOf(stats), [stats])
-  const { cost } = useSessionCost(tokensByModel)
+  const { cost: sessionCost } = useSessionCost(tokensByModel)
+  // Priced day by day from the history database when it can be, else all at today's prices.
+  const { data: datedCost } = useQuery(historyCostQuery())
+  const cost = datedCost ?? sessionCost
 
   // Projects the by-project tab can show: real projects first, the unlinked group last.
   const projects = useMemo(() => {
@@ -86,7 +90,10 @@ function StatsPage() {
   )
   const projectStats = projectStatsResult.data
   const projectTokens = useMemo(() => tokensByModelOf(projectStats), [projectStats])
-  const { cost: projectCost } = useSessionCost(projectTokens)
+  const { cost: projectSessionCost } = useSessionCost(projectTokens)
+  const projectPathForCost = selectedProject?.projectPath
+  const { data: projectDatedCost } = useQuery(historyCostQuery(projectPathForCost, tab === 'by-project' && !!projectPathForCost))
+  const projectCost = projectDatedCost ?? projectSessionCost
 
   const exportable = tab === 'overview' ? stats : tab === 'by-project' ? projectStats : null
 

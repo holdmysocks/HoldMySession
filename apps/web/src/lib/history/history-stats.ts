@@ -16,7 +16,13 @@ export interface HistoryStatsOptions {
  * Null when there is nothing to show, or when sessions were stored before the project columns
  * existed and have not been rescanned yet, so the caller can fall back to the live files.
  */
-export function statsFromHistory(db: Db, options: HistoryStatsOptions = {}): StatsCache | null {
+export type SessionRow = Record<string, unknown>
+
+/**
+ * The stored sessions an options object selects. Null when some were stored before the project
+ * columns existed (they need a rescan), and an empty list when none match.
+ */
+export function selectSessions(db: Db, options: HistoryStatsOptions = {}): SessionRow[] | null {
   const sessions = db
     .prepare(
       `SELECT machine_id, session_key, session_id, project_path, project_display_name, project_name, cwd,
@@ -28,7 +34,7 @@ export function statsFromHistory(db: Db, options: HistoryStatsOptions = {}): Sta
 
   if (sessions.some((row) => row.cwd === null)) return null
 
-  const chosen = sessions.filter(
+  return sessions.filter(
     (row) =>
       !options.projectPath ||
       projectGroupKey({
@@ -38,7 +44,11 @@ export function statsFromHistory(db: Db, options: HistoryStatsOptions = {}): Sta
         projectPath: String(row.project_path),
       }) === options.projectPath,
   )
-  if (chosen.length === 0) return null
+}
+
+export function statsFromHistory(db: Db, options: HistoryStatsOptions = {}): StatsCache | null {
+  const chosen = selectSessions(db, options)
+  if (!chosen || chosen.length === 0) return null
 
   const keys = new Set(chosen.map((row) => `${row.machine_id}\u0000${row.session_key}`))
 
