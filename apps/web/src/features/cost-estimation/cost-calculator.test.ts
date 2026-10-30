@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { calculateSessionCost, getMergedPricing } from './cost-calculator'
-import { DEFAULT_PRICING, DEFAULT_SETTINGS } from '@/features/settings/settings.types'
+import { DEFAULT_PRICING, RETIRED_PRICING, DEFAULT_SETTINGS } from '@/features/settings/settings.types'
 import type { TokenUsage } from '@/lib/parsers/types'
 import type { Settings } from '@/features/settings/settings.types'
 
@@ -195,7 +195,7 @@ describe('getMergedPricing', () => {
     const settings: Settings = DEFAULT_SETTINGS
     const result = getMergedPricing(settings)
 
-    expect(Object.keys(result).length).toBe(DEFAULT_PRICING.length)
+    expect(Object.keys(result).length).toBe(DEFAULT_PRICING.length + RETIRED_PRICING.length)
     expect(result['claude-sonnet-4']).toEqual({
       modelId: 'claude-sonnet-4',
       displayName: 'Claude Sonnet 4',
@@ -246,7 +246,7 @@ describe('getMergedPricing', () => {
 
   it('handles full overrides for all models', () => {
     const overrides: Settings['pricingOverrides'] = {}
-    for (const model of DEFAULT_PRICING) {
+    for (const model of [...DEFAULT_PRICING, ...RETIRED_PRICING]) {
       overrides[model.modelId] = {
         inputPerMTok: 10.0,
         outputPerMTok: 50.0,
@@ -330,5 +330,15 @@ describe('Claude 5 model pricing', () => {
     const ids = DEFAULT_PRICING.map((m) => m.modelId)
     expect(new Set(ids).size).toBe(ids.length)
     for (const [modelId] of expected) expect(ids).toContain(modelId)
+  })
+
+  it('does not offer retired models in Settings, but still prices them for old sessions', () => {
+    const offered = DEFAULT_PRICING.map((m) => m.modelId)
+    const retired = RETIRED_PRICING.map((m) => m.modelId)
+    expect(retired).toEqual(
+      expect.arrayContaining(['claude-opus-4-1', 'claude-opus-4', 'claude-sonnet-4', 'claude-haiku-3-5', 'claude-haiku-3']),
+    )
+    for (const id of retired) expect(offered).not.toContain(id)
+    expect(offered).toEqual(expect.arrayContaining(['claude-opus-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5']))
   })
 })

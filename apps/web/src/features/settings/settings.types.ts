@@ -116,6 +116,30 @@ export const DEFAULT_PRICING: ModelPricing[] = [
     cacheWritePerMTok: 6.25,
   },
   {
+    modelId: 'claude-sonnet-4-5',
+    displayName: 'Claude Sonnet 4.5',
+    inputPerMTok: 3.0,
+    outputPerMTok: 15.0,
+    cacheReadPerMTok: 0.3,
+    cacheWritePerMTok: 3.75,
+  },
+  {
+    modelId: 'claude-haiku-4-5',
+    displayName: 'Claude Haiku 4.5',
+    inputPerMTok: 1.0,
+    outputPerMTok: 5.0,
+    cacheReadPerMTok: 0.1,
+    cacheWritePerMTok: 1.25,
+  },
+]
+
+/**
+ * Models Anthropic has retired (see the model deprecations page). They are not offered in Settings, but old
+ * sessions still name them, so their prices stay in the cost table, and the fallback for an unknown model
+ * is one of them.
+ */
+export const RETIRED_PRICING: ModelPricing[] = [
+  {
     modelId: 'claude-opus-4-1',
     displayName: 'Claude Opus 4.1',
     inputPerMTok: 15.0,
@@ -132,28 +156,12 @@ export const DEFAULT_PRICING: ModelPricing[] = [
     cacheWritePerMTok: 18.75,
   },
   {
-    modelId: 'claude-sonnet-4-5',
-    displayName: 'Claude Sonnet 4.5',
-    inputPerMTok: 3.0,
-    outputPerMTok: 15.0,
-    cacheReadPerMTok: 0.3,
-    cacheWritePerMTok: 3.75,
-  },
-  {
     modelId: 'claude-sonnet-4',
     displayName: 'Claude Sonnet 4',
     inputPerMTok: 3.0,
     outputPerMTok: 15.0,
     cacheReadPerMTok: 0.3,
     cacheWritePerMTok: 3.75,
-  },
-  {
-    modelId: 'claude-haiku-4-5',
-    displayName: 'Claude Haiku 4.5',
-    inputPerMTok: 1.0,
-    outputPerMTok: 5.0,
-    cacheReadPerMTok: 0.1,
-    cacheWritePerMTok: 1.25,
   },
   {
     modelId: 'claude-haiku-3-5',

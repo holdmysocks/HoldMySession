@@ -1,13 +1,13 @@
 import type { TokenUsage } from '@/lib/parsers/types'
 import type { ModelPricing, Settings } from '@/features/settings/settings.types'
-import { DEFAULT_PRICING, normalizeModelId } from '@/features/settings/settings.types'
+import { DEFAULT_PRICING, RETIRED_PRICING, normalizeModelId } from '@/features/settings/settings.types'
 import type { CostBreakdown, ModelCostBreakdown, CategoryCosts } from './cost-estimation.types'
 
 /** Build a complete pricing lookup from defaults + user overrides. */
 export function getMergedPricing(settings: Settings): Record<string, ModelPricing> {
   const table: Record<string, ModelPricing> = {}
 
-  for (const model of DEFAULT_PRICING) {
+  for (const model of [...DEFAULT_PRICING, ...RETIRED_PRICING]) {
     const override = settings.pricingOverrides[model.modelId]
     table[model.modelId] = override
       ? { ...model, ...override }
