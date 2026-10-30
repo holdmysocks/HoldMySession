@@ -58,6 +58,7 @@ export function CostEstimationPanel({ tokensByModel }: CostEstimationPanelProps)
         </p>
         <Link
           to="/settings"
+          search={{ tab: 'pricing' }}
           className="text-[10px] text-gray-500 hover:text-gray-300"
         >
           Configure pricing

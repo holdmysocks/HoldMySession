@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import type { SessionSummary } from '@/lib/parsers/types'
 import {
   dropdownSessions,
+  filterMapProjects,
+  mapProjectValue,
   groupMapProjects,
   orderByActivity,
   resolveSessionDetail,
@@ -221,5 +223,28 @@ describe('dropdownSessions', () => {
 
   it('also leaves out archived sessions, as before', () => {
     expect(dropdownSessions([session({ isArchived: true })])).toEqual([])
+  })
+})
+
+describe('filterMapProjects', () => {
+  const prefs = (over = {}) => ({ scratch: 'group' as const, scratchByName: false, hidden: [], ...over })
+  const proj = (over = {}) => ({ projectKey: 'a', projectPath: '/w/a', projectDisplayName: 'a', sessionCount: 1, activeCount: 0, lastActiveAt: '', ...over })
+
+  it('lists scratch folders only when they are listed as they are', () => {
+    const list = [proj(), proj({ projectKey: 's', projectPath: '/t/scratch', unlinked: true })]
+    expect(filterMapProjects(list, prefs(), 'me')).toHaveLength(1)
+    expect(filterMapProjects(list, prefs({ scratch: 'hide' }), 'me')).toHaveLength(1)
+    expect(filterMapProjects(list, prefs({ scratch: 'show' }), 'me')).toHaveLength(2)
+  })
+
+  it('hides a project on one machine and keeps the same path on another', () => {
+    const list = [proj(), proj({ machineId: 'node1' })]
+    const hidden = [{ machineId: 'node1', projectPath: '/w/a' }]
+    expect(filterMapProjects(list, prefs({ hidden }), 'me')).toEqual([list[0]])
+  })
+
+  it('puts the machine in front of a remote project\'s value', () => {
+    expect(mapProjectValue({ projectKey: 'a' })).toBe('a')
+    expect(mapProjectValue({ projectKey: 'a', machineId: 'n1' })).toBe('n1~a')
   })
 })

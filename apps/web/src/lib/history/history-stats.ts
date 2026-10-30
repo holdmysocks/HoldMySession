@@ -37,6 +37,7 @@ export function selectSessions(db: Db, options: HistoryStatsOptions = {}): Sessi
   return sessions.filter(
     (row) =>
       !options.projectPath ||
+      String(row.project_path) === options.projectPath ||
       projectGroupKey({
         cwd: String(row.cwd),
         projectName: String(row.project_name ?? ''),

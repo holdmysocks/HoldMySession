@@ -4,6 +4,9 @@ import { scanAllSessions, scanAllSessionsWithPaths, getActiveSessions } from '@/
 import type { SessionSummary } from '@/lib/parsers/types'
 import { findPendingQuestions } from '@/lib/map/pending-requests'
 import { filterArchivedSessions, filterHiddenSessions, filterVisibleSessions } from '@/lib/map/session-visibility'
+import { dropdownKey, labelScratch, visibleInLists } from '@/lib/projects/project-prefs'
+import { UNLINKED_PROJECT_KEY, UNLINKED_PROJECT_NAME } from '@/lib/projects/unlinked'
+import type { ScratchMode } from '@/features/settings/settings.types'
 import { latestNotificationBySession, readRecentEvents } from '@/lib/events/event-inbox'
 
 export const getSessionList = createServerFn({ method: 'GET' }).handler(
@@ -66,13 +69,16 @@ export interface PaginatedSessionsResult<T extends SessionSummary = SessionSumma
 export async function paginateAndFilterSessions<T extends SessionSummary>(
   allSessions: T[],
   input: PaginatedSessionsInput,
+  /** With 'group', scratch sessions are one "Unlinked Sessions" entry in the project filter. */
+  scratch: ScratchMode = 'show',
 ): Promise<PaginatedSessionsResult<T>> {
   const { page, pageSize, search, status, project, sort = 'lastActive', sortDir = 'desc' } = input
 
   // Distinct projects from the full unfiltered set, labelled by display name
   const projectLabels = new Map<string, string>()
   for (const s of allSessions) {
-    if (!projectLabels.has(s.projectName)) projectLabels.set(s.projectName, s.projectDisplayName)
+    const key = dropdownKey(s, scratch)
+    if (!projectLabels.has(key)) projectLabels.set(key, key === UNLINKED_PROJECT_KEY ? UNLINKED_PROJECT_NAME : s.projectDisplayName)
   }
   const projects = Array.from(projectLabels, ([name, displayName]) => ({ name, displayName })).sort(
     (a, b) => a.displayName.localeCompare(b.displayName) || a.name.localeCompare(b.name),
@@ -104,7 +110,7 @@ export async function paginateAndFilterSessions<T extends SessionSummary>(
 
   // Project filter: exact match
   if (project) {
-    filtered = filtered.filter((s) => s.projectName === project)
+    filtered = filtered.filter((s) => dropdownKey(s, scratch) === project)
   }
 
   // Sort after filtering
@@ -167,10 +173,16 @@ export const getPaginatedSessions = createServerFn({ method: 'GET' })
       l.items.map((item) => ({ ...item, filePath: '' as const, machineId: l.machine.id, machineName: l.machine.name })),
     )
     const all = [...(view.includeSelf ? await scanAllSessionsWithPaths() : []), ...view.remote, ...liveRemote]
-    const allSessions = filterVisibleSessions(all)
+    // The Projects settings shape the list and the dropdown only. Totals elsewhere still count every session.
+    const { readProjectPrefs } = await import('@/lib/projects/prefs-server')
+    const { prefs, selfId } = readProjectPrefs()
+    const allSessions = labelScratch(
+      visibleInLists(filterVisibleSessions(all), prefs, (s) => (s as { machineId?: string }).machineId ?? selfId),
+      prefs,
+    )
     const hiddenNoProjectCount = filterHiddenSessions(all).length + view.live.reduce((n, l) => n + l.hiddenNoProjectCount, 0)
     const hiddenArchivedCount = filterArchivedSessions(all).length + view.live.reduce((n, l) => n + l.hiddenArchivedCount, 0)
-    const page = await paginateAndFilterSessions(allSessions, data)
+    const page = await paginateAndFilterSessions(allSessions, data, prefs.scratch)
 
     // Signals are computed for the page only. The file scan for open questions runs for active sessions.
     const notifications = latestNotificationBySession(await readRecentEvents())

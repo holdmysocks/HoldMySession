@@ -748,3 +748,27 @@ describe('project labels and session names in the list', () => {
     expect(byDisplay.sessions.map((s) => s.sessionId)).toEqual(['aaaaaaaa-0000'])
   })
 })
+
+describe('paginateAndFilterSessions with grouped scratch sessions', () => {
+  const mk = (id: string, name: string, cwd: string | null) =>
+    ({
+      sessionId: id, projectPath: cwd ?? '', projectKey: name, forkedFrom: null, projectName: name, projectDisplayName: name, cwd,
+      branch: null, startedAt: '2026-01-01T10:00:00.000Z', lastActiveAt: '2026-01-01T11:00:00.000Z', durationMs: 1, messageCount: 1,
+      userMessageCount: 1, assistantMessageCount: 0, isActive: false, toolCallCount: 0, model: null, version: null, fileSizeBytes: 0,
+      outputTokens: 0, sessionName: null, lastStopReason: null,
+    }) as SessionSummary
+  const input = { page: 1, pageSize: 50, search: '', status: 'all' as const, project: '', sort: 'lastActive' as const, sortDir: 'desc' as const }
+
+  it('offers one Unlinked Sessions entry and filters on it', async () => {
+    const all = [mk('1', 'app', '/w/app'), mk('2', 'scratch-aa', '/t/scratch-aa'), mk('3', 'scratch-bb', '/t/scratch-bb')]
+    const result = await paginateAndFilterSessions(all, input, 'group')
+    expect(result.projects.map((p) => p.displayName)).toEqual(['app', 'Unlinked Sessions'])
+    const only = await paginateAndFilterSessions(all, { ...input, project: '__unlinked__' }, 'group')
+    expect(only.sessions.map((s) => s.sessionId).sort()).toEqual(['2', '3'])
+  })
+
+  it('lists each scratch folder when they are shown as they are', async () => {
+    const all = [mk('2', 'scratch-aa', '/t/scratch-aa'), mk('3', 'scratch-bb', '/t/scratch-bb')]
+    expect((await paginateAndFilterSessions(all, input)).projects).toHaveLength(2)
+  })
+})

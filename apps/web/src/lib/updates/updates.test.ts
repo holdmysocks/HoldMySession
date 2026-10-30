@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { compareVersions, parseVersion } from './version'
-import { checkForUpdate, resetUpdateCheck, RELEASES_URL } from './update-check'
+import { checkForUpdate, pickDownload, resetUpdateCheck, RELEASES_URL } from './update-check'
 
 describe('versions', () => {
   it('reads plain and tagged versions', () => {
@@ -33,7 +33,7 @@ describe('checkForUpdate', () => {
   })
   it('reports nothing when GitHub cannot be reached or answers badly, and links to the releases', async () => {
     const failing = await checkForUpdate('0.6.0', async () => { throw new Error('offline') })
-    expect(failing).toEqual({ current: '0.6.0', latest: null, available: false, url: RELEASES_URL })
+    expect(failing).toEqual({ current: '0.6.0', latest: null, available: false, url: RELEASES_URL, download: null })
     resetUpdateCheck()
     expect((await checkForUpdate('0.6.0', reply({}, false))).latest).toBeNull()
     resetUpdateCheck()
@@ -51,5 +51,55 @@ describe('checkForUpdate', () => {
     expect(calls).toBe(1)
     await checkForUpdate('0.6.0', counting, 1_000 + 7 * 60 * 60_000)
     expect(calls).toBe(2)
+  })
+})
+
+describe('pickDownload', () => {
+  const assets = [
+    { name: 'HoldMySession-0.7.0-win-x64.zip', url: 'https://github.com/x/y/win.zip' },
+    { name: 'HoldMySession-0.7.0-mac-arm64.zip', url: 'https://github.com/x/y/mac.zip' },
+    { name: 'SHA256SUMS.txt', url: 'https://github.com/x/y/sums.txt' },
+  ]
+
+  it('picks the zip for this system and its checksums', () => {
+    expect(pickDownload(assets, '0.7.0', 'win32', 'x64')).toEqual({
+      version: '0.7.0', name: 'HoldMySession-0.7.0-win-x64.zip', url: 'https://github.com/x/y/win.zip', sumsUrl: 'https://github.com/x/y/sums.txt',
+    })
+    expect(pickDownload(assets, '0.7.0', 'darwin', 'arm64')?.url).toBe('https://github.com/x/y/mac.zip')
+  })
+
+  it('finds nothing for a system with no build, or an architecture the release lacks', () => {
+    expect(pickDownload(assets, '0.7.0', 'linux', 'x64')).toBeNull()
+    expect(pickDownload(assets, '0.7.0', 'darwin', 'x64')).toBeNull()
+    expect(pickDownload([], '0.7.0', 'win32', 'x64')).toBeNull()
+  })
+
+  it('has no checksums link when the release has none', () => {
+    expect(pickDownload(assets.slice(0, 1), '0.7.0', 'win32', 'x64')?.sumsUrl).toBeNull()
+  })
+})
+
+describe('checkForUpdate downloads', () => {
+  const release = { tag_name: 'v0.7.0', assets: [{ name: 'HoldMySession-0.7.0-win-x64.zip', browser_download_url: 'https://github.com/x/y/win.zip' }] }
+  const answer = async () => ({ ok: true, json: async () => release })
+
+  it('offers no download on a system with no build, even when a newer release exists', async () => {
+    resetUpdateCheck()
+    const info = await checkForUpdate('0.6.0', answer, Date.now(), true)
+    expect(info.available).toBe(true)
+    // The tests run on Linux, which has no packaged build.
+    expect(info.download).toBeNull()
+    resetUpdateCheck()
+  })
+
+  it('asks again when forced, even within the kept time', async () => {
+    resetUpdateCheck()
+    let calls = 0
+    const counting = async () => { calls += 1; return answer() }
+    await checkForUpdate('0.6.0', counting)
+    await checkForUpdate('0.6.0', counting)
+    await checkForUpdate('0.6.0', counting, Date.now(), true)
+    expect(calls).toBe(2)
+    resetUpdateCheck()
   })
 })

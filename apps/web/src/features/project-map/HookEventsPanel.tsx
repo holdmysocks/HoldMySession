@@ -16,7 +16,7 @@ export function HookEventsPanel({ events }: { events: HookEvent[] | undefined })
           <p>No hook events yet.</p>
           <p>
             Turn on <span className="text-gray-300">Needs you notifications</span> under Claude Code hooks in{' '}
-            <Link to="/settings" className="text-brand-300 hover:underline">Settings</Link>.
+            <Link to="/settings" search={{ tab: 'claude' }} className="text-brand-300 hover:underline">Settings</Link>.
           </p>
         </div>
       ) : (

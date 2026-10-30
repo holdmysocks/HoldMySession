@@ -15,7 +15,7 @@ export async function computeProjectStats(
   sessions: SessionSummaryWithPath[],
   projectPath: string,
 ): Promise<StatsCache | null> {
-  const inProject = sessions.filter((session) => projectGroupKey(session) === projectPath)
+  const inProject = sessions.filter((session) => projectGroupKey(session) === projectPath || session.projectPath === projectPath)
   if (inProject.length === 0) return null
   return computeStatsFromSummaries(inProject)
 }

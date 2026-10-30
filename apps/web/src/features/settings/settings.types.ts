@@ -36,6 +36,24 @@ export const LinkSchema = z.object({
   listen: z.enum(['local', 'network']).default('local'),
 })
 
+/** What to do with sessions that ran in a scratch folder (or have no folder): list them, group them, or leave them out of lists. */
+export const SCRATCH_MODES = ['group', 'show', 'hide'] as const
+
+/**
+ * Which projects the lists show. Only lists and dropdowns are affected: a hidden project's usage is
+ * still counted in every total, chart and cost.
+ */
+export const ProjectsSchema = z.object({
+  scratch: z.enum(SCRATCH_MODES).default('group'),
+  /** Label scratch sessions by their session name instead of the scratch folder's name. */
+  scratchByName: z.boolean().default(false),
+  /** Projects the user hid, per machine. */
+  hidden: z
+    .array(z.object({ machineId: z.string(), projectPath: z.string() }))
+    .max(5000)
+    .default([]),
+})
+
 export const SettingsSchema = z.object({
   version: z.literal(1),
   subscriptionTier: z
@@ -44,7 +62,10 @@ export const SettingsSchema = z.object({
   autoScan: AutoScanSchema.default({ enabled: true, intervalMinutes: 15 }),
   /** Ask GitHub now and then whether a newer release exists. Only the version number is compared. */
   checkForUpdates: z.boolean().default(true),
+  /** Desktop app: download new releases in the background and install them when the app next quits. */
+  autoUpdate: z.boolean().default(true),
   link: LinkSchema.default({ role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' }),
+  projects: ProjectsSchema.default({ scratch: 'group', scratchByName: false, hidden: [] }),
   pricingOverrides: z
     .record(z.string(), ModelPricingOverrideSchema)
     .default({}),
@@ -67,6 +88,8 @@ export type ModelPricingOverride = z.infer<typeof ModelPricingOverrideSchema>
 export type Settings = z.infer<typeof SettingsSchema>
 export type AutoScanSetting = z.infer<typeof AutoScanSchema>
 export type LinkSetting = z.infer<typeof LinkSchema>
+export type ProjectsSetting = z.infer<typeof ProjectsSchema>
+export type ScratchMode = (typeof SCRATCH_MODES)[number]
 export type SubscriptionTierId = Settings['subscriptionTier']
 
 export interface ModelPricing {
@@ -287,7 +310,9 @@ export const DEFAULT_SETTINGS: Settings = {
   subscriptionTier: 'pro',
   autoScan: { enabled: true, intervalMinutes: 15 },
   checkForUpdates: true,
+  autoUpdate: true,
   link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' },
+  projects: { scratch: 'group', scratchByName: false, hidden: [] },
   pricingOverrides: {},
   dataSources: [],
 }

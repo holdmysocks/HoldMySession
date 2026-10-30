@@ -11,7 +11,9 @@ const { app, BrowserWindow, Tray, Menu, nativeImage, shell, dialog } = require('
 const path = require('node:path');
 const net = require('node:net');
 const { spawn } = require('node:child_process');
+const os = require('node:os');
 const { pathToFileURL } = require('node:url');
+const { createUpdater } = require('./updater.cjs');
 
 const args = process.argv.slice(1);
 const flag = (name) => args.includes(name);
@@ -92,6 +94,14 @@ function runApp() {
   let quitting = false;
   let rebuildTray = () => undefined;
   let baseUrl = `http://localhost:${PORT}`;
+  const updater = createUpdater({
+    dataDir: process.env.HOLDMYSESSION_DIR || path.join(os.homedir(), '.holdmysession'),
+    exePath: process.execPath,
+    pid: process.pid,
+    platform: process.platform,
+    packaged: app.isPackaged,
+    quit: () => quit(),
+  });
 
   function showWindow() {
     if (!win) createWindow();
@@ -156,12 +166,17 @@ function runApp() {
               rebuild();
             },
           },
+          ...(updater.status().phase === 'ready'
+            ? [{ label: `Update to v${updater.status().version} and restart`, click: () => updater.install(true) }]
+            : []),
           { label: 'Restart', click: () => { app.relaunch(); quit(); } },
           { type: 'separator' },
           { label: 'Quit HoldMySession', click: quit },
         ]),
       );
     rebuild();
+    // The menu offers an update once one is downloaded, so it is rebuilt now and then.
+    setInterval(rebuild, 30_000).unref();
     tray.on('click', showWindow);
     rebuildTray = rebuild;
   }
@@ -198,6 +213,7 @@ function runApp() {
         app.relaunch();
         quit();
       },
+      updates: updater,
     };
     // Load the app once, so the server starts its background work now, not when the first page is opened.
     fetch(`http://127.0.0.1:${PORT}/`, { redirect: 'manual' }).catch(() => undefined);
@@ -209,6 +225,7 @@ function runApp() {
   app.on('activate', () => showWindow());
   app.on('before-quit', () => {
     quitting = true;
+    updater.applyOnQuit();
   });
 
   app.whenReady().then(async () => {

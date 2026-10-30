@@ -21,7 +21,8 @@ const HOOK_EVENTS_SHOWN = 100
 /** The projects on this computer's map dropdown. Server only. */
 export async function computeMapProjects(): Promise<MapProject[]> {
   const sessions = await scanAllSessionsWithPaths()
-  return groupMapProjects(dropdownSessions(sessions))
+  // Scratch folders are included, marked as such: whoever shows the list decides whether to list them.
+  return groupMapProjects(dropdownSessions(sessions, true))
 }
 
 /** The map of one project's live sessions on this computer. Server only. */

@@ -4,6 +4,7 @@ import { includesSelf, remoteSessions, type RemoteSession } from './scope'
 import { callNode, isOnline, touchActivity } from './channel'
 import { selfMachineId } from './machines'
 import type { LiveSessions } from '@/lib/live/sessions'
+import type { MapProject } from '@/features/project-map/project-map.api'
 
 export interface MachineView {
   /** This computer's own sessions belong in the view. */
@@ -81,4 +82,38 @@ export async function machineViewLive(machineId?: string): Promise<LiveMachineVi
   } finally {
     dbCopy.close()
   }
+}
+
+/**
+ * The map projects of every connected node, for a master's "all machines" map. A node that is
+ * offline or does not answer is left out. `selfName` is this computer's name, to mark its own
+ * projects. Looking counts as activity, which keeps the nodes' sync going. Server only.
+ */
+export async function nodeMapProjects(): Promise<{ hasNodes: boolean; selfName: string; projects: MapProject[] }> {
+  if (readSettingsFile().link.role !== 'master') return { hasNodes: false, selfName: '', projects: [] }
+  const db = openHistoryDb()
+  let machines: Array<{ id: string; name: string }>
+  let selfName = ''
+  try {
+    const self = selfMachineId(db)
+    const rows = db.prepare('SELECT machine_id, name FROM machines').all()
+    selfName = String(rows.find((r) => r.machine_id === self)?.name ?? '')
+    machines = rows.filter((r) => r.machine_id !== self).map((r) => ({ id: String(r.machine_id), name: String(r.name) }))
+  } finally {
+    db.close()
+  }
+  if (machines.length === 0) return { hasNodes: false, selfName, projects: [] }
+  touchActivity()
+  const lists = await Promise.all(
+    machines.map(async (m) => {
+      if (!isOnline(m.id)) return []
+      try {
+        const answer = (await callNode(m.id, 'map-projects', {}, 8_000)) as MapProject[]
+        return answer.map((p) => ({ ...p, machineId: m.id, machineName: m.name }))
+      } catch {
+        return []
+      }
+    }),
+  )
+  return { hasNodes: true, selfName, projects: lists.flat() }
 }

@@ -4,6 +4,10 @@ import { scanAllSessions, scanAllSessionsWithPaths } from '@/lib/scanner/session
 import { computeProjectStats } from '@/lib/projects/project-stats'
 import { UNLINKED_PROJECT_KEY, UNLINKED_PROJECT_NAME, projectGroupKey } from '@/lib/projects/unlinked'
 import type { SessionSummary, StatsCache } from '@/lib/parsers/types'
+import { isUnlinkedSession } from '@/lib/projects/unlinked'
+import { hasProject } from '@/lib/map/session-visibility'
+import { visibleInLists } from '@/lib/projects/project-prefs'
+import type { ScratchMode } from '@/features/settings/settings.types'
 
 export interface ProjectAnalytics {
   /** The project's path, or UNLINKED_PROJECT_KEY for the group of unlinked sessions. */
@@ -33,11 +37,14 @@ export interface ProjectAnalyticsResult {
  */
 export function aggregateProjectAnalytics(
   allSessions: SessionSummary[],
+  /** 'group' puts scratch sessions in one entry, 'show' lists each scratch folder, 'hide' leaves them out of the list. */
+  scratch: ScratchMode = 'group',
 ): ProjectAnalyticsResult {
   // Group sessions by project path. Sessions with no project all share one group.
   const projectMap = new Map<string, SessionSummary[]>()
   for (const session of allSessions) {
-    const key = projectGroupKey(session)
+    if (scratch === 'hide' && isUnlinkedSession(session)) continue
+    const key = scratch === 'show' && hasProject(session) ? session.projectPath : projectGroupKey(session)
     const existing = projectMap.get(key) ?? []
     existing.push(session)
     projectMap.set(key, existing)
@@ -91,7 +98,12 @@ export const getProjectAnalytics = createServerFn({ method: 'GET' })
     const { machineView } = await import('@/lib/link/scoped')
     const view = machineView(data.machineId)
     const local = view.includeSelf ? await scanAllSessions() : []
-    return aggregateProjectAnalytics([...local, ...view.remote])
+    // Hidden projects and the scratch mode shape this list only. Totals still count every session.
+    const { readProjectPrefs } = await import('@/lib/projects/prefs-server')
+    const { prefs, selfId } = readProjectPrefs()
+    const all = [...local, ...view.remote]
+    const shown = visibleInLists(all, { ...prefs, scratch: 'show' }, (s) => (s as { machineId?: string }).machineId ?? selfId)
+    return aggregateProjectAnalytics(shown, prefs.scratch)
   })
 
 const projectStatsInputSchema = z.object({ projectPath: z.string().min(1), machineId: z.string().optional() })

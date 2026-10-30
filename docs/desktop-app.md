@@ -10,6 +10,12 @@ HoldMySession can run as a desktop app for Windows and Mac. It is the same serve
 4. `--background` starts it in the tray without opening the window.
 5. **Start with Windows** (Open at login on a Mac) is a switch in the tray menu, with a tick when on, and in Settings, under Desktop app. Both read the same system setting.
 
+### Updating
+
+Settings, Updates has **Check for updates**, **Update now** and **Install updates automatically**. The app downloads the zip for its system from the newest GitHub release, checks it against the release's `SHA256SUMS.txt` (a download that does not match is deleted, never installed), and unpacks it into `~/.holdmysession/updates`. A small script (PowerShell on Windows, sh on a Mac) then waits for the app to quit, swaps the program's files for the new ones, and starts the app again when the update was asked for with **Update now**. With automatic updates on, a download happens in the background and is installed when the app next quits. If the swap fails, the next start says why in Settings.
+
+It needs the app to be in a folder it may write to (not Program Files), a release with a zip for the system (`HoldMySession-<version>-win-x64.zip`, `-mac-arm64.zip`, `-mac-x64.zip`) and `SHA256SUMS.txt`, and a public releases page, since the download is anonymous. Anything else shows a Download link instead.
+
 ### Linking machines from the app
 
 On a master, Settings, Linked machines shows the machine's addresses (local network, tailnet and computer name) and a **pairing code** to paste on each node, which holds every address and the token, so a node works over either network. Turning on **Listen on the network** asks Windows for the firewall permission it needs (Windows shows its own permission prompt), limited to your own network and the tailnet, and the page offers **Restart now** to apply it. If you decline the prompt, the card says what is missing and has an **Allow through the firewall** button. On a Mac the system asks the first time. A node only makes outgoing connections, so it needs no firewall permission, and when it cannot connect it says why (refused, no answer, name not found).

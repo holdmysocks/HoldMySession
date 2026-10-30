@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { applyCustomPositions, layoutProjectMap, type NodePositions } from '@/lib/map/layout'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
+import { mapProjectValue, type MapProject } from './project-map.api'
 import { mapProjectsQuery, projectMapQuery, hookEventsQuery } from './project-map.queries'
 import { MapCanvas, type NodeMove } from './MapCanvas'
 import { NeedsYouPanel } from './NeedsYouPanel'
@@ -20,14 +21,16 @@ interface ProjectMapPageProps {
 export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps) {
   const { privacyMode, anonymizeProjectName, anonymizePath } = usePrivacy()
   const scope = useMachineScope()
-  // On a master with a node chosen, the map is that node's: it answers while this page is open.
-  const machineId = scope.isRemote ? scope.machineId : undefined
-  const projectsQuery = useQuery(mapProjectsQuery(machineId))
+  // With a node chosen the list is that node's. With all machines it holds every connected machine's projects.
+  const projectsQuery = useQuery(mapProjectsQuery(scope.isRemote ? scope.machineId : undefined))
   const projects = projectsQuery.data ?? []
 
-  // A project in the URL that is not in the dropdown (a scratch folder, or one that is gone) shows the first one.
-  const selectedKey = projects.some((p) => p.projectKey === project) ? project! : (projects[0]?.projectKey ?? '')
-  const selectedProject = projects.find((p) => p.projectKey === selectedKey) ?? null
+  // A project in the URL that is not in the dropdown (hidden, or one that is gone) shows the first one.
+  const selectedValue = projects.some((p) => mapProjectValue(p) === project) ? project! : (projects[0] ? mapProjectValue(projects[0]) : '')
+  const selectedProject = projects.find((p) => mapProjectValue(p) === selectedValue) ?? null
+  const selectedKey = selectedProject?.projectKey ?? ''
+  // The project's own machine answers while this page is open. This computer's projects carry no machine.
+  const machineId = selectedProject?.machineId
   const mapQuery = useQuery(projectMapQuery(selectedKey, machineId))
   const eventsQuery = useQuery(hookEventsQuery(machineId))
 
@@ -37,7 +40,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   // In editor mode cards snap to a grid. Holding Alt while dragging places one freely.
   const [snapToGrid, setSnapToGrid] = useState(true)
   // Card positions from the editor. They belong to a project and are saved on the server.
-  const { positions, setPositions, isLoading: layoutLoading, saveFailed } = useMapLayout(machineId ? `${machineId}~${selectedKey}` : selectedKey)
+  const { positions, setPositions, isLoading: layoutLoading, saveFailed } = useMapLayout(selectedValue)
 
   const nodes = useMemo(() => mapQuery.data?.nodes ?? [], [mapQuery.data])
   const baseLayout = useMemo(
@@ -107,6 +110,9 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
     )
   }
 
+  // With several machines the dropdown groups projects under the machine they are on.
+  const machineGroups = groupByMachine(projects)
+
   const displayPath = selectedProject
     ? privacyMode
       ? anonymizePath(selectedProject.projectPath, selectedProject.projectDisplayName)
@@ -121,15 +127,18 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
         <label className="flex items-center gap-2 text-sm text-gray-400">
           <span>Project</span>
           <select
-            value={selectedKey}
+            value={selectedValue}
             onChange={(e) => handleProjectChange(e.target.value)}
             className="max-w-xs rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-100 focus:border-brand-500 focus:outline-none"
           >
-            {projects.map((p) => (
-              <option key={p.projectKey} value={p.projectKey}>
-                {privacyMode ? anonymizeProjectName(p.projectDisplayName) : p.projectDisplayName} ({p.sessionCount})
-              </option>
-            ))}
+            {machineGroups.map((group) => {
+              const options = group.projects.map((p) => (
+                <option key={mapProjectValue(p)} value={mapProjectValue(p)}>
+                  {privacyMode ? anonymizeProjectName(p.projectDisplayName) : p.projectDisplayName} ({p.sessionCount})
+                </option>
+              ))
+              return group.name ? <optgroup key={group.name} label={group.name}>{options}</optgroup> : options
+            })}
           </select>
         </label>
         {selectedProject && (
@@ -216,7 +225,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
             </p>
           ) : layout && layout.nodes.length > 0 ? (
             <MapCanvas
-              key={selectedKey}
+              key={selectedValue}
               layout={layout}
               selectedId={selectedId}
               onSelect={setSelectedId}
@@ -255,4 +264,11 @@ function Header() {
       </p>
     </div>
   )
+}
+
+/** Projects grouped under their machine's name, in the order the machines first appear. No name when machines are not marked. */
+function groupByMachine(projects: MapProject[]): Array<{ name: string; projects: MapProject[] }> {
+  const groups = new Map<string, MapProject[]>()
+  for (const p of projects) groups.set(p.machineName ?? '', [...(groups.get(p.machineName ?? '') ?? []), p])
+  return [...groups].map(([name, list]) => ({ name, projects: list }))
 }

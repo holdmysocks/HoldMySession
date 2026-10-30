@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { settingsQuery, useSettingsMutation } from './settings.queries'
 import {
@@ -14,13 +14,17 @@ import { BackupPanel } from '@/features/history/BackupPanel'
 import { LinkPanel } from '@/features/link/LinkPanel'
 import { HooksPanel } from '@/features/hooks/HooksPanel'
 import { DesktopPanel } from '@/features/desktop/DesktopPanel'
+import { ProjectsPanel } from '@/features/projects/ProjectsPanel'
 import { UpdatesPanel } from '@/features/updates/UpdatesPanel'
 import { LinkedNote } from '@/features/link/LinkedNote'
 import { ClockFormatSetting } from '@/features/time/ClockFormatSetting'
 import { PriceHistoryPanel } from '@/features/history/PriceHistoryPanel'
 import { SubscriptionPanel } from '@/features/history/SubscriptionPanel'
 
-export function SettingsPage() {
+export const SETTINGS_TABS = ['general', 'projects', 'data', 'machines', 'claude', 'pricing', 'updates'] as const
+export type SettingsTab = (typeof SETTINGS_TABS)[number]
+
+export function SettingsPage({ tab, onTab }: { tab: SettingsTab; onTab: (tab: SettingsTab) => void }) {
   const { data: settings, isLoading } = useQuery(settingsQuery)
 
   if (isLoading || !settings) {
@@ -32,10 +36,10 @@ export function SettingsPage() {
     )
   }
 
-  return <SettingsForm settings={settings} />
+  return <SettingsForm settings={settings} tab={tab} onTab={onTab} />
 }
 
-function SettingsForm({ settings }: { settings: Settings }) {
+function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: SettingsTab; onTab: (tab: SettingsTab) => void }) {
   const mutation = useSettingsMutation()
   const { privacyMode, togglePrivacyMode } = usePrivacy()
   const { theme, toggleTheme } = useTheme()
@@ -55,16 +59,8 @@ function SettingsForm({ settings }: { settings: Settings }) {
   }
 
   function handleSave() {
-    const updated: Settings = {
-      version: 1,
-      // The plan is kept as dated periods in the history database now. This field is only kept for older files.
-      subscriptionTier: settings.subscriptionTier,
-      autoScan: settings.autoScan,
-      checkForUpdates: settings.checkForUpdates,
-      link: settings.link,
-      pricingOverrides: overrides,
-      dataSources: [],
-    }
+    // Everything else is kept as it is. The plan is kept as dated periods in the history database now.
+    const updated: Settings = { ...settings, pricingOverrides: overrides, dataSources: [] }
     mutation.mutate(updated, {
       onSuccess: () => {
         setIsDirty(false)
@@ -72,13 +68,12 @@ function SettingsForm({ settings }: { settings: Settings }) {
     })
   }
 
-  return (
-    <div>
-      <h1 className="text-xl font-bold text-gray-100">Settings</h1>
-      <p className="mt-1 text-xs text-gray-500">
-        Configure your subscription tier and API pricing for cost estimation.
-      </p>
-
+  const tabs: Array<{ id: SettingsTab; label: string; content: ReactNode }> = [
+    {
+      id: 'general',
+      label: 'General',
+      content: (
+        <>
       {/* Privacy Mode */}
       <div className="mt-6">
         <h2 className="text-sm font-semibold text-gray-300">Privacy Mode</h2>
@@ -137,7 +132,6 @@ function SettingsForm({ settings }: { settings: Settings }) {
           </div>
         </div>
       </div>
-
       {/* Theme */}
       <div className="mt-6">
         <h2 className="text-sm font-semibold text-gray-300">Theme</h2>
@@ -172,23 +166,30 @@ function SettingsForm({ settings }: { settings: Settings }) {
           </div>
         </div>
       </div>
-
-      <ClockFormatSetting />
-
-      <DesktopPanel />
-
-      <UpdatesPanel />
-
-      <HistoryPanel />
-
-      <BackupPanel />
-
-      <HooksPanel />
-
-      <LinkPanel />
-
-      <SubscriptionPanel />
-
+          <ClockFormatSetting />
+          <DesktopPanel />
+        </>
+      ),
+    },
+    { id: 'projects', label: 'Projects', content: <div className="mt-6"><ProjectsPanel /></div> },
+    {
+      id: 'data',
+      label: 'Data',
+      content: (
+        <>
+          <HistoryPanel />
+          <BackupPanel />
+        </>
+      ),
+    },
+    { id: 'machines', label: 'Machines', content: <LinkPanel /> },
+    { id: 'claude', label: 'Claude Code', content: <HooksPanel /> },
+    {
+      id: 'pricing',
+      label: 'Plan and pricing',
+      content: (
+        <>
+          <SubscriptionPanel />
       {/* Pricing Table */}
       <div className="mt-6">
         <h2 className="text-sm font-semibold text-gray-300">
@@ -206,8 +207,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
           />
         </div>
       </div>
-
-      <PriceHistoryPanel />
+          <PriceHistoryPanel />
 
       {/* Actions */}
       <div className="mt-6 flex items-center justify-between">
@@ -241,6 +241,37 @@ function SettingsForm({ settings }: { settings: Settings }) {
             {mutation.isPending ? 'Saving...' : 'Save'}
           </button>
         </div>
+      </div>
+        </>
+      ),
+    },
+    { id: 'updates', label: 'Updates', content: <UpdatesPanel /> },
+  ]
+  const active = tabs.find((t) => t.id === tab) ?? tabs[0]
+
+  return (
+    <div>
+      <h1 className="text-xl font-bold text-gray-100">Settings</h1>
+      <div role="tablist" aria-label="Settings sections" className="mt-4 flex flex-wrap gap-1 border-b border-gray-800">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            id={`settings-tab-${t.id}`}
+            aria-selected={active.id === t.id}
+            aria-controls="settings-panel"
+            onClick={() => onTab(t.id)}
+            className={`-mb-px border-b-2 px-3 py-2 text-xs transition-colors ${
+              active.id === t.id ? 'border-brand-500 text-gray-100' : 'border-transparent text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id="settings-panel" aria-labelledby={`settings-tab-${active.id}`}>
+        {active.content}
       </div>
     </div>
   )
