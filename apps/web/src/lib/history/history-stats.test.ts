@@ -52,10 +52,11 @@ describe('statsFromHistory', () => {
 
   it('gives the same totals as reading the session files', async () => {
     const { db, compareHistoryWithLive } = await scanned()
-    const rows = await compareHistoryWithLive(db)
-    expect(rows).not.toBeNull()
-    expect(rows!.filter((r) => !r.same)).toEqual([])
-    expect(rows!.find((r) => r.label === 'Sessions')).toMatchObject({ live: 3, history: 3 })
+    const result = await compareHistoryWithLive(db)
+    expect(result).not.toBeNull()
+    expect(result!.rows.filter((r) => !r.same)).toEqual([])
+    expect(result!.rows.find((r) => r.label === 'Sessions')).toMatchObject({ live: 3, history: 3 })
+    expect(result!.changedWhileChecking).toBe(0)
   })
 
   it('counts tokens on the day each reply happened', async () => {

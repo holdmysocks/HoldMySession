@@ -41,15 +41,27 @@ export function compareStats(live: StatsCache, history: StatsCache): ComparisonR
   return rows.map(([label, l, h]) => ({ label, live: l, history: h, same: l === h }))
 }
 
-/** Rescans, then compares the database with a fresh read of the session files. */
-export async function compareHistoryWithLive(db?: Db): Promise<ComparisonRow[] | null> {
+export interface Comparison {
+  rows: ComparisonRow[]
+  /** Session files that grew while the check ran. A session still running makes small differences expected. */
+  changedWhileChecking: number
+}
+
+/**
+ * Rescans, then compares the database with a fresh read of the session files. The two reads are a
+ * moment apart, so it also counts the files that grew in between.
+ */
+export async function compareHistoryWithLive(db?: Db): Promise<Comparison | null> {
   const own = db ?? openHistoryDb()
   try {
+    const before = new Map((await scanAllSessionsWithPaths()).map((s) => [s.filePath, s.fileSizeBytes]))
     await runHistoryScan(own)
     const history = statsFromHistory(own)
-    const live = await computeStatsFromSummaries(await scanAllSessionsWithPaths())
+    const liveSessions = await scanAllSessionsWithPaths()
+    const live = await computeStatsFromSummaries(liveSessions)
     if (!history || !live) return null
-    return compareStats(live, history)
+    const changedWhileChecking = liveSessions.filter((s) => before.get(s.filePath) !== s.fileSizeBytes).length
+    return { rows: compareStats(live, history), changedWhileChecking }
   } finally {
     if (!db) own.close()
   }

@@ -75,6 +75,11 @@ export function HistoryPanel() {
           )}
         </div>
         {check.data === null && <p className="mt-3 text-amber-400">Nothing to compare yet.</p>}
+        {check.data && check.data.changedWhileChecking > 0 && (
+          <p className="mt-3 text-amber-400">
+            {check.data.changedWhileChecking} session{check.data.changedWhileChecking === 1 ? ' was' : 's were'} still being written while this ran, so small differences are expected. Run it again when nothing is active for an exact match.
+          </p>
+        )}
         {check.data && (
           <table className="mt-3 w-full text-left">
             <thead>
@@ -86,7 +91,7 @@ export function HistoryPanel() {
               </tr>
             </thead>
             <tbody>
-              {check.data.map((row) => (
+              {check.data.rows.map((row) => (
                 <tr key={row.label} className="border-t border-gray-800">
                   <td className="py-1 text-gray-300">{row.label}</td>
                   <td className="py-1 text-right font-mono">{row.live.toLocaleString()}</td>
