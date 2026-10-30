@@ -35,7 +35,7 @@ The dashboard reads the Claude config directory on Windows, which is `%USERPROFI
 - **Subagent cards.** Small cards (180 by 44) under the session or fork that dispatched them. The label is the subagent type, then its description. Only running subagents are drawn (see the subagent rule under Status).
 - **Expired subagents.** A subagent quiet for more than 5 minutes is not drawn and takes no space. Its session node shows a small **+N** chip with the count, and the page info line gives the project total.
 - **Layout.** Each depth is a column: top-level sessions, then their forks and subagents, then forks of forks. A parent is centred on its children. Nothing overlaps.
-- **Every session in the project is shown, except sessions with no project.** There is no cap. See [Sessions with no project](#sessions-with-no-project).
+- **Every session in the project is shown, except sessions with no project and archived sessions.** There is no cap. See [Sessions with no project](#sessions-with-no-project) and [Archived and split sessions](#archived-and-split-sessions).
 
 ### Sessions with no project
 
@@ -47,7 +47,18 @@ A session has a project when its transcript records a working directory (`cwd`) 
 
 The map info line and the Sessions page each show the count, as **N hidden (no project)**. The rule is one pure function, `src/lib/map/session-visibility.ts`.
 
-**Stats and project analytics do not use this rule.** They still count every session, including those with no project. This is deliberate: the change is scoped to the map and the Sessions list.
+**Stats and project analytics do not use this rule.** They still count every session, including those with no project and archived ones. This is deliberate: the change is scoped to the map and the Sessions list.
+
+### Archived and split sessions
+
+The Claude desktop app keeps two flags per session in its own store, not in the transcript. The dashboard reads them from `src/lib/desktop/desktop-records.ts`. Read-only.
+
+- **Archived.** `isArchived: true` hides the session from the map, the project dropdown, the Sessions list and the sidebar badge. The map info line and the Sessions page show **N archived hidden**. A session that is archived and also has no project is counted as archived.
+- **Split to top level.** `lineageDetached: true` means the user split the session from its parent in the desktop app. The transcript and `spawnedFrom` still name the parent, so the map draws no parent link for it, and it is a top-level node. Its own forks and subagents stay under it. A fork of a split session is still linked to the split session.
+
+**Where the flags come from.** The app writes one file per session, `local_<id>.json`, under `%APPDATA%\Claude\claude-code-sessions\<account>\<org>\`. The record's `cliSessionId` is the transcript session ID, which is the join key. On a machine without that folder, the flags are all false. Set `CLAUDE_DESKTOP_SESSIONS_DIR` to read the records from another folder.
+
+**Caveats.** The record format is internal to the desktop app and may change. The reader uses only the three fields above and treats anything missing as not set. A session that was never opened in the desktop app has no record, so it is never hidden or split. Records are read on every request, reusing each file's parse while its modification time is unchanged.
 
 ### Project naming
 
@@ -133,11 +144,11 @@ The hook is the only writer of this file. It always exits 0 and swallows errors,
 |---|---|---|
 | Map of every session in a project | Built | No cap. Every session is parsed on the first load and cached by file mtime. |
 | Fork links (child of the parent session) | Built | From `forkedFrom` in the first 50 lines. Same project only. |
-| Split-out forks shown at top level | Built | A session without `forkedFrom` is top level. How the desktop app records a split is not visible (open question). |
+| Split-out forks shown at top level | Built | A session the desktop app split (`lineageDetached`) gets no parent link. Its transcript still names the parent. See [Archived and split sessions](#archived-and-split-sessions). |
 | Continuations linked to their predecessor | Not built, by design | No structural link in the transcript. |
 | Subagents as small cards, running only | Built | Running means the subagent transcript was written in the last 5 minutes. Expired subagents are counted on the session's +N chip. |
 | Sessions with no project hidden | Built | Map and Sessions list. Stats and project analytics still count them. |
-| Archived sessions hidden | Not built | Archive state is not in the transcripts, and no other source was found. See Known limitations. |
+| Archived sessions hidden | Built | From the desktop app's session record (`isArchived`). Counted as "archived hidden". |
 | Subagent transcripts as their own sessions | Not built | Used only to judge running state. |
 | Project name from package.json, git, or folder | Built | From the transcripts' `cwd`. Windows paths read only on Windows. |
 | Session name from `custom-title`, summary, first prompt | Built | Newest `custom-title` wins. |
@@ -155,14 +166,14 @@ The hook is the only writer of this file. It always exits 0 and swallows errors,
 
 ## Known limitations
 
-- **Open question: the desktop app's "split to top level".** If the app records a split in the transcript, we have not found it. Forks split this way are linked by `forkedFrom`, because the transcript still carries it. The map shows the link.
+- **Desktop app records are internal.** The split and archive flags come from `%APPDATA%\Claude\claude-code-sessions`, which the app writes. The format is not documented. Only Windows has this folder unless `CLAUDE_DESKTOP_SESSIONS_DIR` is set, so WSL and macOS sessions are not hidden or split by these flags. The split marker was confirmed on one real split (`lineageDetached: true`), not on a full set of cases.
 - **Open question: active sessions need a folder.** The active check (`src/lib/scanner/active-detector.ts`) requires a folder named after the session id next to the transcript. A session with no such folder can never show as active, including a fork. We have not measured how often this happens on real data.
 - **Transcripts are an internal format.** Claude Code does not document the JSONL record shapes. The fields the map reads are listed in the data mapping guide, marked by how sure we are. Upgrades can break them. Check that guide's upgrade checklist after each Claude Code upgrade.
 - **Message counts come from the first and last 15 lines** of each file, so a long session shows a count that is too low. This predates Phase 1 and is not fixed here. The sessions list and the map both show it.
 - **Permission prompts were not found in the transcript.** Only the Notification hook reveals them. Without the hook, a session waiting on one looks idle.
 - **An unanswered `AskUserQuestion` can belong to an abandoned session.** It is ignored once the session is idle, but an active session with a stale question still shows as needs-you.
 - **Subagents quiet for more than 5 minutes are not drawn**, even if they are still working. Running is judged from the transcript's last write, so a subagent that goes silent for longer than the window counts as expired until it writes again. The session's +N chip still counts it.
-- **Open question: archived sessions are not hidden.** The desktop app's "Archived" tab is not visible in the transcripts. The docs say archiving moves a session to that tab, but not how it is stored. The installed CLI (2.1.312) has no archive marker in the transcript records, and the only "archived" status found is for cloud sessions, which are not local transcripts. We have not built a workaround and have not invented a source. **Next step:** find where the desktop app keeps archive state on Windows (for example under `%APPDATA%\Claude`), then read that store and check how an archived session appears in it. Only then decide whether the map can hide archived sessions.
+- **Archive state lives in the desktop app's records, not the transcript.** The CLI transcript has no archive marker. The app's record (`isArchived`) is the source now used. A session with no desktop record cannot be archived as far as the dashboard can tell.
 - **The map reads only the primary data source.** On Windows, WSL sessions are listed on the Sessions page but not on the map.
 - **Scale.** The first map load parses every session in the project in full, one at a time. Later loads reuse the cache, but active sessions are parsed on every poll (every 10 seconds). A project with hundreds of long sessions will load slowly the first time.
 - **A Windows path can only be read on Windows.** On a Linux server, a Windows `cwd` is shown as recorded, and the name falls back to the last segment of the path.
@@ -199,7 +210,7 @@ Steps 1 and 2 are maintenance and should run after each Claude Code upgrade. Ste
 - **Borders.** Status borders are 2 px on session cards and map session nodes, and 1.5 px on subagent cards. Colours are unchanged.
 - **Subagent expiry.** A subagent is running for 5 minutes after its last write (was 2). Expired subagents are not drawn. A **+N** chip on the session node counts them, and the info line shows the project total.
 - **No-project sessions.** Sessions with no working directory are hidden from the map, the project dropdown and the Sessions list, and their count is shown. Stats and project analytics are unchanged.
-- **Archived sessions.** Not hidden. Archive state is not in the transcripts, so this is an open question (see Known limitations).
+- **Archived sessions.** Hidden, from the desktop app's `isArchived` flag (see [Archived and split sessions](#archived-and-split-sessions)). Not found in the transcripts.
 
 ### Phase 1 follow-up (2026-10-29)
 
@@ -207,7 +218,7 @@ Fixes for problems a Windows user reported with real data.
 
 - **Project name.** The directory name is no longer decoded. The project's path and name come from the transcripts' `cwd`. The name then comes from `package.json`, the git `origin` remote (following `.git` files and worktrees), or the folder name. Hyphenated and dotted folder names keep their characters.
 - **Session name.** Uses the newest `custom-title` (set by `/rename` or `--name`), then the summary, then the first prompt. Branch names are no longer used as titles.
-- **Forks.** Forks show as child nodes of the session they were forked from. Forks whose parent is not in the project, and sessions split to the top level, are not linked.
+- **Forks.** Forks show as child nodes of the session they were forked from. Forks whose parent is not in the project, and sessions split to the top level in the desktop app, are not linked.
 - **Subagents.** Smaller cards, linked to their dispatching session or fork, with running and done states.
 - **Every session.** The map no longer stops at 25 sessions per project.
 - **Layout.** A tree layout, with one column per depth.
@@ -222,3 +233,9 @@ Fixes for problems a Windows user reported with real data.
 - Opt-in `Notification` and `Stop` hooks write to `~/.claude-dashboard/events.jsonl`. Print the snippet with `claude-dashboard --print-hook-config`.
 - New `--print-hook-config` CLI flag and help text.
 - Read-only: no writes to `~/.claude`.
+
+### Archived and split sessions (2026-10-30)
+
+- **Archived sessions hidden.** Read from the desktop app's session record (`isArchived`), joined to the transcript by `cliSessionId`. Shown as **N archived hidden** on the map and the Sessions page.
+- **Split sessions.** Read from `lineageDetached` in the same record. The map draws no parent link for them, so they are top-level nodes.
+- **New module.** `src/lib/desktop/desktop-records.ts`, with tests. Stats and project analytics are unchanged.

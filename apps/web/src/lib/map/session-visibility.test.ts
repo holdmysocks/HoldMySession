@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { filterHiddenSessions, filterVisibleSessions, hasProject } from './session-visibility'
+import {
+  filterArchivedSessions,
+  filterHiddenSessions,
+  filterVisibleSessions,
+  hasProject,
+  isVisible,
+} from './session-visibility'
 import { buildProjectMap, type MapSessionInput } from './project-map'
 import type { AgentInvocation, SessionSummary } from '../parsers/types'
 
@@ -52,6 +58,34 @@ describe('filterVisibleSessions and filterHiddenSessions', () => {
 
   it('splits every session into exactly one of the two lists', () => {
     expect(filterVisibleSessions(sessions).length + filterHiddenSessions(sessions).length).toBe(sessions.length)
+  })
+})
+
+describe('archived sessions', () => {
+  const sessions = [
+    { sessionId: 'valid', cwd: '/work/app', isArchived: false },
+    { sessionId: 'unflagged', cwd: '/work/app' },
+    { sessionId: 'archived', cwd: '/work/app', isArchived: true },
+    { sessionId: 'archived-no-project', cwd: null, isArchived: true },
+    { sessionId: 'no-project', cwd: null, isArchived: false },
+  ]
+
+  it('hides an archived session, and treats a session without the flag as not archived', () => {
+    expect(filterVisibleSessions(sessions).map((s) => s.sessionId)).toEqual(['valid', 'unflagged'])
+    expect(isVisible({ cwd: '/work/app', isArchived: true })).toBe(false)
+  })
+
+  it('counts archived sessions separately from sessions with no project', () => {
+    expect(filterArchivedSessions(sessions).map((s) => s.sessionId)).toEqual(['archived', 'archived-no-project'])
+    expect(filterHiddenSessions(sessions).map((s) => s.sessionId)).toEqual(['no-project'])
+  })
+
+  it('puts every session into exactly one of the three groups', () => {
+    const total =
+      filterVisibleSessions(sessions).length +
+      filterHiddenSessions(sessions).length +
+      filterArchivedSessions(sessions).length
+    expect(total).toBe(sessions.length)
   })
 })
 

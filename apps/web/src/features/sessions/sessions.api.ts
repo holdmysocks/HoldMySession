@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { scanAllSessions, scanAllSessionsWithPaths, getActiveSessions } from '@/lib/scanner/session-scanner'
 import type { SessionSummary } from '@/lib/parsers/types'
 import { findPendingQuestions } from '@/lib/map/pending-requests'
-import { filterHiddenSessions, filterVisibleSessions } from '@/lib/map/session-visibility'
+import { filterArchivedSessions, filterHiddenSessions, filterVisibleSessions } from '@/lib/map/session-visibility'
 import { latestNotificationBySession, readRecentEvents } from '@/lib/events/event-inbox'
 
 export const getSessionList = createServerFn({ method: 'GET' }).handler(
@@ -147,15 +147,18 @@ export async function paginateAndFilterSessions<T extends SessionSummary>(
 export interface PaginatedSessionsResponse extends PaginatedSessionsResult<SessionListItem> {
   /** Sessions left out because they record no working directory. Shown as "hidden (no project)". */
   hiddenNoProjectCount: number
+  /** Sessions left out because the desktop app archived them. Shown as "archived hidden". */
+  hiddenArchivedCount: number
 }
 
 export const getPaginatedSessions = createServerFn({ method: 'GET' })
   .inputValidator((input: unknown) => paginatedSessionsInputSchema.parse(input))
   .handler(async ({ data }): Promise<PaginatedSessionsResponse> => {
-    // Sessions with no project are left out of the list, the page and the project dropdown.
+    // Sessions with no project, and archived sessions, are left out of the list, the page and the project dropdown.
     const all = await scanAllSessionsWithPaths()
     const allSessions = filterVisibleSessions(all)
     const hiddenNoProjectCount = filterHiddenSessions(all).length
+    const hiddenArchivedCount = filterArchivedSessions(all).length
     const page = await paginateAndFilterSessions(allSessions, data)
 
     // Signals are computed for the page only. The file scan for open questions runs for active sessions.
@@ -168,5 +171,5 @@ export const getPaginatedSessions = createServerFn({ method: 'GET' })
       })),
     )
 
-    return { ...page, sessions, hiddenNoProjectCount }
+    return { ...page, sessions, hiddenNoProjectCount, hiddenArchivedCount }
   })

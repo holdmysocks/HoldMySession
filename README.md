@@ -149,7 +149,7 @@ cd apps/web && npm install && npm run build
 
 The **Map** page (`/map`) shows one project's sessions as a tree: each session, its forks as child nodes, and its running subagents as small cards. A subagent quiet for more than 5 minutes is not drawn. Its session shows a **+N** chip instead. Sessions are coloured by status: needs you (yellow, fast pulse), active (green, slow pulse), completed in the last hour (orange), idle (grey). A side panel lists what is waiting on you and recent hook events. It is read-only.
 
-Sessions with no working directory in their transcripts have no project, so the map and the Sessions list hide them and show a count. Stats and project analytics still count them. Archived sessions are not hidden, because the transcripts do not record archive state.
+Sessions with no working directory in their transcripts have no project, so the map and the Sessions list hide them and show a count. Sessions archived in the Claude desktop app are hidden too, and counted. Stats and project analytics still count every session. A session the desktop app split to the top level is not linked to its old parent.
 
 Project and session names come from the transcripts: the project from the recorded working directory, the session from its `/rename` name. Notifications need an opt-in hook. Run `claude-dashboard --print-hook-config` and merge the output into the `hooks` section of `settings.json` in your Claude config directory. The hook records each notification's type and title. Details, data sources, status and limitations are in [docs/session-map/README.md](docs/session-map/README.md).
 

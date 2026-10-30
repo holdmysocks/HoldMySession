@@ -374,6 +374,34 @@ describe('buildProjectMap: forks', () => {
     expect(map.nodes.every((n) => n.parentId === null)).toBe(true)
   })
 
+  it('does not link a fork that was split in the desktop app, even though its transcript names the parent', () => {
+    const split = input({
+      summary: summary({
+        sessionId: 'split-1',
+        forkedFrom: { sessionId: 'parent-1', messageUuid: 'm1' },
+        lineageDetached: true,
+      }),
+      agents: [agent({ agentId: 'y' })],
+      subagentWriteTimes: live('y'),
+    })
+    const map = build([parent, split])
+    const splitNode = map.nodes.find((n) => n.sessionId === 'split-1')!
+    expect(splitNode.parentId).toBeNull()
+    expect(splitNode.isFork).toBe(false)
+    expect(map.edges.filter((e) => e.kind === 'fork')).toEqual([])
+    // The split session keeps its own subagents.
+    expect(map.nodes.find((n) => n.kind === 'subagent')!.parentId).toBe('session:split-1')
+  })
+
+  it('still links a fork of a split session to that split session', () => {
+    const split = input({ summary: summary({ sessionId: 'split-1', lineageDetached: true }) })
+    const child = input({
+      summary: summary({ sessionId: 'child-1', forkedFrom: { sessionId: 'split-1', messageUuid: null } }),
+    })
+    const map = build([split, child])
+    expect(map.nodes.find((n) => n.sessionId === 'child-1')!.parentId).toBe('session:split-1')
+  })
+
   it('supports a fork of a fork', () => {
     const grand = fork
     const greatGrand = input({

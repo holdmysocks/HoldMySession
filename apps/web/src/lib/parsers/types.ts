@@ -37,6 +37,13 @@ export interface SessionSummary {
   projectKey: string
   /** Parent session this one was forked from (from `forkedFrom` in its first records), or null. */
   forkedFrom: ForkedFrom | null
+  /** Archived in the Claude desktop app. From the app's session record, so absent without one. */
+  isArchived?: boolean
+  /**
+   * Split from its parent in the Claude desktop app (`lineageDetached`). The map draws no parent
+   * link for it, even though its transcript still names the parent.
+   */
+  lineageDetached?: boolean
 }
 
 export interface ForkedFrom {

@@ -8,6 +8,7 @@ import { parseSummary, parseFullScan } from '../parsers/session-parser'
 import type { SessionSummary } from '../parsers/types'
 import { truncateSessionName } from '../parsers/session-name'
 import { resolveProjectDisplayName } from './project-display-name'
+import { desktopFlagsFor, loadDesktopSessionFlags } from '../desktop/desktop-records'
 
 /** Extended summary that includes the absolute JSONL file path (server-side only). */
 export interface SessionSummaryWithPath extends SessionSummary {
@@ -91,7 +92,9 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
       new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime(),
   )
 
-  return summaries
+  // Desktop app flags (archived, split). Added to copies, so the summary cache is not changed.
+  const desktopFlags = await loadDesktopSessionFlags()
+  return summaries.map((summary) => ({ ...summary, ...desktopFlagsFor(desktopFlags, summary.sessionId) }))
 }
 
 /** Public API: returns SessionSummary[] without filePath -- used by server functions that serialize to client. */

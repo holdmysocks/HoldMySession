@@ -25,6 +25,11 @@ vi.mock('./active-detector', () => ({
   isSessionActive: vi.fn(),
 }))
 
+vi.mock('../desktop/desktop-records', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../desktop/desktop-records')>()
+  return { ...actual, loadDesktopSessionFlags: vi.fn(async () => new Map()) }
+})
+
 vi.mock('node:fs', () => ({
   promises: {
     stat: vi.fn(),
@@ -380,6 +385,38 @@ describe('session-scanner', () => {
       const result = await scanAllSessionsWithPaths()
 
       expect(result).toEqual([])
+    })
+
+    it('adds the desktop app flags for each session, and leaves other sessions unflagged', async () => {
+      const {
+        scanAllSessionsWithPaths,
+        mockScanProjects,
+        mockParseSummary,
+        mockIsSessionActive,
+        mockStat,
+      } = await importScanner()
+      const { loadDesktopSessionFlags } = await import('../desktop/desktop-records')
+
+      mockScanProjects.mockResolvedValue([
+        makeProject({ sessionFiles: ['session-abc.jsonl', 'session-def.jsonl'] }),
+      ])
+      mockStat.mockResolvedValue({ mtimeMs: 1000, size: 1024 })
+      mockParseSummary.mockImplementation(async (_path: string, sessionId: string) =>
+        makeSummary({ sessionId }),
+      )
+      mockIsSessionActive.mockResolvedValue(false)
+      vi.mocked(loadDesktopSessionFlags).mockResolvedValue(
+        new Map([
+          ['session-abc', { cliSessionId: 'session-abc', isArchived: true, lineageDetached: false }],
+          ['session-def', { cliSessionId: 'session-def', isArchived: false, lineageDetached: true }],
+        ]),
+      )
+
+      const result = await scanAllSessionsWithPaths()
+      const byId = new Map(result.map((s) => [s.sessionId, s]))
+
+      expect(byId.get('session-abc')).toMatchObject({ isArchived: true, lineageDetached: false })
+      expect(byId.get('session-def')).toMatchObject({ isArchived: false, lineageDetached: true })
     })
 
     it('filePath contains the project dirName and session filename', async () => {

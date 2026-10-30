@@ -86,12 +86,17 @@ export function SessionList() {
   // Same rule as the page: sessions with no project are not counted as active here either.
   const activeCount = filterVisibleSessions(activeSessions).length
   const hiddenNoProjectCount = paginatedData?.hiddenNoProjectCount ?? 0
+  const hiddenArchivedCount = paginatedData?.hiddenArchivedCount ?? 0
 
   return (
     <div>
       <SessionFilters projects={projects} activeCount={activeCount} />
 
-      <p className="mt-3 text-xs text-gray-500">{hiddenNoProjectCount} hidden (no project)</p>
+      <p className="mt-3 text-xs text-gray-500">
+        {hiddenNoProjectCount} hidden (no project)
+        <span className="mx-2 text-gray-700">|</span>
+        {hiddenArchivedCount} archived hidden
+      </p>
 
       <div className="mt-4 space-y-2">
         {mergedSessions.length === 0 ? (

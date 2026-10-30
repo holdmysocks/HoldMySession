@@ -13,7 +13,7 @@ import { buildProjectMap, tokenTotal } from '@/lib/map/project-map'
 import type { MapSessionInput, ProjectMap } from '@/lib/map/project-map'
 import { latestNotificationBySession, readRecentEvents } from '@/lib/events/event-inbox'
 import type { HookEvent } from '@/lib/events/event-inbox'
-import { filterHiddenSessions, filterVisibleSessions } from '@/lib/map/session-visibility'
+import { filterArchivedSessions, filterHiddenSessions, filterVisibleSessions } from '@/lib/map/session-visibility'
 
 const HOOK_EVENTS_SHOWN = 100
 
@@ -105,9 +105,10 @@ export const getMapProjects = createServerFn({ method: 'GET' }).handler(
   },
 )
 
-/** The map for one project, plus how many of its sessions were left out for having no project. */
+/** The map for one project, plus how many of its sessions were left out (no project, or archived). */
 export interface ProjectMapResponse extends ProjectMap {
   hiddenNoProjectCount: number
+  hiddenArchivedCount: number
 }
 
 const projectMapInputSchema = z.object({
@@ -119,9 +120,10 @@ export const getProjectMap = createServerFn({ method: 'GET' })
   .handler(async ({ data }): Promise<ProjectMapResponse> => {
     const all = await scanAllSessionsWithPaths()
     const inProject = selectMapSessions(all, data.projectKey)
-    // Sessions with no project are not drawn, and their subagents go with them.
+    // Sessions with no project, and archived sessions, are not drawn, and their subagents go with them.
     const sessions = filterVisibleSessions(inProject)
     const hiddenNoProjectCount = filterHiddenSessions(inProject).length
+    const hiddenArchivedCount = filterArchivedSessions(inProject).length
 
     const notifications = latestNotificationBySession(await readRecentEvents())
 
@@ -151,6 +153,7 @@ export const getProjectMap = createServerFn({ method: 'GET' })
     return {
       ...buildProjectMap(data.projectKey, projectPath, projectDisplayName, inputs),
       hiddenNoProjectCount,
+      hiddenArchivedCount,
     }
   })
 

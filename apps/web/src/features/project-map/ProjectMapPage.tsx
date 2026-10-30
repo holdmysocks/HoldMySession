@@ -39,8 +39,9 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   const needsYouCount = sessionNodes.filter((n) => n.status === 'needs-you').length
   // Expired subagents are not drawn, so their count comes from the session nodes' chips.
   const expiredSubagentTotal = sessionNodes.reduce((sum, n) => sum + n.expiredSubagentCount, 0)
-  // Sessions with no project are left out of the map and counted by the server.
+  // Sessions with no project, and archived sessions, are left out of the map and counted by the server.
   const hiddenNoProjectCount = mapQuery.data?.hiddenNoProjectCount ?? 0
+  const hiddenArchivedCount = mapQuery.data?.hiddenArchivedCount ?? 0
 
   function handleProjectChange(projectKey: string) {
     setSelectedId(null)
@@ -105,6 +106,8 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
             {needsYouCount} need you
             <span className="mx-2 text-gray-700">|</span>
             {hiddenNoProjectCount} hidden (no project)
+            <span className="mx-2 text-gray-700">|</span>
+            {hiddenArchivedCount} archived hidden
             <span className="mx-2 text-gray-700">|</span>
             {expiredSubagentsLabel(expiredSubagentTotal)}
           </p>

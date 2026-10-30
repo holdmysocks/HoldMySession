@@ -132,7 +132,7 @@ What the dashboard does:
 - If the parent is not present, the fork is shown at the top level, unlinked.
 - A session with no `forkedFrom` is always top level, however similar its content.
 
-**Open question:** when the Claude desktop app splits a fork to the top level, we could not find a record of it. If the app only removes the link from its own state, the transcripts still show `forkedFrom`, and the dashboard would still draw the link. If the app writes something to the transcript, we have not seen it. See the open questions in `docs/session-map/README.md`.
+**Split sessions.** When the Claude desktop app splits a fork to the top level, the transcript still shows `forkedFrom`, and `spawnedFrom` in the app's record still names the parent. The app's session record sets `lineageDetached: true`. The dashboard reads that flag and draws no parent link. See [Desktop app session records](#desktop-app-session-records) below.
 
 ### Continuations (context ran out)
 
@@ -218,10 +218,22 @@ The official `sessions/` directory would give a direct signal, but its file form
 5. Run a Notification hook and check the payload in `events.jsonl`.
 6. Update this guide, the tests in `src/lib/parsers/session-listing.test.ts` and `src/lib/scanner/session-identity.test.ts`, and the version at the top.
 
+## Desktop app session records
+
+The Claude desktop app writes one JSON file per session, `local_<id>.json`, under `%APPDATA%\Claude\claude-code-sessions\<account>\<org>\` on Windows. The dashboard reads three fields, read-only, and joins them to transcripts by `cliSessionId`.
+
+| Field | Used for | Confidence |
+|---|---|---|
+| `cliSessionId` | Joins the record to the transcript file name | Joins 87 of 87 archived records to a transcript on Windows |
+| `isArchived` | Hides the session, counted as "archived hidden" | Confirmed: 87 records are `true`, and all 87 have a transcript |
+| `lineageDetached` | No parent link for a session split to the top level | Confirmed on one real split and 13 records in total. A timestamp value would also count as set |
+
+Other fields exist (`spawnedFrom`, `forkedFromSessionId`, `title`, `cwd`) but are not used for links. `spawnedFrom` still names the parent after a split, so it cannot tell a split from a fork. The format is internal to the app and may change. `CLAUDE_DESKTOP_SESSIONS_DIR` overrides the folder.
+
 ## Open questions
 
-- Desktop app "split to top level": is it written to the transcript? Not found.
+- Desktop app "split to top level": the transcript does not change. The app's record gets `lineageDetached`. Whether other app stores also change is not checked.
 - Does the active-session folder requirement hide real active sessions? Needs measuring on real data.
 - Where is the `sessions/` per-process file format documented, if anywhere?
 - Which `summary` writer exists? The reader is confirmed; the writer was not found in 2.1.312.
-- **Archived sessions: not found.** The docs say archiving moves a session to the desktop app's "Archived" tab. They do not say how that state is stored. The 2.1.312 CLI has no archive marker in the transcript records. The only "archived" status found is for cloud sessions, which are not local transcripts. The dashboard therefore cannot hide archived sessions. Next step: find where the desktop app stores archive state on Windows (for example under `%APPDATA%\Claude`), then read that store and check how an archived session is recorded there. Do not add a file-based workaround before that.
+- **Archived sessions: found in the desktop app's record** (`isArchived`). The 2.1.312 CLI transcript has no archive marker. Whether the app's record format is stable is not known.

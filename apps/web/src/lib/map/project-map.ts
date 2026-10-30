@@ -111,8 +111,9 @@ export function sessionStatus(input: MapSessionInput, nowMs: number): SessionSta
 
 /**
  * Parent session of each fork, for sessions whose parent is in the same project.
- * A fork whose parent is missing is not linked. A cycle (possible only in a damaged file)
- * is cut so that the tree stays a tree.
+ * A fork whose parent is missing is not linked. A session split in the desktop app
+ * (`lineageDetached`) is not linked, even though its transcript still names the parent.
+ * A cycle (possible only in a damaged file) is cut so that the tree stays a tree.
  */
 export function forkParents(sessions: MapSessionInput[]): Map<string, string> {
   const ids = new Set(sessions.map((s) => s.summary.sessionId))
@@ -120,6 +121,7 @@ export function forkParents(sessions: MapSessionInput[]): Map<string, string> {
 
   for (const { summary } of sessions) {
     const parent = summary.forkedFrom?.sessionId
+    if (summary.lineageDetached) continue
     if (parent && parent !== summary.sessionId && ids.has(parent)) {
       parentOf.set(summary.sessionId, parent)
     }
