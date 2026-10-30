@@ -10,20 +10,38 @@ import {
 } from './desktop-records'
 
 describe('parseDesktopRecord', () => {
-  it('reads archived and split flags from a record', () => {
+  it('reads archived, split, activity and parent fields from a record', () => {
     expect(
-      parseDesktopRecord({ cliSessionId: 'abc', isArchived: true, lineageDetached: true, sessionId: 'local_1' }),
-    ).toEqual({ cliSessionId: 'abc', isArchived: true, lineageDetached: true })
+      parseDesktopRecord({
+        cliSessionId: 'abc',
+        sessionId: 'local_1',
+        isArchived: true,
+        lineageDetached: true,
+        lastActivityAt: 1793280587490,
+        spawnedFrom: { sessionId: 'local_0' },
+      }),
+    ).toEqual({
+      cliSessionId: 'abc',
+      localId: 'local_1',
+      isArchived: true,
+      lineageDetached: true,
+      lastActivityAt: 1793280587490,
+      parentLocalId: 'local_0',
+      parentCliSessionId: null,
+    })
   })
 
   it('treats missing or odd flags as not set', () => {
     expect(parseDesktopRecord({ cliSessionId: 'abc' })).toEqual({
       cliSessionId: 'abc',
+      localId: '',
       isArchived: false,
       lineageDetached: false,
+      lastActivityAt: null,
+      parentLocalId: null,
+      parentCliSessionId: null,
     })
-    expect(parseDesktopRecord({ cliSessionId: 'abc', isArchived: 'yes', lineageDetached: null })).toEqual({
-      cliSessionId: 'abc',
+    expect(parseDesktopRecord({ cliSessionId: 'abc', isArchived: 'yes', lineageDetached: null })).toMatchObject({
       isArchived: false,
       lineageDetached: false,
     })
@@ -31,6 +49,12 @@ describe('parseDesktopRecord', () => {
 
   it('accepts a split marker that is a timestamp, not only true', () => {
     expect(parseDesktopRecord({ cliSessionId: 'abc', lineageDetached: 1793280587490 })?.lineageDetached).toBe(true)
+  })
+
+  it('reads spawnedFrom whether it is a bare string or an object', () => {
+    expect(parseDesktopRecord({ cliSessionId: 'a', spawnedFrom: 'local_9' })?.parentLocalId).toBe('local_9')
+    expect(parseDesktopRecord({ cliSessionId: 'a', spawnedFrom: { sessionId: 'local_9' } })?.parentLocalId).toBe('local_9')
+    expect(parseDesktopRecord({ cliSessionId: 'a', spawnedFrom: {} })?.parentLocalId).toBeNull()
   })
 
   it('returns null without a transcript session ID, or for a non-object', () => {
@@ -77,15 +101,35 @@ describe('readDesktopSessionFlags', () => {
     writeRecord('account/org/nested/local_2.json', { cliSessionId: 'cli-2', lineageDetached: true })
 
     const flags = await readDesktopSessionFlags(dir)
-    expect(flags.get('cli-1')).toEqual({ cliSessionId: 'cli-1', isArchived: true, lineageDetached: false })
-    expect(flags.get('cli-2')).toEqual({ cliSessionId: 'cli-2', isArchived: false, lineageDetached: true })
+    expect(flags.get('cli-1')).toMatchObject({ cliSessionId: 'cli-1', isArchived: true, lineageDetached: false })
+    expect(flags.get('cli-2')).toMatchObject({ cliSessionId: 'cli-2', isArchived: false, lineageDetached: true })
   })
 
-  it('ignores files that are not session records, and files that do not parse', () => {
+  it('resolves a spawnedFrom app ID to the parent transcript ID', async () => {
+    writeRecord('account/local_parent.json', { sessionId: 'local_parent', cliSessionId: 'cli-parent' })
+    writeRecord('account/local_child.json', {
+      sessionId: 'local_child',
+      cliSessionId: 'cli-child',
+      spawnedFrom: { sessionId: 'local_parent' },
+    })
+    writeRecord('account/local_orphan.json', {
+      sessionId: 'local_orphan',
+      cliSessionId: 'cli-orphan',
+      spawnedFrom: { sessionId: 'local_gone' },
+    })
+
+    const flags = await readDesktopSessionFlags(dir)
+    expect(flags.get('cli-child')!.parentCliSessionId).toBe('cli-parent')
+    expect(flags.get('cli-parent')!.parentCliSessionId).toBeNull()
+    expect(flags.get('cli-orphan')!.parentCliSessionId).toBeNull()
+  })
+
+  it('ignores files that are not session records, and files that do not parse', async () => {
     writeRecord('account/archived-sessions.idx', { v: 1, archived: ['local_1'] })
     writeRecord('account/local_bad.json', '{ not json')
     writeRecord('account/local_empty.json', { sessionId: 'local_9' })
-    return readDesktopSessionFlags(dir).then((flags) => expect(flags.size).toBe(0))
+    const flags = await readDesktopSessionFlags(dir)
+    expect(flags.size).toBe(0)
   })
 
   it('is empty for a folder that does not exist', async () => {
@@ -106,7 +150,35 @@ describe('readDesktopSessionFlags', () => {
 })
 
 describe('desktopFlagsFor', () => {
-  it('returns both flags false when the desktop app has no record for the session', () => {
-    expect(desktopFlagsFor(new Map(), 'unknown')).toEqual({ isArchived: false, lineageDetached: false })
+  it('returns all false or null when the desktop app has no record for the session', () => {
+    expect(desktopFlagsFor(new Map(), 'unknown')).toEqual({
+      isArchived: false,
+      lineageDetached: false,
+      desktopActivityAt: null,
+      desktopParentId: null,
+    })
+  })
+
+  it('returns the activity time as ISO text and the resolved parent', () => {
+    const flags = new Map([
+      [
+        'cli-child',
+        {
+          cliSessionId: 'cli-child',
+          localId: 'local_child',
+          isArchived: false,
+          lineageDetached: false,
+          lastActivityAt: 1793280587490,
+          parentLocalId: 'local_parent',
+          parentCliSessionId: 'cli-parent',
+        },
+      ],
+    ])
+    expect(desktopFlagsFor(flags, 'cli-child')).toEqual({
+      isArchived: false,
+      lineageDetached: false,
+      desktopActivityAt: new Date(1793280587490).toISOString(),
+      desktopParentId: 'cli-parent',
+    })
   })
 })

@@ -43,17 +43,59 @@ export async function discoverSubagentFiles(
   return result
 }
 
+/** Bytes read from the end of a transcript to find its last record. */
+const TAIL_BYTES = 64 * 1024
+
+/** The `timestamp` of one JSONL line as epoch ms, or undefined when the line has none. */
+function lineTime(line: string): number | undefined {
+  try {
+    const record = JSON.parse(line) as { timestamp?: unknown }
+    if (typeof record.timestamp !== 'string') return undefined
+    const time = Date.parse(record.timestamp)
+    return Number.isNaN(time) ? undefined : time
+  } catch {
+    return undefined
+  }
+}
+
 /**
- * Last-write time (epoch ms) of each subagent transcript under a session directory.
- * The map uses it to tell a running subagent (written recently) from a finished one.
- * Keyed by agentId, like discoverSubagentFiles. A missing file is simply absent.
+ * Time (epoch ms) of the last record in a JSONL transcript, read from the file's tail.
+ * This is the record's own timestamp, not the file's modification time. Something that
+ * touches a file (an app opening it, a copy, a backup) changes the modification time but
+ * adds no record, so the last record stays old and the file is not treated as active.
+ * Undefined when no record in the tail has a timestamp, or the file cannot be read.
  */
-export async function readSubagentWriteTimes(sessionDir: string): Promise<Map<string, number>> {
+export async function readLastRecordTime(filePath: string): Promise<number | undefined> {
+  const handle = await fs.promises.open(filePath, 'r').catch(() => null)
+  if (!handle) return undefined
+  try {
+    const { size } = await handle.stat()
+    const length = Math.min(size, TAIL_BYTES)
+    if (length === 0) return undefined
+    const buffer = Buffer.alloc(length)
+    await handle.read(buffer, 0, length, size - length)
+    const lines = buffer.toString('utf8').split('\n').reverse()
+    for (const line of lines) {
+      const time = lineTime(line)
+      if (time !== undefined) return time
+    }
+    return undefined
+  } finally {
+    await handle.close()
+  }
+}
+
+/**
+ * Last-record time (epoch ms) of each subagent transcript under a session directory.
+ * The map uses it to tell a running subagent (recent record) from a finished one.
+ * Keyed by agentId, like discoverSubagentFiles. A subagent with no readable record is absent.
+ */
+export async function readSubagentLastActivity(sessionDir: string): Promise<Map<string, number>> {
   const times = new Map<string, number>()
   const files = await discoverSubagentFiles(sessionDir)
   for (const [agentId, filePath] of files) {
-    const stat = await fs.promises.stat(filePath).catch(() => null)
-    if (stat) times.set(agentId, stat.mtimeMs)
+    const time = await readLastRecordTime(filePath)
+    if (time !== undefined) times.set(agentId, time)
   }
   return times
 }

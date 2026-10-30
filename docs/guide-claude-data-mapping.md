@@ -228,7 +228,7 @@ The Claude desktop app writes one JSON file per session, `local_<id>.json`, unde
 | `isArchived` | Hides the session, counted as "archived hidden" | Confirmed: 87 records are `true`, and all 87 have a transcript |
 | `lineageDetached` | No parent link for a session split to the top level | Confirmed on one real split and 13 records in total. A timestamp value would also count as set |
 
-Other fields exist (`spawnedFrom`, `forkedFromSessionId`, `title`, `cwd`) but are not used for links. `spawnedFrom` still names the parent after a split, so it cannot tell a split from a fork. The format is internal to the app and may change. `CLAUDE_DESKTOP_SESSIONS_DIR` overrides the folder.
+`spawnedFrom` names the parent the app nests the session under. It is written either as a string or as an object with a `sessionId` field, and the value is the parent's app ID (`local_<id>`), which the dashboard resolves to the parent's transcript ID. The map draws a nested child under its parent, except when `lineageDetached` is set. `lastActivityAt` (epoch ms) is the app's activity time, which the map uses to order sessions. Other fields (`forkedFromSessionId`, `title`, `cwd`) are not used for links. The format is internal to the app and may change. `CLAUDE_DESKTOP_SESSIONS_DIR` overrides the folder.
 
 ## Open questions
 

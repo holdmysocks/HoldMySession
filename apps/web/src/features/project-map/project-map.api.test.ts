@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import type { SessionSummary } from '@/lib/parsers/types'
 import {
   groupMapProjects,
+  orderByActivity,
   resolveSessionDetail,
   selectMapSessions,
   type CachedSessionDetail,
@@ -36,6 +37,33 @@ function session(overrides: Partial<SessionSummary> = {}): SessionSummary {
 }
 
 const EMPTY_DETAIL: SessionDetailInput = { agents: [], totalTokens: 0, pendingQuestions: [] }
+
+describe('orderByActivity', () => {
+  const base = (id: string, lastActiveAt: string, desktopActivityAt?: string | null) =>
+    ({ sessionId: id, lastActiveAt, desktopActivityAt }) as SessionSummary
+
+  it('orders newest first by the desktop activity time', () => {
+    const sessions = [
+      base('transcript-newest', '2026-01-03T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
+      base('desktop-newest', '2026-01-01T00:00:00.000Z', '2026-01-03T00:00:00.000Z'),
+    ]
+    expect(orderByActivity(sessions).map((s) => s.sessionId)).toEqual(['desktop-newest', 'transcript-newest'])
+  })
+
+  it('falls back to the transcript time when there is no desktop record', () => {
+    const sessions = [
+      base('older', '2026-01-01T00:00:00.000Z'),
+      base('newer', '2026-01-02T00:00:00.000Z', null),
+    ]
+    expect(orderByActivity(sessions).map((s) => s.sessionId)).toEqual(['newer', 'older'])
+  })
+
+  it('does not change the input array', () => {
+    const sessions = [base('a', '2026-01-01T00:00:00.000Z'), base('b', '2026-01-02T00:00:00.000Z')]
+    orderByActivity(sessions)
+    expect(sessions.map((s) => s.sessionId)).toEqual(['a', 'b'])
+  })
+})
 
 describe('groupMapProjects', () => {
   it('returns an empty list when there are no sessions', () => {

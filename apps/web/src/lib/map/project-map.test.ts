@@ -53,7 +53,7 @@ function input(overrides: Partial<MapSessionInput> = {}): MapSessionInput {
   return {
     summary: summary(),
     agents: [],
-    subagentWriteTimes: new Map(),
+    subagentLastActivity: new Map(),
     pendingQuestions: [],
     lastNotificationAt: null,
     totalTokens: 1000,
@@ -147,7 +147,7 @@ describe('buildProjectMap: sessions', () => {
   })
 
   it('leaves the project display name and branch off subagent nodes', () => {
-    const map = build([input({ agents: [agent({ agentId: 'x' })], subagentWriteTimes: live('x') })])
+    const map = build([input({ agents: [agent({ agentId: 'x' })], subagentLastActivity: live('x') })])
     expect(map.nodes[1].projectDisplayName).toBeNull()
     expect(map.nodes[1].branch).toBeNull()
   })
@@ -179,7 +179,7 @@ describe('buildProjectMap: subagents', () => {
     const map = build([
       input({
         agents: [agent({ agentId: 'x1' }), agent({ agentId: 'x2', durationMs: 500 })],
-        subagentWriteTimes: live('x1', 'x2'),
+        subagentLastActivity: live('x1', 'x2'),
       }),
     ])
     const children = map.nodes.filter((n) => n.kind === 'subagent')
@@ -194,7 +194,7 @@ describe('buildProjectMap: subagents', () => {
     const map = build([
       input({
         agents: [agent({ agentId: 'live' }), agent({ agentId: 'old' })],
-        subagentWriteTimes: new Map([
+        subagentLastActivity: new Map([
           ['live', NOW - 30_000],
           ['old', NOW - SUBAGENT_CACHE_WINDOW_MS - 1_000],
         ]),
@@ -228,7 +228,7 @@ describe('buildProjectMap: subagents', () => {
             tokens: { inputTokens: 5, outputTokens: 7, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
           }),
         ],
-        subagentWriteTimes: live('tok'),
+        subagentLastActivity: live('tok'),
       }),
     ])
     expect(map.nodes.find((n) => n.kind === 'subagent')?.tokens).toBe(12)
@@ -244,7 +244,7 @@ describe('buildProjectMap: subagents', () => {
             tokens: { inputTokens: 5, outputTokens: 7, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
           }),
         ],
-        subagentWriteTimes: live('tot'),
+        subagentLastActivity: live('tot'),
       }),
     ])
     expect(map.nodes.find((n) => n.kind === 'subagent')?.tokens).toBe(99)
@@ -252,7 +252,7 @@ describe('buildProjectMap: subagents', () => {
 
   it('uses the agent id to keep child node ids unique', () => {
     const map = build([
-      input({ agents: [agent({ agentId: 'one' }), agent({ agentId: 'two' })], subagentWriteTimes: live('one', 'two') }),
+      input({ agents: [agent({ agentId: 'one' }), agent({ agentId: 'two' })], subagentLastActivity: live('one', 'two') }),
     ])
     const ids = map.nodes.map((n) => n.id)
     expect(new Set(ids).size).toBe(ids.length)
@@ -265,7 +265,7 @@ describe('buildProjectMap: subagents', () => {
           summary: summary({ isActive: true }),
           pendingQuestions: [question()],
           agents: [agent({ agentId: 'c' })],
-          subagentWriteTimes: live('c'),
+          subagentLastActivity: live('c'),
         }),
       ],
       NOW,
@@ -282,7 +282,7 @@ describe('expiredSubagentCount', () => {
   it('counts every subagent that is not running, including ones with no transcript', () => {
     const session = input({
       agents: [agent({ agentId: 'run' }), agent({ agentId: 'stale' }), agent({ agentId: 'none' })],
-      subagentWriteTimes: new Map([
+      subagentLastActivity: new Map([
         ['run', NOW],
         ['stale', NOW - SUBAGENT_CACHE_WINDOW_MS - 1],
       ]),
@@ -291,7 +291,7 @@ describe('expiredSubagentCount', () => {
   })
 
   it('is 0 when every subagent is running', () => {
-    const session = input({ agents: [agent({ agentId: 'a' })], subagentWriteTimes: live('a') })
+    const session = input({ agents: [agent({ agentId: 'a' })], subagentLastActivity: live('a') })
     expect(expiredSubagentCount(session, NOW)).toBe(0)
   })
 })
@@ -301,7 +301,7 @@ describe('buildProjectMap: expired subagents', () => {
     const map = build([
       input({
         agents: [agent({ agentId: 'e1' }), agent({ agentId: 'e2' })],
-        subagentWriteTimes: new Map([
+        subagentLastActivity: new Map([
           ['e1', NOW - SUBAGENT_CACHE_WINDOW_MS - 60_000],
           ['e2', NOW - SUBAGENT_CACHE_WINDOW_MS - 60_000],
         ]),
@@ -324,7 +324,7 @@ describe('buildProjectMap: expired subagents', () => {
       input({
         summary: summary({ sessionId: 'b0000000' }),
         agents: [agent({ agentId: 'y' }), agent({ agentId: 'z' })],
-        subagentWriteTimes: live('y'),
+        subagentLastActivity: live('y'),
       }),
     ])
     const counts = map.nodes.filter((n) => n.kind === 'session').map((n) => n.expiredSubagentCount)
@@ -382,7 +382,7 @@ describe('buildProjectMap: forks', () => {
         lineageDetached: true,
       }),
       agents: [agent({ agentId: 'y' })],
-      subagentWriteTimes: live('y'),
+      subagentLastActivity: live('y'),
     })
     const map = build([parent, split])
     const splitNode = map.nodes.find((n) => n.sessionId === 'split-1')!
@@ -391,6 +391,33 @@ describe('buildProjectMap: forks', () => {
     expect(map.edges.filter((e) => e.kind === 'fork')).toEqual([])
     // The split session keeps its own subagents.
     expect(map.nodes.find((n) => n.kind === 'subagent')!.parentId).toBe('session:split-1')
+  })
+
+  it('links a session the desktop app nested under a parent, when the transcript has no forkedFrom', () => {
+    const nested = input({ summary: summary({ sessionId: 'nested-1', desktopParentId: 'parent-1' }) })
+    const map = build([parent, nested])
+    expect(map.nodes.find((n) => n.sessionId === 'nested-1')!.parentId).toBe('session:parent-1')
+    expect(map.edges).toEqual([
+      { id: 'edge:session:nested-1', from: 'session:parent-1', to: 'session:nested-1', kind: 'fork' },
+    ])
+  })
+
+  it('prefers the transcript forkedFrom over the desktop parent', () => {
+    const both = input({
+      summary: summary({
+        sessionId: 'both',
+        forkedFrom: { sessionId: 'parent-1', messageUuid: null },
+        desktopParentId: 'other',
+      }),
+    })
+    const map = build([parent, both])
+    expect(map.nodes.find((n) => n.sessionId === 'both')!.parentId).toBe('session:parent-1')
+  })
+
+  it('does not nest a split session under its desktop parent either', () => {
+    const split = input({ summary: summary({ sessionId: 'split-2', desktopParentId: 'parent-1', lineageDetached: true }) })
+    const map = build([parent, split])
+    expect(map.nodes.find((n) => n.sessionId === 'split-2')!.parentId).toBeNull()
   })
 
   it('still links a fork of a split session to that split session', () => {
@@ -416,7 +443,7 @@ describe('buildProjectMap: forks', () => {
     const withAgent = input({
       summary: summary({ sessionId: 'fork-1', forkedFrom: { sessionId: 'parent-1', messageUuid: null } }),
       agents: [agent({ agentId: 'z' })],
-      subagentWriteTimes: live('z'),
+      subagentLastActivity: live('z'),
     })
     const map = build([parent, withAgent])
     const child = map.nodes.find((n) => n.kind === 'subagent')!

@@ -7,10 +7,10 @@ import type { MapEdge, MapNode, ProjectMap } from './project-map'
  * without overlap. Coordinates are in SVG user units, so the canvas can use a viewBox.
  */
 
-export const SESSION_WIDTH = 260
-export const SESSION_HEIGHT = 84
-export const SUBAGENT_WIDTH = 180
-export const SUBAGENT_HEIGHT = 44
+export const SESSION_WIDTH = 280
+export const SESSION_HEIGHT = 92
+export const SUBAGENT_WIDTH = 190
+export const SUBAGENT_HEIGHT = 50
 export const SUBAGENT_GAP = 10
 /** Gap between the right edge of one column and the left edge of the next. */
 const COLUMN_GAP = 60

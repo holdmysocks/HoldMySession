@@ -126,7 +126,7 @@ describe('visibility with expired subagents', () => {
     const inputs: MapSessionInput[] = filterVisibleSessions([summary('s1', '/work/app')]).map((s) => ({
       summary: s,
       agents: [agent],
-      subagentWriteTimes: new Map([['old', NOW - 60 * 60_000]]),
+      subagentLastActivity: new Map([['old', NOW - 60 * 60_000]]),
       pendingQuestions: [],
       lastNotificationAt: null,
       totalTokens: 0,

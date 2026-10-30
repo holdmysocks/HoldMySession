@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { SessionSummary } from '../parsers/types'
 import type { ProjectInfo } from './project-scanner'
 import type { DataSource } from '../utils/claude-path'
+import type { DesktopSessionFlags } from '../desktop/desktop-records'
 
 // Mock all external dependencies inline (vi.mock is hoisted)
 vi.mock('./project-scanner', () => ({
@@ -21,9 +22,11 @@ vi.mock('../parsers/session-parser', () => ({
   parseFullScan: vi.fn().mockResolvedValue({ outputTokens: 0, customTitle: null }),
 }))
 
-vi.mock('./active-detector', () => ({
-  isSessionActive: vi.fn(),
-}))
+vi.mock('./active-detector', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./active-detector')>()
+  // The record check is covered in active-detector.test.ts. Here every session has a recent record.
+  return { ...actual, isSessionActive: vi.fn(), hasRecentRecord: vi.fn(() => true) }
+})
 
 vi.mock('../desktop/desktop-records', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../desktop/desktop-records')>()
@@ -69,6 +72,19 @@ function makeProject(overrides: Partial<ProjectInfo> = {}): ProjectInfo {
     projectName: 'myproject',
     cwdKnown: true,
     sessionFiles: ['session-abc.jsonl'],
+    ...overrides,
+  }
+}
+
+function flags(cliSessionId: string, overrides: Partial<DesktopSessionFlags> = {}): DesktopSessionFlags {
+  return {
+    cliSessionId,
+    localId: `local_${cliSessionId}`,
+    isArchived: false,
+    lastActivityAt: null,
+    lineageDetached: false,
+    parentLocalId: null,
+    parentCliSessionId: null,
     ...overrides,
   }
 }
@@ -407,8 +423,8 @@ describe('session-scanner', () => {
       mockIsSessionActive.mockResolvedValue(false)
       vi.mocked(loadDesktopSessionFlags).mockResolvedValue(
         new Map([
-          ['session-abc', { cliSessionId: 'session-abc', isArchived: true, lineageDetached: false }],
-          ['session-def', { cliSessionId: 'session-def', isArchived: false, lineageDetached: true }],
+          ['session-abc', flags('session-abc', { isArchived: true })],
+          ['session-def', flags('session-def', { lineageDetached: true })],
         ]),
       )
 

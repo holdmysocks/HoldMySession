@@ -65,7 +65,7 @@ function input(
   return {
     summary: summary(sessionId, forkOf),
     agents: all,
-    subagentWriteTimes: writeTimes,
+    subagentLastActivity: writeTimes,
     pendingQuestions: [],
     lastNotificationAt: null,
     totalTokens: 0,
@@ -156,20 +156,20 @@ describe('layoutProjectMap', () => {
     }
   })
 
-  it('stacks subagent cards 54px apart and sizes the block to fit them', () => {
+  it('stacks subagent cards 60px apart and sizes the block to fit them', () => {
     const layout = layoutProjectMap(mapOf([input('s0', 3)]))
     const children = layout.nodes.filter((n) => n.kind === 'subagent')
-    // card 44 + gap 10
-    expect(children.map((c) => c.y)).toEqual([0, 54, 108])
-    // 3 * 54 - 10 = 152, taller than the session node
-    expect(layout.height).toBe(152)
+    // card 50 + gap 10
+    expect(children.map((c) => c.y)).toEqual([0, 60, 120])
+    // 3 * 60 - 10 = 170, taller than the session node
+    expect(layout.height).toBe(170)
   })
 
   it('centres the session node vertically in its block', () => {
     const layout = layoutProjectMap(mapOf([input('s0', 3)]))
     const session = layout.nodes.find((n) => n.kind === 'session')!
-    // (152 - 84) / 2 = 34
-    expect(session.y).toBe(34)
+    // (170 - 92) / 2 = 39
+    expect(session.y).toBe(39)
   })
 
   it('keeps top-level blocks separated by a 24px gap', () => {

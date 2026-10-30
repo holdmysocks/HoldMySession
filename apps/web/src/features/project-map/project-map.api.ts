@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { scanAllSessionsWithPaths } from '@/lib/scanner/session-scanner'
 import type { SessionSummaryWithPath } from '@/lib/scanner/session-scanner'
 import { parseDetail } from '@/lib/parsers/session-parser'
-import { readSubagentWriteTimes } from '@/lib/parsers/subagent-discovery'
+import { readSubagentLastActivity } from '@/lib/parsers/subagent-discovery'
 import type { AgentInvocation, SessionSummary } from '@/lib/parsers/types'
 import { findPendingQuestions } from '@/lib/map/pending-requests'
 import type { PendingQuestion } from '@/lib/map/pending-requests'
@@ -71,6 +71,15 @@ export function groupMapProjects(sessions: SessionSummary[]): MapProject[] {
   )
 }
 
+/**
+ * Newest first by when the desktop app last saw activity in the session, falling back to the
+ * transcript's last record. This is the order the map shows top-level sessions in.
+ */
+export function orderByActivity<T extends SessionSummary>(sessions: T[]): T[] {
+  const time = (s: SessionSummary) => Date.parse(s.desktopActivityAt ?? s.lastActiveAt)
+  return [...sessions].sort((a, b) => time(b) - time(a))
+}
+
 /** Every session in one project, in the order given (newest first). No cap: the map shows them all. */
 export function selectMapSessions<T extends SessionSummary>(sessions: T[], projectKey: string): T[] {
   return sessions.filter((s) => s.projectKey === projectKey)
@@ -121,7 +130,7 @@ export const getProjectMap = createServerFn({ method: 'GET' })
     const all = await scanAllSessionsWithPaths()
     const inProject = selectMapSessions(all, data.projectKey)
     // Sessions with no project, and archived sessions, are not drawn, and their subagents go with them.
-    const sessions = filterVisibleSessions(inProject)
+    const sessions = orderByActivity(filterVisibleSessions(inProject))
     const hiddenNoProjectCount = filterHiddenSessions(inProject).length
     const hiddenArchivedCount = filterArchivedSessions(inProject).length
 
@@ -141,7 +150,7 @@ export const getProjectMap = createServerFn({ method: 'GET' })
       inputs.push({
         summary: session,
         agents: detail.agents,
-        subagentWriteTimes: await readSubagentWriteTimes(sessionDir),
+        subagentLastActivity: await readSubagentLastActivity(sessionDir),
         pendingQuestions: detail.pendingQuestions,
         lastNotificationAt: notifications.get(session.sessionId) ?? null,
         totalTokens: detail.totalTokens,

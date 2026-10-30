@@ -62,9 +62,9 @@ describe('session status pulse in app.css', () => {
     expect(css).toMatch(/@keyframes status-glow-active[\s\S]*?10px rgb\(34 197 94 \/ 0\.7\)/)
   })
 
-  it('scales the map halo from 1 to 1.08 around the centre of its box', () => {
-    expect(css).toMatch(/@keyframes status-halo-needs-you[\s\S]*?scale\(1\.08\)/)
-    expect(css).toMatch(/@keyframes status-halo-active[\s\S]*?scale\(1\.08\)/)
+  it('scales the map halo from 1 to 1.03 around the centre of its box', () => {
+    expect(css).toMatch(/@keyframes status-halo-needs-you[\s\S]*?scale\(1\.03\)/)
+    expect(css).toMatch(/@keyframes status-halo-active[\s\S]*?scale\(1\.03\)/)
     for (const selector of ['.status-halo-needs-you', '.status-halo-active']) {
       expect(ruleBody(selector)).toContain('transform-box: fill-box')
       expect(ruleBody(selector)).toContain('transform-origin: center')

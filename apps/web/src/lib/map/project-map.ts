@@ -76,8 +76,8 @@ export interface ProjectMap {
 export interface MapSessionInput {
   summary: SessionSummary
   agents: AgentInvocation[]
-  /** Last write time (epoch ms) per subagent agentId, from the subagent transcript files. */
-  subagentWriteTimes: ReadonlyMap<string, number>
+  /** Time (epoch ms) of the last record per subagent agentId, from the subagent transcript files. */
+  subagentLastActivity: ReadonlyMap<string, number>
   pendingQuestions: PendingQuestion[]
   /** Latest Notification hook event for this session, ISO timestamp, or null. */
   lastNotificationAt: string | null
@@ -120,8 +120,8 @@ export function forkParents(sessions: MapSessionInput[]): Map<string, string> {
   const parentOf = new Map<string, string>()
 
   for (const { summary } of sessions) {
-    const parent = summary.forkedFrom?.sessionId
     if (summary.lineageDetached) continue
+    const parent = summary.forkedFrom?.sessionId ?? summary.desktopParentId ?? null
     if (parent && parent !== summary.sessionId && ids.has(parent)) {
       parentOf.set(summary.sessionId, parent)
     }
@@ -178,7 +178,7 @@ function sessionNode(
 }
 
 /**
- * A subagent is running when its transcript was written inside SUBAGENT_CACHE_WINDOW_MS.
+ * A subagent is running when its transcript's last record is inside SUBAGENT_CACHE_WINDOW_MS.
  * No transcript (no agentId, or the file is gone) means it cannot be shown as running.
  */
 export function isSubagentRunning(writtenAt: number | undefined, nowMs: number): boolean {
@@ -186,7 +186,7 @@ export function isSubagentRunning(writtenAt: number | undefined, nowMs: number):
 }
 
 function subagentWriteTime(input: MapSessionInput, agent: AgentInvocation): number | undefined {
-  return agent.agentId ? input.subagentWriteTimes.get(agent.agentId) : undefined
+  return agent.agentId ? input.subagentLastActivity.get(agent.agentId) : undefined
 }
 
 /** How many of this session's subagents have expired and so are not drawn. */

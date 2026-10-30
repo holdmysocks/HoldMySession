@@ -44,6 +44,16 @@ export interface SessionSummary {
    * link for it, even though its transcript still names the parent.
    */
   lineageDetached?: boolean
+  /**
+   * When the Claude desktop app last saw activity in this session (ISO time), or null. The map
+   * orders sessions by it, falling back to `lastActiveAt`.
+   */
+  desktopActivityAt?: string | null
+  /**
+   * Parent session, from the desktop app's `spawnedFrom`, when the transcript has no `forkedFrom`.
+   * The map draws it as a child link, like a fork. Null when not nested.
+   */
+  desktopParentId?: string | null
 }
 
 export interface ForkedFrom {

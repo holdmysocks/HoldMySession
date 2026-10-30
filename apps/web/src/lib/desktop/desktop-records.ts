@@ -14,13 +14,37 @@ import * as path from 'node:path'
 export interface DesktopSessionFlags {
   /** `cliSessionId`: the transcript session ID. Used to join a record to its transcript. */
   cliSessionId: string
+  /** `sessionId`: the desktop app's own ID for the session (local_<uuid>). */
+  localId: string
   /** `isArchived`: the user archived the session in the desktop app. */
   isArchived: boolean
+  /** `lastActivityAt` (epoch ms): when the desktop app last saw activity in the session. Null when absent. */
+  lastActivityAt: number | null
   /**
    * `lineageDetached`: the session was split from its parent in the desktop app. The transcript
    * and `spawnedFrom` still point at the parent, so the map must not draw that link.
    */
   lineageDetached: boolean
+  /** `spawnedFrom`, as the app's own ID of the parent (local_<uuid>), or null. */
+  parentLocalId: string | null
+  /**
+   * The parent's transcript ID, resolved from `parentLocalId` across all records. Null when the
+   * session is not nested, or the parent has no record on this machine.
+   */
+  parentCliSessionId: string | null
+}
+
+/**
+ * The app's ID of the parent, from `spawnedFrom`. The app writes either a bare string or an
+ * object with a `sessionId` field, so both are read.
+ */
+function spawnedFromLocalId(value: unknown): string | null {
+  if (typeof value === 'string') return value === '' ? null : value
+  if (typeof value === 'object' && value !== null) {
+    const id = (value as Record<string, unknown>).sessionId
+    return typeof id === 'string' && id !== '' ? id : null
+  }
+  return null
 }
 
 /** Pure: the flags from one parsed record, or null when the record has no transcript ID. */
@@ -30,8 +54,15 @@ export function parseDesktopRecord(value: unknown): DesktopSessionFlags | null {
   if (typeof record.cliSessionId !== 'string' || record.cliSessionId === '') return null
   return {
     cliSessionId: record.cliSessionId,
+    localId: typeof record.sessionId === 'string' ? record.sessionId : '',
     isArchived: record.isArchived === true,
+    lastActivityAt:
+      typeof record.lastActivityAt === 'number' && Number.isFinite(record.lastActivityAt)
+        ? record.lastActivityAt
+        : null,
     lineageDetached: Boolean(record.lineageDetached),
+    parentLocalId: spawnedFromLocalId(record.spawnedFrom),
+    parentCliSessionId: null,
   }
 }
 
@@ -81,14 +112,31 @@ async function readRecord(file: string, mtimeMs: number): Promise<DesktopSession
   return flags
 }
 
-/** Flags for every readable record under `dir`, keyed by transcript session ID. */
+/**
+ * Flags for every readable record under `dir`, keyed by transcript session ID. Each record's
+ * parent is resolved from the app's IDs to transcript IDs, using the records read here.
+ */
 export async function readDesktopSessionFlags(dir: string): Promise<Map<string, DesktopSessionFlags>> {
-  const byCliSessionId = new Map<string, DesktopSessionFlags>()
+  const records: DesktopSessionFlags[] = []
   for (const file of await listRecordFiles(dir)) {
     const stat = await fs.promises.stat(file).catch(() => null)
     if (!stat) continue
     const flags = await readRecord(file, stat.mtimeMs)
-    if (flags) byCliSessionId.set(flags.cliSessionId, flags)
+    if (flags) records.push(flags)
+  }
+
+  const cliIdByLocalId = new Map<string, string>()
+  for (const record of records) {
+    if (record.localId !== '') cliIdByLocalId.set(record.localId, record.cliSessionId)
+  }
+
+  const byCliSessionId = new Map<string, DesktopSessionFlags>()
+  for (const record of records) {
+    const parent = record.parentLocalId ? cliIdByLocalId.get(record.parentLocalId) : undefined
+    byCliSessionId.set(record.cliSessionId, {
+      ...record,
+      parentCliSessionId: parent && parent !== record.cliSessionId ? parent : null,
+    })
   }
   return byCliSessionId
 }
@@ -100,14 +148,22 @@ export async function loadDesktopSessionFlags(): Promise<Map<string, DesktopSess
   return readDesktopSessionFlags(dir).catch(() => new Map<string, DesktopSessionFlags>())
 }
 
-/** The two flags for one transcript session. Both false when the desktop app has no record for it. */
+/** The flags for one transcript session. All false or null when the desktop app has no record for it. */
 export function desktopFlagsFor(
   flags: Map<string, DesktopSessionFlags>,
   sessionId: string,
-): { isArchived: boolean; lineageDetached: boolean } {
+): {
+  isArchived: boolean
+  lineageDetached: boolean
+  desktopActivityAt: string | null
+  desktopParentId: string | null
+} {
   const record = flags.get(sessionId)
   return {
     isArchived: record?.isArchived ?? false,
     lineageDetached: record?.lineageDetached ?? false,
+    desktopActivityAt:
+      record?.lastActivityAt != null ? new Date(record.lastActivityAt).toISOString() : null,
+    desktopParentId: record?.parentCliSessionId ?? null,
   }
 }

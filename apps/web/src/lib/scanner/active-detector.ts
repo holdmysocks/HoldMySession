@@ -5,6 +5,15 @@ import { getProjectsDir } from '../utils/claude-path'
 const ACTIVE_THRESHOLD_MS = 120_000 // 2 minutes
 
 /**
+ * True when the session's last record is recent. Together with the file check below, this
+ * decides active. A file that is only touched (opened or copied) without a new record stays idle.
+ */
+export function hasRecentRecord(lastActiveAt: string, nowMs: number = Date.now()): boolean {
+  const time = Date.parse(lastActiveAt)
+  return !Number.isNaN(time) && nowMs - time <= ACTIVE_THRESHOLD_MS
+}
+
+/**
  * Check if a session is active by examining:
  * 1. mtime of the JSONL file (within last 2 minutes)
  * 2. Existence of a lock directory (session ID without .jsonl extension)

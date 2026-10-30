@@ -60,7 +60,7 @@ describe('MapCanvas', () => {
     {
       summary: summary('aaaaaaaa-1111', { isActive: true }),
       agents: [agent],
-      subagentWriteTimes: new Map([['agent-1', Date.now()]]),
+      subagentLastActivity: new Map([['agent-1', Date.now()]]),
       pendingQuestions: [],
       lastNotificationAt: null,
       totalTokens: 500,
@@ -68,7 +68,7 @@ describe('MapCanvas', () => {
     {
       summary: summary('bbbbbbbb-2222', { isActive: true }),
       agents: [],
-      subagentWriteTimes: new Map(),
+      subagentLastActivity: new Map(),
       pendingQuestions: [
         { toolUseId: 'q', timestamp: '2026-01-01T10:00:00Z', questions: [{ header: 'H', question: 'Q?' }] },
       ],
@@ -124,17 +124,23 @@ describe('MapCanvas', () => {
     expect(screen.getByRole('button', { name: 'Subagent, Explore, Running' }).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('shows the project name first, then the session name, branch, short id and message count', () => {
+  it('shows the session name next to the dot, then the short id and message count, branch and model', () => {
     renderCanvas(layout)
-    expect(screen.getAllByText('My App').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Fix the map labels').length).toBeGreaterThan(0)
-    expect(screen.getByText('feature/map · aaaaaaaa · 4 msgs')).toBeTruthy()
+    expect(screen.getByText('aaaaaaaa · 4 msgs')).toBeTruthy()
+    expect(screen.getAllByText('feature/map').length).toBeGreaterThan(0)
     expect(screen.getAllByText('example-1').length).toBeGreaterThan(0)
+  })
+
+  it('leaves the project name off the card, but keeps it in the accessible label', () => {
+    renderCanvas(layout)
+    expect(screen.queryByText('My App')).toBeNull()
+    expect(screen.getAllByRole('button', { name: /Session, My App, Fix the map labels/ }).length).toBeGreaterThan(0)
   })
 
   it('uses a neutral title, not the branch, when the session has no name', () => {
     const plain = buildLayout([
-      { summary: summary('cccccccc-3333', { sessionName: null }), agents: [], subagentWriteTimes: new Map(), pendingQuestions: [], lastNotificationAt: null, totalTokens: 0 },
+      { summary: summary('cccccccc-3333', { sessionName: null }), agents: [], subagentLastActivity: new Map(), pendingQuestions: [], lastNotificationAt: null, totalTokens: 0 },
     ])
     renderCanvas(plain)
     expect(screen.getByRole('button', { name: 'Session, My App, Untitled session, Idle' })).toBeTruthy()
@@ -142,11 +148,11 @@ describe('MapCanvas', () => {
 
   it('labels a running subagent as running and a fork as a forked session', () => {
     const forked = buildLayout([
-      { summary: summary('aaaaaaaa-1111'), agents: [], subagentWriteTimes: new Map(), pendingQuestions: [], lastNotificationAt: null, totalTokens: 0 },
+      { summary: summary('aaaaaaaa-1111'), agents: [], subagentLastActivity: new Map(), pendingQuestions: [], lastNotificationAt: null, totalTokens: 0 },
       {
         summary: summary('eeeeeeee-5555', { forkedFrom: { sessionId: 'aaaaaaaa-1111', messageUuid: null } }),
         agents: [{ ...agent, agentId: 'live' }],
-        subagentWriteTimes: new Map([['live', Date.now()]]),
+        subagentLastActivity: new Map([['live', Date.now()]]),
         pendingQuestions: [],
         lastNotificationAt: null,
         totalTokens: 0,
@@ -168,7 +174,7 @@ describe('MapCanvas borders and expired subagents', () => {
     return {
       summary: summary(sessionId, overrides),
       agents,
-      subagentWriteTimes: new Map(writeTimes),
+      subagentLastActivity: new Map(writeTimes),
       pendingQuestions: [],
       lastNotificationAt: null,
       totalTokens: 0,
@@ -244,7 +250,7 @@ describe('MapCanvas status styling', () => {
           lastActiveAt: new Date().toISOString(),
         }),
         agents: [],
-        subagentWriteTimes: new Map(),
+        subagentLastActivity: new Map(),
         pendingQuestions: status.pending
           ? [{ toolUseId: 'q', timestamp: new Date().toISOString(), questions: [] }]
           : [],

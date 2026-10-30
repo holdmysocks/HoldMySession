@@ -30,11 +30,11 @@ The dashboard reads the Claude config directory on Windows, which is `%USERPROFI
 
 ## What the map shows
 
-- **Session nodes.** The project name is the primary label. The session name is the second line. Branch, short id, and message count are small text, with the model at the bottom.
+- **Session nodes.** The session name sits next to the status dot. The project is not shown on the card, because the map is already for one project. Short id and message count come next, then the branch, then the model. The text is 11 to 15 px.
 - **Fork nodes.** A fork of a session in the same project hangs off that session, joined by a dashed edge. The node says "Forked session" in the details panel.
 - **Subagent cards.** Small cards (180 by 44) under the session or fork that dispatched them. The label is the subagent type, then its description. Only running subagents are drawn (see the subagent rule under Status).
 - **Expired subagents.** A subagent quiet for more than 5 minutes is not drawn and takes no space. Its session node shows a small **+N** chip with the count, and the page info line gives the project total.
-- **Layout.** Each depth is a column: top-level sessions, then their forks and subagents, then forks of forks. A parent is centred on its children. Nothing overlaps.
+- **Layout.** Each depth is a column: top-level sessions, then their forks and subagents, then forks of forks. A parent is centred on its children. Top-level sessions are in the desktop app's activity order, newest first, and the map follows the app's order as it changes. The canvas has 8 px of space around the drawing, so borders and halos are not cut off.
 - **Every session in the project is shown, except sessions with no project and archived sessions.** There is no cap. See [Sessions with no project](#sessions-with-no-project) and [Archived and split sessions](#archived-and-split-sessions).
 
 ### Sessions with no project
@@ -97,7 +97,7 @@ Every status border is 2 px wide on session cards and on map session nodes.
 | Status | Border (2 px) | Motion | Rule |
 |---|---|---|---|
 | Needs you | yellow `#facc15` | fast pulse, 1.2 s. The glow grows to about 14 px at 0.9 alpha, and the border brightens at the peak. | The session is active and has an open `AskUserQuestion`, or a Notification hook event is newer than its last write. An open question in an idle session is ignored, since it was abandoned. |
-| Active | green | slow pulse, 2.4 s. The glow grows to about 10 px at 0.7 alpha. | Active: the transcript was written in the last 2 minutes, and the session's folder exists (see limitations). |
+| Active | green | slow pulse, 2.4 s. The glow grows to about 10 px at 0.7 alpha. | Active: the transcript file was written in the last 2 minutes, its last record is also in the last 2 minutes, and the session's folder exists (see limitations). A file that is only touched, with no new record, is not active. |
 | Completed | Claude orange `#d97757`, solid | none | Not active, the last assistant `stop_reason` is `end_turn`, and the last write was within the **last hour**. |
 | Idle | grey | none | Anything else. Including completed sessions older than an hour. |
 
@@ -105,10 +105,10 @@ Every status border is 2 px wide on session cards and on map session nodes.
 
 | State | Border | Motion | Rule |
 |---|---|---|---|
-| Running | green | slow pulse, as for active | The subagent's transcript was written in the last **5 minutes** (`SUBAGENT_CACHE_WINDOW_MS`). |
+| Running | green | slow pulse, as for active | The timestamp of the subagent transcript's **last record** is within the last **5 minutes** (`SUBAGENT_CACHE_WINDOW_MS`). The file's modification time is not used. |
 | Expired | not drawn | none | Anything else, including a subagent with no transcript file or no `agentId`. It is counted on the session's **+N** chip. |
 
-**How the pulse is drawn.** Session cards glow with a `box-shadow` on their border. Map nodes have a halo rect behind them that fades in and scales from 1 to 1.08 around its centre. Both are CSS keyframes, with no JavaScript timers. With `prefers-reduced-motion: reduce`, the pulse stops, the halo is hidden, and the status colour and border stay.
+**How the pulse is drawn.** Session cards glow with a `box-shadow` on their border. Map nodes have a halo rect behind them that fades in and scales from 1 to 1.03 around its centre, inset 2 px. Both are CSS keyframes, with no JavaScript timers. With `prefers-reduced-motion: reduce`, the pulse stops, the halo is hidden, and the status colour and border stay.
 
 ### Subagent details
 
@@ -143,10 +143,10 @@ The hook is the only writer of this file. It always exits 0 and swallows errors,
 | Feature | Status | Notes |
 |---|---|---|
 | Map of every session in a project | Built | No cap. Every session is parsed on the first load and cached by file mtime. |
-| Fork links (child of the parent session) | Built | From `forkedFrom` in the first 50 lines. Same project only. |
+| Fork links (child of the parent session) | Built | From `forkedFrom` in the first 50 lines, or else the desktop app's `spawnedFrom`. Same project only. A split session is never linked. |
 | Split-out forks shown at top level | Built | A session the desktop app split (`lineageDetached`) gets no parent link. Its transcript still names the parent. See [Archived and split sessions](#archived-and-split-sessions). |
 | Continuations linked to their predecessor | Not built, by design | No structural link in the transcript. |
-| Subagents as small cards, running only | Built | Running means the subagent transcript was written in the last 5 minutes. Expired subagents are counted on the session's +N chip. |
+| Subagents as small cards, running only | Built | Running means the subagent transcript's last record is within 5 minutes. Expired subagents are counted on the session's +N chip. |
 | Sessions with no project hidden | Built | Map and Sessions list. Stats and project analytics still count them. |
 | Archived sessions hidden | Built | From the desktop app's session record (`isArchived`). Counted as "archived hidden". |
 | Subagent transcripts as their own sessions | Not built | Used only to judge running state. |
@@ -172,7 +172,8 @@ The hook is the only writer of this file. It always exits 0 and swallows errors,
 - **Message counts come from the first and last 15 lines** of each file, so a long session shows a count that is too low. This predates Phase 1 and is not fixed here. The sessions list and the map both show it.
 - **Permission prompts were not found in the transcript.** Only the Notification hook reveals them. Without the hook, a session waiting on one looks idle.
 - **An unanswered `AskUserQuestion` can belong to an abandoned session.** It is ignored once the session is idle, but an active session with a stale question still shows as needs-you.
-- **Subagents quiet for more than 5 minutes are not drawn**, even if they are still working. Running is judged from the transcript's last write, so a subagent that goes silent for longer than the window counts as expired until it writes again. The session's +N chip still counts it.
+- **Background tasks are not seen.** A session that is running a background task, with no new transcript record, shows as idle. The transcript does not record background tasks, so this needs a different signal. We have not found one yet.
+- **Subagents quiet for more than 5 minutes are not drawn**, even if they are still working. Running is judged from the transcript's last record, so a subagent that goes silent for longer than the window counts as expired until it writes again. The session's +N chip still counts it.
 - **Archive state lives in the desktop app's records, not the transcript.** The CLI transcript has no archive marker. The app's record (`isArchived`) is the source now used. A session with no desktop record cannot be archived as far as the dashboard can tell.
 - **The map reads only the primary data source.** On Windows, WSL sessions are listed on the Sessions page but not on the map.
 - **Scale.** The first map load parses every session in the project in full, one at a time. Later loads reuse the cache, but active sessions are parsed on every poll (every 10 seconds). A project with hundreds of long sessions will load slowly the first time.
@@ -239,3 +240,11 @@ Fixes for problems a Windows user reported with real data.
 - **Archived sessions hidden.** Read from the desktop app's session record (`isArchived`), joined to the transcript by `cliSessionId`. Shown as **N archived hidden** on the map and the Sessions page.
 - **Split sessions.** Read from `lineageDetached` in the same record. The map draws no parent link for them, so they are top-level nodes.
 - **New module.** `src/lib/desktop/desktop-records.ts`, with tests. Stats and project analytics are unchanged.
+
+### Ordering, parent links and activity (2026-10-30, later)
+
+- **Activity needs a recent record.** An active session needs both a recently written file and a recent last record. A file that an app or a backup only touches stays idle. This removed false greens on old sessions.
+- **Subagents use the last record's timestamp** from the end of their transcript, not the file's modification time.
+- **Order follows the desktop app.** Top-level sessions are ordered by the desktop record's `lastActivityAt`, falling back to the transcript's last record. The order was checked against the app's sidebar.
+- **Nesting follows `spawnedFrom`.** The app nests a session under its parent with `spawnedFrom`, which is written either as a string or as an object with `sessionId`. The map now links those children, as it does forks. The child's label reads "fork", which is a little misleading for these.
+- **Layout.** Session nodes are 280 by 92 px and subagent cards 190 by 50 px. The project name is no longer on the card.

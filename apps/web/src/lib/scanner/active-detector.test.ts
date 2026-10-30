@@ -11,7 +11,7 @@ vi.mock('@/lib/utils/claude-path', () => ({
 }))
 
 import * as fs from 'node:fs'
-import { isSessionActive } from './active-detector'
+import { hasRecentRecord, isSessionActive } from './active-detector'
 
 const mockStat = fs.promises.stat as ReturnType<typeof vi.fn>
 
@@ -260,5 +260,21 @@ describe('isSessionActive', () => {
 
       expect(mockStat).toHaveBeenCalledWith('/fake/projects/my-project-dir/my-session-id')
     })
+  })
+})
+
+describe('hasRecentRecord', () => {
+  const NOW = Date.parse('2026-01-01T12:00:00.000Z')
+
+  it('is true when the last record is within the active window', () => {
+    expect(hasRecentRecord('2026-01-01T11:59:30.000Z', NOW)).toBe(true)
+  })
+
+  it('is false when the last record is older than the active window', () => {
+    expect(hasRecentRecord('2026-01-01T11:00:00.000Z', NOW)).toBe(false)
+  })
+
+  it('is false when the timestamp cannot be read', () => {
+    expect(hasRecentRecord('not a date', NOW)).toBe(false)
   })
 })

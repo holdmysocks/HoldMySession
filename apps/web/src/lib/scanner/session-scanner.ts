@@ -3,7 +3,7 @@ import * as path from 'node:path'
 import { getProjectsDir, getProjectsDirFor, getDataSources, extractSessionId } from '../utils/claude-path'
 import type { DataSource } from '../utils/claude-path'
 import { scanProjects, scanProjectsFrom } from './project-scanner'
-import { isSessionActive } from './active-detector'
+import { hasRecentRecord, isSessionActive } from './active-detector'
 import { parseSummary, parseFullScan } from '../parsers/session-parser'
 import type { SessionSummary } from '../parsers/types'
 import { truncateSessionName } from '../parsers/session-name'
@@ -57,7 +57,7 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
       const cached = summaryCache.get(sessionId)
       if (cached && cached.mtimeMs === stat.mtimeMs) {
         // Refresh active status even for cached entries
-        const active = await isSessionActive(project.dirName, sessionId)
+        const active = (await isSessionActive(project.dirName, sessionId)) && hasRecentRecord(cached.summary.lastActiveAt)
         summaries.push({ ...cached.summary, isActive: active, filePath, projectDisplayName })
         continue
       }
@@ -73,7 +73,7 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
       )
 
       if (summary) {
-        const active = await isSessionActive(project.dirName, sessionId)
+        const active = (await isSessionActive(project.dirName, sessionId)) && hasRecentRecord(summary.lastActiveAt)
         summary.isActive = active
         await applyFullScan(summary, filePath)
 
@@ -135,7 +135,9 @@ export async function scanSessionsFromSource(source: DataSource): Promise<Sessio
 
       const cached = summaryCache.get(`${source.id}:${sessionId}`)
       if (cached && cached.mtimeMs === stat.mtimeMs) {
-        const active = await isSessionActive(project.dirName, sessionId, projectsDirOverride)
+        const active =
+          (await isSessionActive(project.dirName, sessionId, projectsDirOverride)) &&
+          hasRecentRecord(cached.summary.lastActiveAt)
         summaries.push({
           ...cached.summary,
           isActive: active,
@@ -157,7 +159,9 @@ export async function scanSessionsFromSource(source: DataSource): Promise<Sessio
       )
 
       if (summary) {
-        const active = await isSessionActive(project.dirName, sessionId, projectsDirOverride)
+        const active =
+          (await isSessionActive(project.dirName, sessionId, projectsDirOverride)) &&
+          hasRecentRecord(summary.lastActiveAt)
         summary.isActive = active
         await applyFullScan(summary, filePath)
         summary.sourceId = source.id

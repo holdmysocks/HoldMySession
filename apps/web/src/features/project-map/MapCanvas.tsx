@@ -35,7 +35,12 @@ const STATUS_CLASSES: Record<
 const SESSION_STROKE = 2
 const SUBAGENT_STROKE = 1.5
 /** How far the halo extends past the node on each side at rest. */
-const HALO_INSET = 4
+const HALO_INSET = 2
+/**
+ * Empty space around the drawing. The border, the halo and the selection outline sit just
+ * outside each node, so without this they are cut off at the canvas edge.
+ */
+const CANVAS_PAD = 8
 
 /** Inline SVG rendering of a laid-out project map. Nodes are focusable; Enter or Space selects. */
 export function MapCanvas({ layout, selectedId, onSelect }: MapCanvasProps) {
@@ -43,9 +48,9 @@ export function MapCanvas({ layout, selectedId, onSelect }: MapCanvasProps) {
     <svg
       role="group"
       aria-label="Session map"
-      width={layout.width}
-      height={layout.height}
-      viewBox={`0 0 ${layout.width} ${layout.height}`}
+      width={layout.width + CANVAS_PAD * 2}
+      height={layout.height + CANVAS_PAD * 2}
+      viewBox={`${-CANVAS_PAD} ${-CANVAS_PAD} ${layout.width + CANVAS_PAD * 2} ${layout.height + CANVAS_PAD * 2}`}
       className="block"
     >
       {layout.edges.map((edge) => (
@@ -143,8 +148,7 @@ function NodeView({ node, selected, onSelect }: NodeViewProps) {
       />
       {isSession ? (
         <SessionLines
-          projectLabel={projectLabel ?? sessionTitle}
-          sessionTitle={projectLabel ? sessionTitle : null}
+          sessionTitle={sessionTitle}
           dotClass={classes.dot}
           branch={branch}
           subtitle={node.subtitle}
@@ -174,8 +178,11 @@ function ExpiredChip({ count, x, y }: { count: number; x: number; y: number }) {
   )
 }
 
+/**
+ * Text on a session card. The project is left off: the map is already for one project. The
+ * session name sits next to the status dot, and the lines below it are larger than before.
+ */
 function SessionLines({
-  projectLabel,
   sessionTitle,
   dotClass,
   branch,
@@ -183,8 +190,7 @@ function SessionLines({
   model,
   isFork,
 }: {
-  projectLabel: string
-  sessionTitle: string | null
+  sessionTitle: string
   dotClass: string
   branch: string | null
   subtitle: string
@@ -193,20 +199,20 @@ function SessionLines({
 }) {
   return (
     <>
-      <circle cx={16} cy={20} r={4} className={dotClass} />
-      <text x={28} y={24} className="fill-gray-100 text-[13px] font-semibold">
-        {truncateLabel(projectLabel, 30)}
+      <circle cx={16} cy={21} r={5} className={dotClass} />
+      <text x={30} y={26} className="fill-gray-100 text-[15px] font-semibold">
+        {truncateLabel(sessionTitle, 28)}
       </text>
-      {sessionTitle && (
-        <text x={28} y={41} className="fill-gray-300 text-[11px]">
-          {truncateLabel(sessionTitle, 36)}
+      <text x={16} y={46} className="fill-gray-400 text-[12px]">
+        {truncateLabel(subtitle, 36)}
+      </text>
+      {branch && (
+        <text x={16} y={63} className="fill-gray-500 text-[11px]">
+          {truncateLabel(branch, 40)}
         </text>
       )}
-      <text x={28} y={57} className="fill-gray-500 text-[10px]">
-        {truncateLabel(branch ? `${branch} · ${subtitle}` : subtitle, 42)}
-      </text>
       {(model || isFork) && (
-        <text x={28} y={73} className="fill-gray-500 font-mono text-[10px]">
+        <text x={16} y={79} className="fill-gray-500 font-mono text-[11px]">
           {[isFork ? 'fork' : null, model].filter(Boolean).join(' · ')}
         </text>
       )}
@@ -225,12 +231,12 @@ function SubagentLines({
 }) {
   return (
     <>
-      <circle cx={12} cy={14} r={3.5} className={dotClass} />
-      <text x={22} y={18} className="fill-gray-100 text-[12px] font-semibold">
-        {truncateLabel(title, 22)}
+      <circle cx={12} cy={15} r={3.5} className={dotClass} />
+      <text x={22} y={19} className="fill-gray-100 text-[13px] font-semibold">
+        {truncateLabel(title, 24)}
       </text>
-      <text x={22} y={34} className="fill-gray-500 text-[10px]">
-        {truncateLabel(description, 28)}
+      <text x={22} y={37} className="fill-gray-500 text-[11px]">
+        {truncateLabel(description, 30)}
       </text>
     </>
   )
