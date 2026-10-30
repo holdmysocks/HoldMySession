@@ -237,3 +237,7 @@ The Claude desktop app writes one JSON file per session, `local_<id>.json`, unde
 - Where is the `sessions/` per-process file format documented, if anywhere?
 - Which `summary` writer exists? The reader is confirmed; the writer was not found in 2.1.312.
 - **Archived sessions: found in the desktop app's record** (`isArchived`). The 2.1.312 CLI transcript has no archive marker. Whether the app's record format is stable is not known.
+
+## Background task output (Windows)
+
+Claude Code writes each background task's output to `%TEMP%\claude\<project folder>\<session ID>\tasks\<task ID>.output`. The folder name is the same as the transcript's project folder, and the session ID is the transcript's file name. The file grows while the task runs. The dashboard counts a session as active when one of these files was written in the last 2 minutes. Confirmed on Windows with a real 10-minute task. The transcript records nothing about background tasks.

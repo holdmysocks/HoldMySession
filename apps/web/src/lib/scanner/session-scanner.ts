@@ -4,6 +4,7 @@ import { getProjectsDir, getProjectsDirFor, getDataSources, extractSessionId } f
 import type { DataSource } from '../utils/claude-path'
 import { scanProjects, scanProjectsFrom } from './project-scanner'
 import { hasRecentRecord, isSessionActive } from './active-detector'
+import { backgroundTaskDir, hasRecentBackgroundTask } from './background-tasks'
 import { parseSummary, parseFullScan } from '../parsers/session-parser'
 import type { SessionSummary } from '../parsers/types'
 import { truncateSessionName } from '../parsers/session-name'
@@ -33,6 +34,23 @@ async function applyFullScan(summary: SessionSummary, filePath: string): Promise
 }
 
 /**
+ * Whether a session is running now. A session is active when its transcript is being written
+ * (see isSessionActive and hasRecentRecord), or when one of its background tasks wrote output
+ * recently. The second case is the one the transcript cannot show.
+ */
+async function sessionRunning(
+  projectDirName: string,
+  sessionId: string,
+  lastActiveAt: string,
+  projectsDirOverride?: string,
+): Promise<boolean> {
+  const transcriptActive =
+    (await isSessionActive(projectDirName, sessionId, projectsDirOverride)) && hasRecentRecord(lastActiveAt)
+  if (transcriptActive) return true
+  return hasRecentBackgroundTask(backgroundTaskDir(projectDirName, sessionId))
+}
+
+/**
  * Internal scanning logic that returns summaries with their file paths.
  * Used by both public APIs below.
  */
@@ -57,7 +75,7 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
       const cached = summaryCache.get(sessionId)
       if (cached && cached.mtimeMs === stat.mtimeMs) {
         // Refresh active status even for cached entries
-        const active = (await isSessionActive(project.dirName, sessionId)) && hasRecentRecord(cached.summary.lastActiveAt)
+        const active = await sessionRunning(project.dirName, sessionId, cached.summary.lastActiveAt)
         summaries.push({ ...cached.summary, isActive: active, filePath, projectDisplayName })
         continue
       }
@@ -73,7 +91,7 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
       )
 
       if (summary) {
-        const active = (await isSessionActive(project.dirName, sessionId)) && hasRecentRecord(summary.lastActiveAt)
+        const active = await sessionRunning(project.dirName, sessionId, summary.lastActiveAt)
         summary.isActive = active
         await applyFullScan(summary, filePath)
 
@@ -140,9 +158,7 @@ export async function scanSessionsFromSource(source: DataSource): Promise<Sessio
 
       const cached = summaryCache.get(`${source.id}:${sessionId}`)
       if (cached && cached.mtimeMs === stat.mtimeMs) {
-        const active =
-          (await isSessionActive(project.dirName, sessionId, projectsDirOverride)) &&
-          hasRecentRecord(cached.summary.lastActiveAt)
+        const active = await sessionRunning(project.dirName, sessionId, cached.summary.lastActiveAt, projectsDirOverride)
         summaries.push({
           ...cached.summary,
           isActive: active,
@@ -164,9 +180,7 @@ export async function scanSessionsFromSource(source: DataSource): Promise<Sessio
       )
 
       if (summary) {
-        const active =
-          (await isSessionActive(project.dirName, sessionId, projectsDirOverride)) &&
-          hasRecentRecord(summary.lastActiveAt)
+        const active = await sessionRunning(project.dirName, sessionId, summary.lastActiveAt, projectsDirOverride)
         summary.isActive = active
         await applyFullScan(summary, filePath)
         summary.sourceId = source.id

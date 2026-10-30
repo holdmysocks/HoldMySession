@@ -172,7 +172,7 @@ The hook is the only writer of this file. It always exits 0 and swallows errors,
 - **Message counts come from the first and last 15 lines** of each file, so a long session shows a count that is too low. This predates Phase 1 and is not fixed here. The sessions list and the map both show it.
 - **Permission prompts were not found in the transcript.** Only the Notification hook reveals them. Without the hook, a session waiting on one looks idle.
 - **An unanswered `AskUserQuestion` can belong to an abandoned session.** It is ignored once the session is idle, but an active session with a stale question still shows as needs-you.
-- **Background tasks are not seen.** A session that is running a background task, with no new transcript record, shows as idle. The transcript does not record background tasks, so this needs a different signal. We have not found one yet.
+- **Background tasks are seen only when they write output.** A session counts as active when a task output file under `%TEMP%\claude\<project folder>\<session ID>\tasks\` was written in the last 2 minutes. A task that prints nothing may not touch its file, so it shows as idle until it writes. This is Windows only, because the folder is under the temp folder of the machine that runs Claude Code.
 - **Subagents quiet for more than 5 minutes are not drawn**, even if they are still working. Running is judged from the transcript's last record, so a subagent that goes silent for longer than the window counts as expired until it writes again. The session's +N chip still counts it.
 - **Archive state lives in the desktop app's records, not the transcript.** The CLI transcript has no archive marker. The app's record (`isArchived`) is the source now used. A session with no desktop record cannot be archived as far as the dashboard can tell.
 - **The map reads only the primary data source.** On Windows, WSL sessions are listed on the Sessions page but not on the map.
@@ -248,3 +248,7 @@ Fixes for problems a Windows user reported with real data.
 - **Order follows the desktop app.** Top-level sessions are ordered by the desktop record's `lastActivityAt`, falling back to the transcript's last record. The order was checked against the app's sidebar.
 - **Nesting follows `spawnedFrom`.** The app nests a session under its parent with `spawnedFrom`, which is written either as a string or as an object with `sessionId`. The map now links those children, as it does forks. The card says **sub-session** for these, and **fork** for a child linked by the transcript's `forkedFrom`.
 - **Layout.** Session nodes are 280 by 92 px and subagent cards 190 by 50 px. The project name is no longer on the card.
+
+### Background tasks (2026-10-30, later still)
+
+- **Active while a background task writes.** A session is active when a task output in `%TEMP%\claude\<project folder>\<session ID>\tasks\` was written in the last 2 minutes, even if its transcript is quiet. Measured on a real 10-minute task, which wrote to its `.output` file while it ran. Code: `src/lib/scanner/background-tasks.ts`.
