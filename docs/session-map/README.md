@@ -32,7 +32,7 @@ The dashboard reads the Claude config directory on Windows, which is `%USERPROFI
 
 - **Session nodes.** The session name sits next to the status dot. The project is not shown on the card, because the map is already for one project. Short id and message count come next, then the branch, then the model. The text is 11 to 15 px.
 - **Fork nodes.** A fork of a session in the same project hangs off that session, joined by a dashed edge. The node says "Forked session" in the details panel.
-- **Subagent cards.** Small cards (190 by 50) below the session or fork that dispatched them, side by side. The label is the subagent type, then its description. Only running subagents are drawn (see the subagent rule under Status).
+- **Subagent cards.** Small cards (200 by 60, so their edges sit on the editor's grid) below the session or fork that dispatched them, side by side. The label is the subagent type, then its description. Only running subagents are drawn (see the subagent rule under Status).
 - **Expired subagents.** A subagent quiet for more than 5 minutes is not drawn and takes no space. Its session node shows a small **+N** chip with the count, and the page info line gives the project total.
 - **Layout.** Each depth is a row, so branches grow downward: top-level sessions side by side in the first row, then their forks and subagents below them, then forks of forks. A parent is centred above its children. Top-level sessions are in the desktop app's activity order, newest first, and the map follows the app's order as it changes. See [Moving around and editing the layout](#moving-around-and-editing-the-layout) for how the canvas is shown.
 - **Every session in the project is shown, except sessions with no project and archived sessions.** There is no cap. See [Sessions with no project](#sessions-with-no-project) and [Archived and split sessions](#archived-and-split-sessions).
@@ -269,7 +269,7 @@ Fixes for problems a Windows user reported with real data.
 - **Subagents use the last record's timestamp** from the end of their transcript, not the file's modification time.
 - **Order follows the desktop app.** Top-level sessions are ordered by the desktop record's `lastActivityAt`, falling back to the transcript's last record. The order was checked against the app's sidebar.
 - **Nesting follows `spawnedFrom`.** The app nests a session under its parent with `spawnedFrom`, which is written either as a string or as an object with `sessionId`. The map now links those children, as it does forks. The card says **sub-session** for these, and **fork** for a child linked by the transcript's `forkedFrom`.
-- **Layout.** Session nodes are 280 by 92 px and subagent cards 190 by 50 px. The project name is no longer on the card.
+- **Layout.** Session nodes are 280 by 92 px and subagent cards 200 by 60 px. The project name is no longer on the card.
 
 ### Background tasks (2026-10-30, later still)
 

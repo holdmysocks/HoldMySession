@@ -618,11 +618,11 @@ function SubagentLines({
 }) {
   return (
     <>
-      <circle cx={12} cy={15} r={3.5} className={dotClass} />
-      <text x={22} y={19} className="fill-gray-100 text-[13px] font-semibold">
+      <circle cx={12} cy={19} r={3.5} className={dotClass} />
+      <text x={22} y={24} className="fill-gray-100 text-[13px] font-semibold">
         {truncateLabel(title, 24)}
       </text>
-      <text x={22} y={37} className="fill-gray-500 text-[11px]">
+      <text x={22} y={44} className="fill-gray-500 text-[11px]">
         {truncateLabel(description, 30)}
       </text>
     </>

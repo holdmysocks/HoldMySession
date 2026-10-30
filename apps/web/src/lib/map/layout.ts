@@ -12,8 +12,9 @@ import type { MapEdge, MapNode, ProjectMap } from './project-map'
 
 export const SESSION_WIDTH = 280
 export const SESSION_HEIGHT = 92
-export const SUBAGENT_WIDTH = 190
-export const SUBAGENT_HEIGHT = 50
+/** Multiples of the editor's 20-unit grid, so a subagent card's edges line up with the grid. */
+export const SUBAGENT_WIDTH = 200
+export const SUBAGENT_HEIGHT = 60
 /** Gap between the bottom of one row and the top of the next. Room for the link lines. */
 export const ROW_GAP = 70
 /** Gap between sibling blocks under the same parent. */
