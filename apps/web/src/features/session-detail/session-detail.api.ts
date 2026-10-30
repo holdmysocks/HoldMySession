@@ -4,6 +4,8 @@ import { createServerFn } from '@tanstack/react-start'
 import { parseDetail } from '@/lib/parsers/session-parser'
 import { buildProjectInfo } from '@/lib/scanner/project-scanner'
 import { resolveProjectDisplayName } from '@/lib/scanner/project-display-name'
+import { applyAutoCompactWindow } from '@/lib/parsers/context-limit'
+import { loadAutoCompactWindow } from '@/lib/claude-settings/auto-compact'
 import { findSessionFile } from './find-session-file'
 
 export const getSessionDetail = createServerFn({ method: 'GET' })
@@ -25,5 +27,11 @@ export const getSessionDetail = createServerFn({ method: 'GET' })
 
     const detail = await parseDetail(filePath.path, data.sessionId, project.projectPath, project.projectName)
     const projectDisplayName = await resolveProjectDisplayName(project.projectPath, project.projectName)
-    return { ...detail, projectDisplayName }
+
+    // A window the user set with /autocompact or in settings.json is the one they work in.
+    const configured = detail.contextWindow
+      ? await loadAutoCompactWindow(project.projectPath, detail.contextWindow.modelName)
+      : null
+    const contextWindow = applyAutoCompactWindow(detail.contextWindow, configured)
+    return { ...detail, contextWindow, projectDisplayName }
   })

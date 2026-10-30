@@ -36,7 +36,7 @@ Everything runs entirely on your machine. Read-only — it never modifies any Cl
 - Zoom controls for detailed inspection of complex multi-agent workflows
 
 **Context window visualization**
-- Live breakdown of how your context window is being used: input, output, cache reads, cache writes. The window size is found automatically: from the model (1M for the current Claude families, 200K for older ones), and widened to fit when a session held more than its model's window
+- Live breakdown of how your context window is being used: input, output, cache reads, cache writes. The window size is found automatically: your own auto-compact setting if you set one (`/autocompact`), otherwise the model's window (1M for the current Claude families, 200K for older ones), widened to fit when a session held more than that
 - See at a glance whether your main session is staying lean or accumulating context
 - Per-session and per-agent cost estimates with per-model and per-category breakdowns
 

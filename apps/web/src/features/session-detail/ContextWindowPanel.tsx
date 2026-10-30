@@ -20,12 +20,14 @@ const LIMIT_SOURCE_NOTE = {
   model: 'window set by the model',
   observed: 'window detected from usage',
   default: 'window assumed (unknown model)',
+  setting: 'window set by your autocompact setting',
 } as const
 
 const LIMIT_SOURCE_HELP = {
   model: "The model's known context window.",
   observed: 'The session held more context than the model normally allows, so its window is larger. The size is the next whole million tokens.',
   default: 'The model is not recognised, so a 200K window is assumed. If the session used more, the window is widened to fit.',
+  setting: 'The auto-compact window from your Claude Code settings (autoCompactWindow, or /autocompact), which is the window you work in.',
 } as const
 
 export function ContextWindowPanel({ contextWindow, tokens }: Props) {

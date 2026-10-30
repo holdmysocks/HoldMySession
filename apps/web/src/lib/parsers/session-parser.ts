@@ -16,7 +16,7 @@ import type {
 } from './types'
 import * as path from 'node:path'
 import { discoverSubagentFiles } from './subagent-discovery'
-import { contextLimitFor } from './context-limit'
+import { contextLimitFor, deriveContextWindow } from './context-limit'
 import { HEAD_SCAN_LINES, findForkedFrom, parseRecord } from './session-head'
 import {
   createSessionNameState,
@@ -862,26 +862,8 @@ function buildContextWindowData(
   // The window is not in the transcript, so it comes from the model and from the most context the
   // session ever held, which cannot exceed the window.
   const peak = Math.max(...snapshots.map((snapshot) => snapshot.contextSize))
-  const { tokens: contextLimit, source: contextLimitSource } = contextLimitFor(modelName, peak)
-  const autocompactBuffer = Math.round(contextLimit * 0.165)
-  const systemOverhead = snapshots[0].contextSize
-  const currentContextSize = snapshots[snapshots.length - 1].contextSize
-  const messagesEstimate = Math.max(0, currentContextSize - systemOverhead)
-  const freeSpace = Math.max(0, contextLimit - currentContextSize)
-  const usagePercent = Math.round((currentContextSize / contextLimit) * 100)
-
-  return {
-    contextLimit,
-    contextLimitSource,
-    modelName,
-    systemOverhead,
-    currentContextSize,
-    messagesEstimate,
-    freeSpace,
-    autocompactBuffer,
-    usagePercent,
-    snapshots,
-  }
+  const { tokens, source } = contextLimitFor(modelName, peak)
+  return deriveContextWindow(snapshots, modelName, tokens, source)
 }
 
 // --- Token merge helpers ---
