@@ -62,6 +62,11 @@ export const getHistoryStatus = createServerFn({ method: 'GET' }).handler(async 
   }
 })
 
+export const checkHistory = createServerFn({ method: 'POST' }).handler(async () => {
+  const { compareHistoryWithLive } = await import('@/lib/history/compare')
+  return compareHistoryWithLive()
+})
+
 export const rescanHistory = createServerFn({ method: 'POST' }).handler(async () => {
   const { runHistoryScan } = await import('@/lib/history/scan')
   return runHistoryScan()

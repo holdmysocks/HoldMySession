@@ -94,5 +94,9 @@ const projectStatsInputSchema = z.object({ projectPath: z.string().min(1) })
 export const getProjectStats = createServerFn({ method: 'GET' })
   .inputValidator((input: unknown) => projectStatsInputSchema.parse(input))
   .handler(async ({ data }): Promise<StatsCache | null> => {
-    return computeProjectStats(await scanAllSessionsWithPaths(), data.projectPath)
+    const { loadHistoryStats } = await import('@/lib/history/history-read')
+    return (
+      (await loadHistoryStats({ projectPath: data.projectPath })) ??
+      computeProjectStats(await scanAllSessionsWithPaths(), data.projectPath)
+    )
   })

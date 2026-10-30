@@ -81,14 +81,14 @@ export function ingestSessions(db: Db, entries: IngestEntry[], now: Date = new D
   const exists = db.prepare('SELECT 1 AS found FROM sessions WHERE machine_id = ? AND session_key = ?')
   const upsert = db.prepare(`
     INSERT INTO sessions (machine_id, session_key, session_id, project_key, project_path, project_display_name, session_name,
-      started_at, last_active_at, duration_ms, message_count, tool_call_count, on_disk, first_seen_at, last_seen_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+      started_at, last_active_at, duration_ms, message_count, tool_call_count, on_disk, first_seen_at, last_seen_at, cwd, project_name)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
     ON CONFLICT (machine_id, session_key) DO UPDATE SET
       project_path = excluded.project_path, project_display_name = excluded.project_display_name,
       session_name = COALESCE(excluded.session_name, sessions.session_name),
       started_at = excluded.started_at, last_active_at = excluded.last_active_at, duration_ms = excluded.duration_ms,
       message_count = excluded.message_count, tool_call_count = excluded.tool_call_count,
-      on_disk = 1, last_seen_at = excluded.last_seen_at
+      on_disk = 1, last_seen_at = excluded.last_seen_at, cwd = excluded.cwd, project_name = excluded.project_name
   `)
   const clearUsage = db.prepare('DELETE FROM usage_daily WHERE machine_id = ? AND session_key = ?')
   const addUsage = db.prepare(`
@@ -121,6 +121,8 @@ export function ingestSessions(db: Db, entries: IngestEntry[], now: Date = new D
         detail ? Object.values(detail.toolFrequency).reduce((a, b) => a + b, 0) : summary.toolCallCount,
         stamp,
         stamp,
+        summary.cwd ?? '',
+        summary.projectName,
       )
 
       if (!detail) continue

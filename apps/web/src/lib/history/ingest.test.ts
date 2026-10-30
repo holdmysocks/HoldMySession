@@ -103,7 +103,7 @@ describe('ingestSessions', () => {
     const db = openHistoryDb(':memory:')
     ingestSessions(db, [entry('mine', { m: usage({ inputTokens: 1 }) }, [[1, 'm']])])
     db.prepare(
-      `INSERT INTO sessions VALUES ('other-machine', 'proj:theirs', 'theirs', 'proj', '/p', 'P', 'n', 'a', 'b', 1, 1, 1, 1, 'x', 'y')`,
+      `INSERT INTO sessions (machine_id, session_key, session_id, project_key, project_path, project_display_name, session_name, started_at, last_active_at, duration_ms, message_count, tool_call_count, on_disk, first_seen_at, last_seen_at) VALUES ('other-machine', 'proj:theirs', 'theirs', 'proj', '/p', 'P', 'n', 'a', 'b', 1, 1, 1, 1, 'x', 'y')`,
     ).run()
     const result = ingestSessions(db, [entry('mine', { m: usage({ inputTokens: 1 }) }, [[1, 'm']])])
     expect(result.missing).toBe(0)

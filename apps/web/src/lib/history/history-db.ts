@@ -118,6 +118,11 @@ const MIGRATIONS: string[] = [
   CREATE INDEX sessions_started ON sessions (started_at);
   CREATE INDEX usage_daily_day ON usage_daily (day);
   `,
+  // 3: what the project grouping needs. NULL means the session has not been rescanned since this column was added.
+  `
+  ALTER TABLE sessions ADD COLUMN cwd TEXT;
+  ALTER TABLE sessions ADD COLUMN project_name TEXT;
+  `,
 ]
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, queryOptions } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { getHistoryStatus, rescanHistory } from './history.api'
+import { checkHistory, getHistoryStatus, rescanHistory } from './history.api'
 
 export const historyStatusQuery = queryOptions({
   queryKey: ['history-status'],
@@ -15,6 +15,8 @@ export function HistoryPanel() {
     mutationFn: () => rescanHistory(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['history-status'] }),
   })
+
+  const check = useMutation({ mutationFn: () => checkHistory() })
 
   const scan = status?.lastScan
   return (
@@ -60,10 +62,43 @@ export function HistoryPanel() {
           >
             {rescan.isPending ? 'Scanning…' : 'Rescan now'}
           </button>
+          <button
+            type="button"
+            onClick={() => check.mutate()}
+            disabled={check.isPending}
+            className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-xs text-gray-300 hover:text-gray-100 disabled:opacity-50"
+          >
+            {check.isPending ? 'Checking…' : 'Check against session files'}
+          </button>
           {rescan.data && !rescan.data.ok && (
             <span role="alert" className="text-red-400">Scan failed: {rescan.data.message}</span>
           )}
         </div>
+        {check.data === null && <p className="mt-3 text-amber-400">Nothing to compare yet.</p>}
+        {check.data && (
+          <table className="mt-3 w-full text-left">
+            <thead>
+              <tr className="text-gray-500">
+                <th className="py-1 font-normal">Total</th>
+                <th className="py-1 text-right font-normal">Session files</th>
+                <th className="py-1 text-right font-normal">History database</th>
+                <th className="py-1 pl-3 font-normal"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {check.data.map((row) => (
+                <tr key={row.label} className="border-t border-gray-800">
+                  <td className="py-1 text-gray-300">{row.label}</td>
+                  <td className="py-1 text-right font-mono">{row.live.toLocaleString()}</td>
+                  <td className="py-1 text-right font-mono">{row.history.toLocaleString()}</td>
+                  <td className={`py-1 pl-3 ${row.same ? 'text-emerald-500' : 'text-red-400'}`}>
+                    {row.same ? 'same' : `differs by ${(row.history - row.live).toLocaleString()}`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )

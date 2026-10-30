@@ -6,7 +6,7 @@ It uses the SQLite module built into Node 22 (`node:sqlite`), so nothing needs c
 
 ## Status
 
-Done: the database, migrations, the scan that fills it, the data folder rename (`src/lib/data-dir.ts`) and the machine in the keys. Stats, pricing history and subscription history do not read from it yet.
+Done: the database, migrations, the scan that fills it, the data folder rename (`src/lib/data-dir.ts`) and the machine in the keys. Stats and the per-project overview now read from it. Pricing history and subscription history do not yet.
 
 ## Tables
 
@@ -25,13 +25,23 @@ The schema version is SQLite's `user_version`. `MIGRATIONS` in `src/lib/history/
 
 Settings, under History database, shows the file, the session count, the days covered and the last scan, and has a Rescan now button.
 
+## Stats from the database
+
+The overall Stats and the Overview by Project tab read from the database first, and fall back to reading the session files if it cannot be used (`src/lib/history/history-read.ts`, `history-stats.ts`). Sessions that are no longer on disk are included. If the database is empty it is filled first. If the last scan is more than five minutes old, a new one starts in the background and the page answers from what is stored, so the page is at most one refresh behind. The automatic scan setting will replace that rule.
+
+Two things differ from reading the files: tokens are counted on the day each reply happened, not all on the day the session was last active, and days are local days. Session, message and tool counts still go on the day the session was last active.
+
+Migration 3 added the working folder and folder name to `sessions`, which the project grouping needs. Sessions stored before it are rescanned automatically on first use.
+
+**Check against session files** in Settings, under History database, rescans and shows the totals from the files next to the totals from the database, row by row, for sessions, messages, every token kind and each model.
+
 ## Planned
 
 Build order from here. Each step is its own commit.
 
 1. **Data folder rename (done).** Move the dashboard's own data from `~/.claude-dashboard` to `~/.holdmysession`. One function decides the folder, and the settings, map layouts, cache, hook log and history database all use it. `HOLDMYSESSION_DIR` overrides it, and the older `CLAUDE_DASHBOARD_DIR` and `CLAUDE_DASHBOARD_HOME` still work. On first start the old folder is copied across, not moved, and left in place. The hook script uses the same rule, so notifications keep working.
 2. **Keys that include the machine (done).** A migration makes `machine_id` part of the keys of `sessions` and `usage_daily`, so rows from two machines can never collide. Done before anything else is stored, while there is only one machine's data.
-3. **Stats read from the database**, compared against today's numbers first.
+3. **Stats read from the database (done).** See below.
 4. **Dated pricing.** An append-only list of price entries per model, each either "from date D onward" or "window D1 to D2". To price a day, replay the entries in the order they were made, each painting its range over the ones before. A note can be attached to an entry.
 5. **Subscription history.** Tier, monthly price and start date as dated rows (Pro $20, then Max 20x $200 from October 10 as the first test case), the savings against API cost, a monthly view, and a second number on the cost card.
 6. **Automatic scan.** On or off, every 5, 10, 15, 30 min, or 1, 2, 6, 12, 24 h, run by a server-side timer so it works with no tab open.

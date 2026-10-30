@@ -50,7 +50,7 @@ describe('migration 2: the machine is part of the key', () => {
     expect(db.prepare('SELECT machine_id, session_name FROM sessions').get()).toMatchObject({ machine_id: 'machine-1', session_name: 'name' })
     expect(db.prepare('SELECT machine_id, output_tokens FROM usage_daily').get()).toMatchObject({ machine_id: 'machine-1', output_tokens: 2 })
 
-    db.prepare(`INSERT INTO sessions VALUES ('machine-2', 'k', 's', 'p', '/p', 'P', 'other', 'a', 'b', 1, 2, 3, 1, 'x', 'y')`).run()
+    db.prepare(`INSERT INTO sessions (machine_id, session_key, session_id, project_key, project_path, project_display_name, session_name, started_at, last_active_at, duration_ms, message_count, tool_call_count, on_disk, first_seen_at, last_seen_at) VALUES ('machine-2', 'k', 's', 'p', '/p', 'P', 'other', 'a', 'b', 1, 2, 3, 1, 'x', 'y')`).run()
     expect(Number(db.prepare('SELECT COUNT(*) AS n FROM sessions').get()!.n)).toBe(2)
   })
 })
