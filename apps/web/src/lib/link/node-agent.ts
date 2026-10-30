@@ -2,7 +2,7 @@ import { readSettingsFile } from '@/lib/settings-file'
 import { openHistoryDb } from '@/lib/history/history-db'
 import { runCommand } from '@/lib/live/handlers'
 import { isLinkedNode } from './shared'
-import { normalizeMasterUrl } from './node-sync'
+import { masterCandidates, noteGoodAddress } from './node-sync'
 import { selfMachineId } from './machines'
 import type { Command } from './channel'
 
@@ -43,8 +43,10 @@ export async function answerCommand(base: string, token: string, machineId: stri
 export async function agentRound(deps: AgentDeps = defaultDeps, failures = { count: 0 }): Promise<number> {
   const settings = readSettingsFile()
   if (!isLinkedNode(settings)) return 10_000
-  const base = normalizeMasterUrl(settings.link.masterUrl)
-  if (!base) return 30_000
+  const candidates = masterCandidates(settings.link)
+  if (candidates.length === 0) return 30_000
+  // After a failure the next address is tried, so a master that moved between networks is found again.
+  const base = candidates[failures.count % candidates.length]
 
   let machineId: string
   const db = openHistoryDb()
@@ -65,6 +67,7 @@ export async function agentRound(deps: AgentDeps = defaultDeps, failures = { cou
       return response.status === 401 || response.status === 403 ? 30_000 : Math.min(60_000, 5_000 * 2 ** failures.count)
     }
     failures.count = 0
+    noteGoodAddress(base)
     const { commands } = (await response.json()) as { commands: Command[] }
     // Answered in the background, so the next request is open again straight away.
     for (const command of commands) void answerCommand(base, settings.link.masterToken, machineId, command, deps).catch(() => undefined)

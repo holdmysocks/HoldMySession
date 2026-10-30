@@ -64,6 +64,10 @@ export function startAutoScan(): void {
     // A master asks connected nodes for fresh stats while someone is looking.
     void import('@/lib/link/master-sync').then((m) => m.masterSyncTick()).catch(() => undefined)
   }
+  // On Windows, a machine that listens on the network asks for the firewall permission it needs, once.
+  void import('@/lib/link/firewall').then((m) =>
+    m.ensureFirewallOnStart(Number(process.env.HOLDMYSESSION_PORT_IN_USE) || 3000, ['0.0.0.0', '::'].includes(process.env.HOLDMYSESSION_LISTEN_HOST ?? '')),
+  ).catch(() => undefined)
   // A node keeps a request open to its master, so the master can ask it for live data.
   void import('@/lib/link/node-agent').then((m) => m.startNodeAgent()).catch(() => undefined)
   const timer = setInterval(tick, TICK_MS)

@@ -51,6 +51,9 @@ export async function createAppServer({ distDir, host, port }) {
   process.env.NODE_ENV = 'production';
   // Where the app lives, for the hook commands written to Claude Code's settings.
   process.env.HOLDMYSESSION_APP_DIR ||= resolve(distDir, '..');
+  // What this server is really listening on, so Settings can tell when a changed choice still needs a restart.
+  process.env.HOLDMYSESSION_LISTEN_HOST = host;
+  process.env.HOLDMYSESSION_PORT_IN_USE = String(port);
   const clientDir = join(distDir, 'client');
 
   const serverModule = await import(pathToFileURL(join(distDir, 'server', 'server.js')).href);

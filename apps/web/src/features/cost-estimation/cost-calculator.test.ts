@@ -212,7 +212,7 @@ describe('getMergedPricing', () => {
       subscriptionTier: 'pro',
       autoScan: { enabled: true, intervalMinutes: 15 },
       checkForUpdates: true,
-      link: { role: 'node', masterUrl: '', masterToken: '', nodeToken: '', listen: 'local' },
+      link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' },
       dataSources: [],
       pricingOverrides: {
         'claude-sonnet-4': {
@@ -263,7 +263,7 @@ describe('getMergedPricing', () => {
       subscriptionTier: 'pro',
       autoScan: { enabled: true, intervalMinutes: 15 },
       checkForUpdates: true,
-      link: { role: 'node', masterUrl: '', masterToken: '', nodeToken: '', listen: 'local' },
+      link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' },
       pricingOverrides: overrides,
       dataSources: [],
     }

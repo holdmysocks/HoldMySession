@@ -1,6 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import type { LinkSetting } from '@/features/settings/settings.types'
+import type { MachineAddress } from '@/lib/link/addresses'
+import type { FirewallState } from '@/lib/link/firewall'
 
 export interface MachineSummary {
   machineId: string
@@ -21,8 +23,44 @@ export interface LinkState {
   showMachineFilter: boolean
   selfMachineId: string
   machines: MachineSummary[]
+  /** Master: how nodes reach this machine. */
+  network: {
+    port: number
+    addresses: MachineAddress[]
+    /** One string a node can paste to join: every address and the token. Null until this machine is a master. */
+    pairingCode: string | null
+    /** The server is listening on the network right now. */
+    listeningOnNetwork: boolean
+    /** The Listen on the network choice differs from what the server is doing, so it must be restarted. */
+    needsRestart: boolean
+    /** The desktop app can restart itself from here. Otherwise the person restarts it. */
+    canRestart: boolean
+    firewall: FirewallState
+  }
   /** Node: the state of the link to its master. */
   sync: { lastPushAt: string | null; lastAttemptAt: string | null; lastError: string | null; masterName: string | null }
+}
+
+interface NetworkDeps {
+  machineAddresses: typeof import('@/lib/link/addresses').machineAddresses
+  makePairingCode: typeof import('@/lib/link/addresses').makePairingCode
+  firewallState: typeof import('@/lib/link/firewall').firewallState
+  canRestart: boolean
+}
+
+function networkState(link: LinkSetting, deps: NetworkDeps): LinkState['network'] {
+  const port = Number(process.env.HOLDMYSESSION_PORT_IN_USE) || 3000
+  const listeningOnNetwork = ['0.0.0.0', '::'].includes(process.env.HOLDMYSESSION_LISTEN_HOST ?? '')
+  const addresses = deps.machineAddresses(port)
+  return {
+    port,
+    addresses,
+    pairingCode: link.role === 'master' && link.nodeToken ? deps.makePairingCode(addresses.map((a) => a.url), link.nodeToken) : null,
+    listeningOnNetwork,
+    needsRestart: link.role === 'master' && (link.listen === 'network') !== listeningOnNetwork,
+    canRestart: deps.canRestart,
+    firewall: deps.firewallState(),
+  }
 }
 
 async function readState(): Promise<LinkState> {
@@ -32,6 +70,9 @@ async function readState(): Promise<LinkState> {
   const { isLinkedNode } = await import('@/lib/link/shared')
   const { linkStatus } = await import('@/lib/link/node-sync')
   const { isOnline, touchActivity } = await import('@/lib/link/channel')
+  const { machineAddresses, makePairingCode } = await import('@/lib/link/addresses')
+  const { firewallState } = await import('@/lib/link/firewall')
+  const { desktopBridge } = await import('@/lib/desktop-bridge')
   const settings = readSettingsFile()
   // A page being open is what keeps a master asking its nodes for fresh stats.
   if (settings.link.role === 'master') touchActivity()
@@ -47,6 +88,7 @@ async function readState(): Promise<LinkState> {
         machineId: m.machineId, name: m.name, isSelf: m.isSelf, appVersion: m.appVersion, lastSeenAt: m.lastSeenAt, sessions: m.sessions,
         online: m.isSelf || isOnline(m.machineId),
       })),
+      network: networkState(settings.link, { machineAddresses, makePairingCode, firewallState, canRestart: desktopBridge() !== null }),
       sync: linkStatus(db),
     }
   } finally {
@@ -82,7 +124,36 @@ export const regenerateNodeToken = createServerFn({ method: 'POST' }).handler(as
 
 export const setListen = createServerFn({ method: 'POST' })
   .inputValidator((input: unknown) => z.object({ listen: z.enum(['local', 'network']) }).parse(input))
-  .handler(async ({ data }) => updateLink((link) => ({ ...link, listen: data.listen })))
+  .handler(async ({ data }) => {
+    const state = await updateLink((link) => ({ ...link, listen: data.listen }))
+    // Turning the network on is when the firewall permission is needed, so ask for it now.
+    if (data.listen === 'network') {
+      const { firewallState, requestFirewallRule, markDeclined } = await import('@/lib/link/firewall')
+      if (firewallState() === 'missing') {
+        markDeclined(false)
+        requestFirewallRule(Number(process.env.HOLDMYSESSION_PORT_IN_USE) || 3000)
+      }
+    }
+    return state
+  })
+
+/** Asks Windows to let this machine be reached from the local network and the tailnet. Shows Windows' own permission prompt. */
+export const allowFirewall = createServerFn({ method: 'POST' }).handler(async (): Promise<LinkState> => {
+  const { requestFirewallRule, markDeclined } = await import('@/lib/link/firewall')
+  markDeclined(false)
+  requestFirewallRule(Number(process.env.HOLDMYSESSION_PORT_IN_USE) || 3000)
+  return readState()
+})
+
+/** Restarts the desktop app, so a changed Listen on the network choice takes effect. */
+export const restartApp = createServerFn({ method: 'POST' }).handler(async (): Promise<boolean> => {
+  const { desktopBridge } = await import('@/lib/desktop-bridge')
+  const bridge = desktopBridge()
+  if (!bridge) return false
+  // Answer first, then restart, so the page gets its reply.
+  setTimeout(() => bridge.restart(), 300)
+  return true
+})
 
 export interface ConnectResult {
   ok: boolean
@@ -90,46 +161,70 @@ export interface ConnectResult {
   masterName?: string
 }
 
-/** Checks the master's address and token, and if they work, saves them and sends this machine's history. */
+/**
+ * Joins a master. Give a pairing code (every address of the master and its token, copied from the master's
+ * Settings), or one address and the token. Every address is tried at the same time and the first of them
+ * that answers is used, with the rest kept, so the same node works on the local network and over a tailnet.
+ */
 export const connectToMaster = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ url: z.string().max(500), token: z.string().max(200) }).parse(input))
+  .inputValidator((input: unknown) => z.object({ code: z.string().max(4000).optional(), url: z.string().max(500).optional(), token: z.string().max(200).optional() }).parse(input))
   .handler(async ({ data }): Promise<ConnectResult> => {
-    const { normalizeMasterUrl, pushToMaster } = await import('@/lib/link/node-sync')
+    const { normalizeMasterUrl, pushToMaster, noteGoodAddress } = await import('@/lib/link/node-sync')
+    const { parsePairingCode } = await import('@/lib/link/addresses')
+    const { explainConnectionError } = await import('@/lib/link/explain')
     const { readSettingsFile } = await import('@/lib/settings-file')
     const { openHistoryDb, LATEST_SCHEMA_VERSION } = await import('@/lib/history/history-db')
     const { readVersionFromPackageJson } = await import('@/lib/app-version')
 
-    const base = normalizeMasterUrl(data.url)
-    if (!base) return { ok: false, message: 'That is not a valid address. Use something like http://192.168.1.20:3000.' }
-    if (!data.token.trim()) return { ok: false, message: 'Enter the master\'s token.' }
-
-    let reply: Response
-    try {
-      reply = await fetch(`${base}/api/link/ping`, {
-        headers: { Authorization: `Bearer ${data.token.trim()}` },
-        signal: AbortSignal.timeout(10_000),
-      })
-    } catch {
-      return { ok: false, message: `Could not reach ${base}. Check the address, that the master is running with "Listen on the network" on, and that both machines are on the same network or tailnet.` }
+    let urls: string[]
+    let token: string
+    if (data.code?.trim()) {
+      const parsed = parsePairingCode(data.code)
+      if (!parsed) return { ok: false, message: 'That pairing code is not valid. Copy it again from the master\'s Settings.' }
+      urls = parsed.urls
+      token = parsed.token
+    } else {
+      token = (data.token ?? '').trim()
+      urls = data.url?.trim() ? [data.url] : []
     }
-    const body = (await reply.json().catch(() => ({}))) as { message?: string; name?: string; schemaVersion?: number }
-    if (!reply.ok) return { ok: false, message: body.message ?? `The master answered ${reply.status}.` }
-    if (body.schemaVersion !== LATEST_SCHEMA_VERSION) {
+    const bases = [...new Set(urls.map((u) => normalizeMasterUrl(u)).filter((u): u is string => u !== null))]
+    if (bases.length === 0) return { ok: false, message: 'That is not a valid address. Use something like http://192.168.1.20:3000, or paste the pairing code.' }
+    if (!token) return { ok: false, message: 'Enter the master\'s token, or paste its pairing code.' }
+
+    type Ping = { base: string; reply?: Response; body?: { message?: string; name?: string; schemaVersion?: number }; error?: unknown }
+    const pings: Ping[] = await Promise.all(
+      bases.map(async (base): Promise<Ping> => {
+        try {
+          const reply = await fetch(`${base}/api/link/ping`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8_000) })
+          return { base, reply, body: (await reply.json().catch(() => ({}))) as Ping['body'] }
+        } catch (error) {
+          return { base, error }
+        }
+      }),
+    )
+    const good = pings.find((p) => p.reply?.ok)
+    if (!good) {
+      const answered = pings.find((p) => p.reply)
+      if (answered) return { ok: false, message: answered.body?.message ?? `The master answered ${answered.reply?.status}.` }
+      return { ok: false, message: pings.map((p) => explainConnectionError(p.error, p.base)).join(' ') }
+    }
+    if (good.body?.schemaVersion !== LATEST_SCHEMA_VERSION) {
       return { ok: false, message: 'The master runs a different version of the app. Update both to the same version.' }
     }
 
-    await updateLink((link) => ({ ...link, role: 'node', masterUrl: base, masterToken: data.token.trim() }))
+    noteGoodAddress(good.base)
+    await updateLink((link) => ({ ...link, role: 'node', masterUrl: good.base, masterUrls: bases, masterToken: token }))
     const db = openHistoryDb()
     try {
       await pushToMaster(db, readSettingsFile(), readVersionFromPackageJson())
     } finally {
       db.close()
     }
-    return { ok: true, message: `Linked to ${body.name ?? 'the master'}.`, masterName: body.name }
+    return { ok: true, message: `Linked to ${good.body?.name ?? 'the master'}.`, masterName: good.body?.name }
   })
 
 export const disconnectFromMaster = createServerFn({ method: 'POST' }).handler(async () =>
-  updateLink((link) => ({ ...link, masterUrl: '', masterToken: '' })),
+  updateLink((link) => ({ ...link, masterUrl: '', masterUrls: [], masterToken: '' })),
 )
 
 /** Sends what changed to the master now, without scanning. */

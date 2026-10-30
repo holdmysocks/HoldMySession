@@ -13,6 +13,7 @@ import { HistoryPanel } from '@/features/history/HistoryPanel'
 import { BackupPanel } from '@/features/history/BackupPanel'
 import { LinkPanel } from '@/features/link/LinkPanel'
 import { HooksPanel } from '@/features/hooks/HooksPanel'
+import { DesktopPanel } from '@/features/desktop/DesktopPanel'
 import { UpdatesPanel } from '@/features/updates/UpdatesPanel'
 import { LinkedNote } from '@/features/link/LinkedNote'
 import { ClockFormatSetting } from '@/features/time/ClockFormatSetting'
@@ -173,6 +174,8 @@ function SettingsForm({ settings }: { settings: Settings }) {
       </div>
 
       <ClockFormatSetting />
+
+      <DesktopPanel />
 
       <UpdatesPanel />
 

@@ -26,6 +26,8 @@ export const LinkSchema = z.object({
   role: z.enum(['node', 'master']).default('node'),
   /** Node: the master's address, as typed. Any address that reaches it works, local or tailnet. */
   masterUrl: z.string().default(''),
+  /** Node: every address the master can be reached on (local network, tailnet, name), tried in turn. */
+  masterUrls: z.array(z.string()).default([]),
   /** Node: the master's token. */
   masterToken: z.string().default(''),
   /** Master: the token a node must present. Empty until the master role is first switched on. */
@@ -42,7 +44,7 @@ export const SettingsSchema = z.object({
   autoScan: AutoScanSchema.default({ enabled: true, intervalMinutes: 15 }),
   /** Ask GitHub now and then whether a newer release exists. Only the version number is compared. */
   checkForUpdates: z.boolean().default(true),
-  link: LinkSchema.default({ role: 'node', masterUrl: '', masterToken: '', nodeToken: '', listen: 'local' }),
+  link: LinkSchema.default({ role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' }),
   pricingOverrides: z
     .record(z.string(), ModelPricingOverrideSchema)
     .default({}),
@@ -285,7 +287,7 @@ export const DEFAULT_SETTINGS: Settings = {
   subscriptionTier: 'pro',
   autoScan: { enabled: true, intervalMinutes: 15 },
   checkForUpdates: true,
-  link: { role: 'node', masterUrl: '', masterToken: '', nodeToken: '', listen: 'local' },
+  link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' },
   pricingOverrides: {},
   dataSources: [],
 }

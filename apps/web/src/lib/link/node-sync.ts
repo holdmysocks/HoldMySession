@@ -3,6 +3,7 @@ import { LATEST_SCHEMA_VERSION, getMeta, setMeta } from '@/lib/history/history-d
 import type { Settings } from '@/features/settings/settings.types'
 import { isLinkedNode, applyShared } from './shared'
 import { selfMachineId } from './machines'
+import { explainConnectionError } from './explain'
 import type { PushResponse, SessionPayload } from './protocol'
 
 /** How many sessions go in one request. */
@@ -25,6 +26,26 @@ export function normalizeMasterUrl(raw: string): string | null {
   } catch {
     return null
   }
+}
+
+let lastGood: string | null = null
+
+/** Every address the master can be reached on, the one that worked last time first. Duplicates and bad addresses are dropped. */
+export function masterCandidates(link: { masterUrl: string; masterUrls?: string[] }): string[] {
+  const all = [link.masterUrl, ...(link.masterUrls ?? [])]
+    .map((u) => normalizeMasterUrl(u))
+    .filter((u): u is string => u !== null)
+  const unique = [...new Set(all)]
+  return lastGood && unique.includes(lastGood) ? [lastGood, ...unique.filter((u) => u !== lastGood)] : unique
+}
+
+/** For tests: forget which address worked. */
+export function resetMasterAddress(): void {
+  lastGood = null
+}
+
+export function noteGoodAddress(base: string): void {
+  lastGood = base
 }
 
 interface Pending {
@@ -82,9 +103,31 @@ export async function pushToMaster(
   fetchImpl: FetchLike = fetch as unknown as FetchLike,
 ): Promise<SyncOutcome> {
   if (!isLinkedNode(settings)) return { ok: true, skipped: true, sent: 0, message: null }
-  const base = normalizeMasterUrl(settings.link.masterUrl)
-  if (!base) return record(db, { ok: false, skipped: false, sent: 0, message: 'The master address is not a valid http or https address.' })
+  const candidates = masterCandidates(settings.link)
+  if (candidates.length === 0) return record(db, { ok: false, skipped: false, sent: 0, message: 'The master address is not a valid http or https address.' })
 
+  // Each address is tried in turn, so the same node works on the local network and over a tailnet. The one that
+  // answers is remembered. An answer of any kind, even a refusal, means the master was reached.
+  let last: SyncOutcome & { reachable: boolean } = { ok: false, skipped: false, sent: 0, message: null, reachable: false }
+  for (const base of candidates) {
+    last = await pushOnce(db, settings, base, appVersion, fetchImpl)
+    if (last.reachable) {
+      noteGoodAddress(base)
+      break
+    }
+  }
+  const { reachable: _reachable, ...outcome } = last
+  void _reachable
+  return record(db, outcome)
+}
+
+async function pushOnce(
+  db: Db,
+  settings: Settings,
+  base: string,
+  appVersion: string | null,
+  fetchImpl: FetchLike,
+): Promise<SyncOutcome & { reachable: boolean }> {
   const machineId = selfMachineId(db)
   const self = db.prepare('SELECT name, name_updated_at FROM machines WHERE machine_id = ?').get(machineId)!
   let sent = 0
@@ -110,7 +153,7 @@ export async function pushToMaster(
         } catch {
           // Keep the status message.
         }
-        return record(db, { ok: false, skipped: false, sent, message })
+        return { ok: false, skipped: false, sent, message, reachable: true }
       }
       const reply = (await response.json()) as PushResponse
       const mark = db.prepare('UPDATE sessions SET synced_hash = ? WHERE machine_id = ? AND session_key = ? AND sync_hash = ?')
@@ -125,10 +168,9 @@ export async function pushToMaster(
       if (batch.length < BATCH) break
     }
   } catch (error) {
-    const reason = error instanceof Error ? (error.name === 'TimeoutError' ? 'The master did not answer in time.' : error.message) : String(error)
-    return record(db, { ok: false, skipped: false, sent, message: `Could not reach the master: ${reason}` })
+    return { ok: false, skipped: false, sent, message: `Could not reach the master: ${explainConnectionError(error, base)}`, reachable: false }
   }
-  return record(db, { ok: true, skipped: false, sent, message: null })
+  return { ok: true, skipped: false, sent, message: null, reachable: true }
 }
 
 function record(db: Db, outcome: SyncOutcome): SyncOutcome {

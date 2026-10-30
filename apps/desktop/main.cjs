@@ -25,6 +25,11 @@ const WEB_DIR = app.isPackaged || require('node:fs').existsSync(path.join(__dirn
   : path.join(__dirname, '..', 'web');
 const ICONS = path.join(__dirname, 'icons');
 const PORT = Number(process.env.HOLDMYSESSION_PORT) || 3000;
+// The start-up entry is saved with these arguments, and has to be read back with the same ones: on Windows the
+// check is by program and arguments together, so reading it without them always says it is off.
+const LOGIN_ARGS = ['--background'];
+const loginEnabled = () => app.getLoginItemSettings({ path: process.execPath, args: LOGIN_ARGS }).openAtLogin;
+const setLogin = (enabled) => app.setLoginItemSettings({ openAtLogin: enabled, path: process.execPath, args: LOGIN_ARGS });
 
 app.setAppUserModelId('com.holdmysocks.holdmysession');
 
@@ -85,6 +90,7 @@ function runApp() {
   let tray = null;
   let server = null;
   let quitting = false;
+  let rebuildTray = () => undefined;
   let baseUrl = `http://localhost:${PORT}`;
 
   function showWindow() {
@@ -135,7 +141,6 @@ function runApp() {
     const image = nativeImage.createFromPath(path.join(ICONS, process.platform === 'win32' ? 'tray.png' : 'tray@2x.png'));
     tray = new Tray(process.platform === 'darwin' ? image.resize({ width: 18, height: 18 }) : image);
     tray.setToolTip(`HoldMySession ${app.getVersion()}`);
-    const loginItems = () => app.getLoginItemSettings().openAtLogin;
     const rebuild = () =>
       tray.setContextMenu(
         Menu.buildFromTemplate([
@@ -145,9 +150,9 @@ function runApp() {
           {
             label: process.platform === 'darwin' ? 'Open at login' : 'Start with Windows',
             type: 'checkbox',
-            checked: loginItems(),
+            checked: loginEnabled(),
             click: (item) => {
-              app.setLoginItemSettings({ openAtLogin: item.checked, args: ['--background'] });
+              setLogin(item.checked);
               rebuild();
             },
           },
@@ -158,6 +163,7 @@ function runApp() {
       );
     rebuild();
     tray.on('click', showWindow);
+    rebuildTray = rebuild;
   }
 
   function quit() {
@@ -180,6 +186,19 @@ function runApp() {
       server.once('error', reject);
       server.listen(PORT, host, resolve);
     });
+    // The Settings page asks the app for these through this object, since the server runs inside this process.
+    globalThis.__holdmysessionDesktop = {
+      getOpenAtLogin: () => loginEnabled(),
+      setOpenAtLogin: (enabled) => {
+        setLogin(Boolean(enabled));
+        rebuildTray();
+        return loginEnabled();
+      },
+      restart: () => {
+        app.relaunch();
+        quit();
+      },
+    };
     // Load the app once, so the server starts its background work now, not when the first page is opened.
     fetch(`http://127.0.0.1:${PORT}/`, { redirect: 'manual' }).catch(() => undefined);
   }

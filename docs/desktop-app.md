@@ -8,6 +8,11 @@ HoldMySession can run as a desktop app for Windows and Mac. It is the same serve
 2. Closing the window hides it. Use the tray icon to open it again, open it in a browser, turn on Start with Windows (Open at login on a Mac), restart it, or quit.
 3. Running it again while it is already running opens the existing window.
 4. `--background` starts it in the tray without opening the window.
+5. **Start with Windows** (Open at login on a Mac) is a switch in the tray menu, with a tick when on, and in Settings, under Desktop app. Both read the same system setting.
+
+### Linking machines from the app
+
+On a master, Settings, Linked machines shows the machine's addresses (local network, tailnet and computer name) and a **pairing code** to paste on each node, which holds every address and the token, so a node works over either network. Turning on **Listen on the network** asks Windows for the firewall permission it needs (Windows shows its own permission prompt), limited to your own network and the tailnet, and the page offers **Restart now** to apply it. If you decline the prompt, the card says what is missing and has an **Allow through the firewall** button. On a Mac the system asks the first time. A node only makes outgoing connections, so it needs no firewall permission, and when it cannot connect it says why (refused, no answer, name not found).
 
 The programs are not signed, so Windows SmartScreen or macOS Gatekeeper will warn on first run. On Windows choose More info, then Run anyway. On a Mac, Control-click the app, choose Open, then Open again.
 

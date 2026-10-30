@@ -48,7 +48,7 @@ describe('SettingsSchema', () => {
     const result = SettingsSchema.safeParse(input)
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data).toEqual({ ...input, dataSources: [], autoScan: { enabled: true, intervalMinutes: 15 }, checkForUpdates: true, link: { role: 'node', masterUrl: '', masterToken: '', nodeToken: '', listen: 'local' } })
+      expect(result.data).toEqual({ ...input, dataSources: [], autoScan: { enabled: true, intervalMinutes: 15 }, checkForUpdates: true, link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' } })
     }
   })
 

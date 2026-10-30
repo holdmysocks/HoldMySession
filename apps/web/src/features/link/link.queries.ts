@@ -1,6 +1,6 @@
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  connectToMaster, disconnectFromMaster, getLinkState, regenerateNodeToken, removeLinkedMachine, renameMachineName, setLinkRole,
+  allowFirewall, connectToMaster, disconnectFromMaster, restartApp, getLinkState, regenerateNodeToken, removeLinkedMachine, renameMachineName, setLinkRole,
   setListen, syncNow,
 } from './link.api'
 
@@ -21,6 +21,8 @@ export function useLinkMutations() {
     role: useMutation({ mutationFn: setLinkRole, onSuccess: refresh }),
     token: useMutation({ mutationFn: regenerateNodeToken, onSuccess: refresh }),
     listen: useMutation({ mutationFn: setListen, onSuccess: refresh }),
+    firewall: useMutation({ mutationFn: allowFirewall, onSuccess: refresh }),
+    restart: useMutation({ mutationFn: restartApp }),
     connect: useMutation({ mutationFn: connectToMaster, onSuccess: refresh }),
     disconnect: useMutation({ mutationFn: disconnectFromMaster, onSuccess: refresh }),
     sync: useMutation({ mutationFn: syncNow, onSuccess: refresh }),

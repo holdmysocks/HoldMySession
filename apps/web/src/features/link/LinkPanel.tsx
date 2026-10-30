@@ -104,59 +104,109 @@ interface SectionProps {
 
 function MasterSection({ state, m, fail }: SectionProps) {
   const [shown, setShown] = useState(false)
+  const [copied, setCopied] = useState<string | null>(null)
+  const net = state.network
+  const copy = (text: string, label: string) => {
+    void navigator.clipboard?.writeText(text)
+    setCopied(label)
+    setTimeout(() => setCopied((c) => (c === label ? null : c)), 2000)
+  }
+  const on = state.link.listen === 'network'
   return (
-    <div className="space-y-3 border-t border-gray-800 pt-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-gray-300">Listen on the network</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={state.link.listen === 'network'}
-          aria-label="Listen on the network"
-          onClick={() => m.listen.mutate({ data: { listen: state.link.listen === 'network' ? 'local' : 'network' } }, { onError: fail })}
-          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
-            state.link.listen === 'network' ? 'bg-brand-600' : 'bg-gray-800'
-          }`}
-        >
-          <span
-            className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-              state.link.listen === 'network' ? 'translate-x-[18px]' : 'translate-x-[3px]'
-            }`}
-          />
-        </button>
-        <span className="text-gray-500">
-          Nodes connect to this machine's address, local network or tailnet, either works. Applies the next time HoldMySession starts.
-        </span>
+    <div className="space-y-4 border-t border-gray-800 pt-3">
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-gray-300">Listen on the network</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={on}
+            aria-label="Listen on the network"
+            onClick={() => m.listen.mutate({ data: { listen: on ? 'local' : 'network' } }, { onError: fail })}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${on ? 'bg-brand-600' : 'bg-gray-800'}`}
+          >
+            <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+          </button>
+          <span className={net.listeningOnNetwork ? 'text-emerald-500' : 'text-gray-500'}>
+            {net.listeningOnNetwork ? 'Listening on the network now' : 'Only this computer can reach it right now'}
+          </span>
+        </div>
+        {net.needsRestart && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-500">
+            <span>HoldMySession has to restart for this to take effect.</span>
+            {net.canRestart ? (
+              <button type="button" className={button} disabled={m.restart.isPending} onClick={() => m.restart.mutate(undefined as never, { onError: fail })}>
+                {m.restart.isPending ? 'Restarting…' : 'Restart now'}
+              </button>
+            ) : (
+              <span>Close it and start it again.</span>
+            )}
+          </div>
+        )}
+        {net.firewall !== 'not-needed' && on && (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-gray-300">Windows Firewall</span>
+            <span className={net.firewall === 'allowed' ? 'text-emerald-500' : 'text-amber-500'}>
+              {net.firewall === 'allowed' ? 'Allowed for this network and your tailnet' : 'Not allowed yet, so other machines cannot connect'}
+            </span>
+            {net.firewall !== 'allowed' && (
+              <button type="button" className={button} disabled={m.firewall.isPending} onClick={() => m.firewall.mutate(undefined as never, { onError: fail })}>
+                Allow through the firewall
+              </button>
+            )}
+          </div>
+        )}
+        <p className="text-[10px] text-gray-500">
+          This lets nodes, and any browser on your network or tailnet, reach this machine on port {net.port}. The firewall rule is limited to
+          your own network and the tailnet, and the dashboard itself has no login, so only turn it on on networks you trust.
+        </p>
       </div>
-      {state.link.listen !== 'network' && (
-        <p className="text-amber-400">Nodes cannot reach this machine until that is on and HoldMySession is restarted.</p>
-      )}
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-gray-300">Token for nodes</span>
-        <code className="rounded bg-gray-950 px-2 py-1 font-mono text-gray-200">
-          {shown ? state.link.nodeToken : '•'.repeat(24)}
-        </code>
-        <button type="button" className={button} onClick={() => setShown((s) => !s)}>{shown ? 'Hide' : 'Show'}</button>
-        <button type="button" className={button} onClick={() => navigator.clipboard?.writeText(state.link.nodeToken)}>Copy</button>
-        <button
-          type="button"
-          className={button}
-          onClick={() => window.confirm('Make a new token? Every linked node stops sending until you give it the new one.') && m.token.mutate(undefined as never, { onError: fail })}
-        >
-          New token
-        </button>
+
+      <div className="space-y-1.5">
+        <p className="font-medium text-gray-300">Link a node</p>
+        <p className="text-gray-500">On the other machine, open Settings, Linked machines, and paste this code. It holds every address of this machine and the token, so it works on the local network and the tailnet.</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <code className="max-w-md truncate rounded bg-gray-950 px-2 py-1 font-mono text-gray-200">
+            {net.pairingCode ? (shown ? net.pairingCode : '•'.repeat(32)) : 'Not ready yet'}
+          </code>
+          <button type="button" className={button} onClick={() => setShown((s) => !s)}>{shown ? 'Hide' : 'Show'}</button>
+          <button type="button" className={button} disabled={!net.pairingCode} onClick={() => net.pairingCode && copy(net.pairingCode, 'code')}>
+            {copied === 'code' ? 'Copied' : 'Copy pairing code'}
+          </button>
+          <button
+            type="button"
+            className={button}
+            onClick={() => window.confirm('Make a new token? Every linked node stops sending until it has the new pairing code.') && m.token.mutate(undefined as never, { onError: fail })}
+          >
+            New token
+          </button>
+        </div>
       </div>
-      <p className="text-[10px] text-gray-500">
-        On each node, enter this machine's address (for example http://192.168.1.20:3000 or http://my-pc.your-tailnet.ts.net:3000) and this token.
-        Traffic is not encrypted, so use it on a network you trust or a tailnet.
-      </p>
+
+      <div className="space-y-1">
+        <p className="font-medium text-gray-300">This machine's addresses</p>
+        <ul className="space-y-1">
+          {net.addresses.map((a) => (
+            <li key={a.url} className="flex flex-wrap items-center gap-x-3">
+              <span className="w-56 font-mono text-gray-200">{a.url}</span>
+              <span className="text-gray-500">{a.kind === 'lan' ? 'local network' : a.kind === 'tailnet' ? 'tailnet' : a.kind === 'name' ? 'computer name' : 'other'}</span>
+              <button type="button" className="text-brand-600 hover:underline" onClick={() => copy(a.url, a.url)}>
+                {copied === a.url ? 'Copied' : 'Copy'}
+              </button>
+            </li>
+          ))}
+        </ul>
+        <p className="text-[10px] text-gray-500">Traffic is not encrypted, so use it on a network you trust or a tailnet.</p>
+      </div>
     </div>
   )
 }
 
 function NodeSection({ state, m, fail }: SectionProps) {
+  const [code, setCode] = useState('')
   const [url, setUrl] = useState(state.link.masterUrl)
   const [token, setToken] = useState('')
+  const [manual, setManual] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
   return (
     <div className="space-y-3 border-t border-gray-800 pt-3">
@@ -166,9 +216,10 @@ function NodeSection({ state, m, fail }: SectionProps) {
             Linked to <span className="font-medium">{state.sync.masterName ?? state.link.masterUrl}</span>
             <span className="ml-2 font-mono text-gray-500">{state.link.masterUrl}</span>
           </p>
-          <p className="text-gray-500">
-            Last sent {when(state.sync.lastPushAt)}. Prices and the plan come from the master.
-          </p>
+          {state.link.masterUrls.length > 1 && (
+            <p className="text-gray-500">Also tried when that one does not answer: {state.link.masterUrls.filter((u) => u !== state.link.masterUrl).join(', ')}</p>
+          )}
+          <p className="text-gray-500">Last sent {when(state.sync.lastPushAt)}. Prices and the plan come from the master.</p>
           {state.sync.lastError && <p role="alert" className="text-red-400">{state.sync.lastError}</p>}
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" className={button} disabled={m.sync.isPending} onClick={() => m.sync.mutate({ data: { everything: false } }, { onError: fail })}>
@@ -192,23 +243,35 @@ function NodeSection({ state, m, fail }: SectionProps) {
           onSubmit={(e) => {
             e.preventDefault()
             setResult(null)
-            m.connect.mutate({ data: { url, token } }, { onSuccess: (r) => setResult(r), onError: fail })
+            m.connect.mutate({ data: manual ? { url, token } : { code } }, { onSuccess: (r) => setResult(r), onError: fail })
           }}
         >
           <p className="font-medium text-gray-300">Link to a master</p>
-          <label className="flex items-center gap-2">
-            Master address
-            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://192.168.1.20:3000" className={`${input} flex-1 font-mono`} />
-          </label>
-          <label className="flex items-center gap-2">
-            Token
-            <input value={token} onChange={(e) => setToken(e.target.value)} type="password" autoComplete="off" className={`${input} flex-1 font-mono`} />
-          </label>
-          <div className="flex items-center gap-3">
+          {!manual ? (
+            <label className="flex items-center gap-2">
+              Pairing code
+              <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Paste the code from the master's Settings" autoComplete="off" className={`${input} flex-1 font-mono`} />
+            </label>
+          ) : (
+            <>
+              <label className="flex items-center gap-2">
+                Master address
+                <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://192.168.1.20:3000" className={`${input} flex-1 font-mono`} />
+              </label>
+              <label className="flex items-center gap-2">
+                Token
+                <input value={token} onChange={(e) => setToken(e.target.value)} type="password" autoComplete="off" className={`${input} flex-1 font-mono`} />
+              </label>
+            </>
+          )}
+          <div className="flex flex-wrap items-center gap-3">
             <button type="submit" className={button} disabled={m.connect.isPending}>{m.connect.isPending ? 'Connecting…' : 'Connect'}</button>
+            <button type="button" className="text-brand-600 hover:underline" onClick={() => setManual((v) => !v)}>
+              {manual ? 'Use a pairing code instead' : 'Enter an address and token instead'}
+            </button>
             {result && <span role={result.ok ? 'status' : 'alert'} className={result.ok ? 'text-emerald-500' : 'text-red-400'}>{result.message}</span>}
           </div>
-          <p className="text-[10px] text-gray-500">This machine works on its own until it is linked. Use the master's local or tailnet address, whichever this machine can reach.</p>
+          <p className="text-[10px] text-gray-500">This machine works on its own until it is linked.</p>
         </form>
       )}
     </div>
