@@ -1,19 +1,28 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
 import type { PositionedEdge, PositionedNode, ProjectLayout } from '@/lib/map/layout'
 import type { MapNodeStatus } from '@/lib/map/project-map'
 import { boundsOf, fitView, zoomAt, type FitOptions, type MapView, type ViewSize } from '@/lib/map/viewport'
+import { GRID_SIZE, dragPositions, nodesInBox, toggleId, type Placed } from '@/lib/map/editing'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { expiredSubagentsLabel, kindLabel, relationTag, shortModelName, statusLabel, truncateLabel } from './format-node'
+
+/** A card's new top-left corner, in map coordinates. */
+export type NodeMove = Placed
 
 interface MapCanvasProps {
   layout: ProjectLayout
   selectedId: string | null
   onSelect: (nodeId: string) => void
-  /** Editor mode: dragging a card moves it. Otherwise dragging anywhere pans the map. */
+  /**
+   * Editor mode: dragging a card moves it, Ctrl-click or Ctrl and a drag over empty space selects
+   * several, and dragging any selected card moves them all. Otherwise dragging anywhere pans.
+   */
   editMode?: boolean
-  /** Called while a card is dragged or nudged, with its new top-left corner in map coordinates. */
-  onNodeMove?: (nodeId: string, x: number, y: number) => void
+  /** Called while cards are dragged or nudged, with every moved card's new top-left corner. */
+  onNodesMove?: (moves: NodeMove[]) => void
+  /** In editor mode, cards snap to a grid while dragged. Holding Alt places them freely. */
+  snapToGrid?: boolean
 }
 
 /**
@@ -45,33 +54,66 @@ const HALO_INSET = 2
 
 /** Pointer travel, in pixels, before a press counts as a drag. Below it the press is a click. */
 const DRAG_THRESHOLD = 4
-/** Map units a focused card moves per arrow key press in editor mode. */
+/** Map units a focused card moves per arrow key press in editor mode. With the grid on, one grid step. */
 const NUDGE_STEP = 10
+/** The grid dots are left out below this zoom, where they would run together. */
+const MIN_GRID_ZOOM = 0.35
+const NO_IDS: readonly string[] = []
 /** The first view fits the whole drawing, but never smaller than this, so text stays readable. */
 const INITIAL_FIT: FitOptions = { padding: 16, minScale: 0.5, maxScale: 1, center: false }
 /** The Fit button shows everything, however small that makes it. */
 const FULL_FIT: FitOptions = { padding: 32, minScale: 0.15, maxScale: 1.5, center: true }
 const ZOOM_BUTTON_FACTOR = 1.25
 
-interface Drag {
+interface DragBase {
   pointerId: number
   startX: number
   startY: number
   moved: boolean
-  /** A card being moved, or null when the drag pans the map. */
-  nodeId: string | null
-  /** The card's position, or the view's, when the drag started. */
-  originX: number
-  originY: number
+}
+
+type Drag =
+  | (DragBase & {
+      kind: 'nodes'
+      /** The card under the pointer. With the grid on, it is the one that lands on a grid point. */
+      primaryId: string
+      /** Every card being moved, where it was when the drag started. */
+      origins: Placed[]
+      /** Whether the primary card was already in the selection. If not, it becomes the selection. */
+      wasSelected: boolean
+    })
+  | (DragBase & { kind: 'marquee'; left: number; top: number })
+  | (DragBase & { kind: 'pan'; originX: number; originY: number })
+
+/** A selection box in screen pixels, relative to the map. */
+interface Marquee {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
 }
 
 /**
  * Inline SVG rendering of a laid-out project map. It fills the space it is given. Dragging empty
- * space pans, the wheel zooms, and in editor mode dragging a card moves it. Nodes are focusable;
- * Enter or Space selects, and in editor mode the arrow keys nudge the focused card.
+ * space pans, the wheel zooms, and in editor mode dragging a card moves it, to a grid unless Alt is
+ * held. Ctrl-click, or Ctrl and a drag over empty space, selects several cards, and dragging one of
+ * them moves them all. Nodes are focusable; Enter or Space selects, and in editor mode the arrow
+ * keys nudge the focused card, or the whole selection when it is part of it.
  */
-export function MapCanvas({ layout, selectedId, onSelect, editMode = false, onNodeMove }: MapCanvasProps) {
+export function MapCanvas({
+  layout,
+  selectedId,
+  onSelect,
+  editMode = false,
+  onNodesMove,
+  snapToGrid = false,
+}: MapCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null)
+  const gridId = `map-grid-${useId().replace(/:/g, '')}`
+  // The cards picked in editor mode, apart from the one the details panel shows.
+  const [selection, setSelection] = useState<string[]>([])
+  const [marquee, setMarquee] = useState<Marquee | null>(null)
+  const activeSelection = editMode ? selection : NO_IDS
   const dragRef = useRef<Drag | null>(null)
   const suppressClickRef = useRef(false)
   const [size, setSize] = useState<ViewSize>({ width: 0, height: 0 })
@@ -129,16 +171,23 @@ export function MapCanvas({ layout, selectedId, onSelect, editMode = false, onNo
   function handlePointerDown(event: PointerEvent<SVGSVGElement>) {
     if (event.button !== 0) return
     const nodeId = (event.target as Element).closest?.('[data-node-id]')?.getAttribute('data-node-id') ?? null
-    const node = editMode && onNodeMove && nodeId ? layout.nodes.find((n) => n.id === nodeId) : undefined
-    dragRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      moved: false,
-      nodeId: node?.id ?? null,
-      originX: node ? node.x : viewRef.current.x,
-      originY: node ? node.y : viewRef.current.y,
+    const base = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, moved: false }
+
+    if (editMode && onNodesMove && nodeId) {
+      const wasSelected = activeSelection.includes(nodeId)
+      const ids = wasSelected ? activeSelection : [nodeId]
+      const origins = layout.nodes
+        .filter((node) => ids.includes(node.id))
+        .map((node) => ({ id: node.id, x: node.x, y: node.y }))
+      dragRef.current = { ...base, kind: 'nodes', primaryId: nodeId, origins, wasSelected }
+      return
     }
+    if (editMode && (event.ctrlKey || event.metaKey)) {
+      const rect = svgRef.current?.getBoundingClientRect()
+      dragRef.current = { ...base, kind: 'marquee', left: rect?.left ?? 0, top: rect?.top ?? 0 }
+      return
+    }
+    dragRef.current = { ...base, kind: 'pan', originX: viewRef.current.x, originY: viewRef.current.y }
   }
 
   function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
@@ -153,11 +202,23 @@ export function MapCanvas({ layout, selectedId, onSelect, editMode = false, onNo
       commitView(viewRef.current)
       // Captured only once it is a drag, so a plain click still reaches the card.
       svgRef.current?.setPointerCapture?.(event.pointerId)
-      if (drag.nodeId === null) setPanning(true)
+      if (drag.kind === 'pan') setPanning(true)
+      // Dragging a card that was not selected selects it alone, so the outline shows what moves.
+      if (drag.kind === 'nodes' && !drag.wasSelected) setSelection([drag.primaryId])
     }
-    if (drag.nodeId !== null) {
+
+    if (drag.kind === 'nodes') {
       const k = viewRef.current.k
-      onNodeMove?.(drag.nodeId, drag.originX + dx / k, drag.originY + dy / k)
+      // Alt places freely. Otherwise the grid snaps, when it is on.
+      const snap = snapToGrid && !event.altKey
+      onNodesMove?.(dragPositions(drag.origins, drag.primaryId, dx / k, dy / k, snap))
+    } else if (drag.kind === 'marquee') {
+      setMarquee({
+        x0: drag.startX - drag.left,
+        y0: drag.startY - drag.top,
+        x1: event.clientX - drag.left,
+        y1: event.clientY - drag.top,
+      })
     } else {
       commitView({ ...viewRef.current, x: drag.originX + dx, y: drag.originY + dy })
     }
@@ -168,6 +229,23 @@ export function MapCanvas({ layout, selectedId, onSelect, editMode = false, onNo
     if (!drag || drag.pointerId !== event.pointerId) return
     dragRef.current = null
     setPanning(false)
+
+    if (drag.kind === 'marquee' && marquee) {
+      const { x, y, k } = viewRef.current
+      setSelection(
+        nodesInBox(layout.nodes, {
+          x0: (marquee.x0 - x) / k,
+          y0: (marquee.y0 - y) / k,
+          x1: (marquee.x1 - x) / k,
+          y1: (marquee.y1 - y) / k,
+        }),
+      )
+    }
+    setMarquee(null)
+
+    // A plain click on empty space in editor mode drops the selection.
+    if (drag.kind === 'pan' && !drag.moved && editMode) setSelection([])
+
     if (!drag.moved) return
     svgRef.current?.releasePointerCapture?.(event.pointerId)
     // The click that ends a drag must not select the card it ended on.
@@ -175,6 +253,29 @@ export function MapCanvas({ layout, selectedId, onSelect, editMode = false, onNo
     window.setTimeout(() => {
       suppressClickRef.current = false
     }, 0)
+  }
+
+  /** A click on a card. In editor mode Ctrl adds it to the selection, or takes it out. */
+  function handleNodeClick(nodeId: string, additive: boolean) {
+    if (editMode && additive) {
+      const next = toggleId(selection, nodeId)
+      setSelection(next)
+      if (next.includes(nodeId)) onSelect(nodeId)
+      return
+    }
+    if (editMode) setSelection([nodeId])
+    onSelect(nodeId)
+  }
+
+  /** An arrow key on a card. The whole selection moves with it when the card is part of it. */
+  function handleNudge(nodeId: string, stepX: number, stepY: number, free: boolean) {
+    const ids = activeSelection.includes(nodeId) ? activeSelection : [nodeId]
+    const origins = layout.nodes
+      .filter((node) => ids.includes(node.id))
+      .map((node) => ({ id: node.id, x: node.x, y: node.y }))
+    const snap = snapToGrid && !free
+    const step = snap ? GRID_SIZE : NUDGE_STEP
+    onNodesMove?.(dragPositions(origins, nodeId, stepX * step, stepY * step, snap))
   }
 
   function zoomFromCentre(factor: number) {
@@ -205,7 +306,32 @@ export function MapCanvas({ layout, selectedId, onSelect, editMode = false, onNo
           event.preventDefault()
         }}
       >
+        {editMode && snapToGrid && size.width > 0 && view.k >= MIN_GRID_ZOOM && (
+          <defs>
+            <pattern
+              id={gridId}
+              width={GRID_SIZE}
+              height={GRID_SIZE}
+              x={-GRID_SIZE / 2}
+              y={-GRID_SIZE / 2}
+              patternUnits="userSpaceOnUse"
+            >
+              <circle cx={GRID_SIZE / 2} cy={GRID_SIZE / 2} r={1.1} className="fill-gray-700" />
+            </pattern>
+          </defs>
+        )}
         <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
+          {editMode && snapToGrid && size.width > 0 && view.k >= MIN_GRID_ZOOM && (
+            <rect
+              data-grid
+              x={-view.x / view.k}
+              y={-view.y / view.k}
+              width={size.width / view.k}
+              height={size.height / view.k}
+              fill={`url(#${gridId})`}
+              pointerEvents="none"
+            />
+          )}
           {layout.edges.map((edge) => (
             <MapEdgeLine key={edge.id} edge={edge} />
           ))}
@@ -214,12 +340,27 @@ export function MapCanvas({ layout, selectedId, onSelect, editMode = false, onNo
               key={node.id}
               node={node}
               selected={node.id === selectedId}
+              multiSelected={activeSelection.includes(node.id)}
               editMode={editMode}
-              onSelect={onSelect}
-              onNodeMove={onNodeMove}
+              canMove={Boolean(onNodesMove)}
+              onClick={handleNodeClick}
+              onNudge={handleNudge}
             />
           ))}
         </g>
+        {marquee && (
+          <rect
+            data-marquee
+            x={Math.min(marquee.x0, marquee.x1)}
+            y={Math.min(marquee.y0, marquee.y1)}
+            width={Math.abs(marquee.x1 - marquee.x0)}
+            height={Math.abs(marquee.y1 - marquee.y0)}
+            strokeWidth={1}
+            strokeDasharray="4 3"
+            className="fill-brand-500/10 stroke-brand-500"
+            pointerEvents="none"
+          />
+        )}
       </svg>
 
       <div
@@ -271,20 +412,25 @@ function MapEdgeLine({ edge }: { edge: PositionedEdge }) {
 
 interface NodeViewProps {
   node: PositionedNode
+  /** The card the details panel shows. */
   selected: boolean
+  /** One of the cards picked in editor mode. */
+  multiSelected: boolean
   editMode: boolean
-  onSelect: (nodeId: string) => void
-  onNodeMove?: (nodeId: string, x: number, y: number) => void
+  canMove: boolean
+  onClick: (nodeId: string, additive: boolean) => void
+  /** An arrow key in editor mode: a step of -1, 0 or 1 on each axis, and whether Alt was held. */
+  onNudge: (nodeId: string, stepX: number, stepY: number, free: boolean) => void
 }
 
 const NUDGE_KEYS: Record<string, [number, number]> = {
-  ArrowLeft: [-NUDGE_STEP, 0],
-  ArrowRight: [NUDGE_STEP, 0],
-  ArrowUp: [0, -NUDGE_STEP],
-  ArrowDown: [0, NUDGE_STEP],
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
 }
 
-function NodeView({ node, selected, editMode, onSelect, onNodeMove }: NodeViewProps) {
+function NodeView({ node, selected, multiSelected, editMode, canMove, onClick, onNudge }: NodeViewProps) {
   const { privacyMode, anonymizeSessionName, anonymizeProjectName, anonymizeBranch } = usePrivacy()
   const isSession = node.kind === 'session'
   const classes = STATUS_CLASSES[node.status]
@@ -313,13 +459,13 @@ function NodeView({ node, selected, editMode, onSelect, onNodeMove }: NodeViewPr
   function handleKeyDown(event: KeyboardEvent<SVGGElement>) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
-      onSelect(node.id)
+      onClick(node.id, event.ctrlKey || event.metaKey)
       return
     }
-    const nudge = editMode && onNodeMove ? NUDGE_KEYS[event.key] : undefined
+    const nudge = editMode && canMove ? NUDGE_KEYS[event.key] : undefined
     if (nudge) {
       event.preventDefault()
-      onNodeMove?.(node.id, node.x + nudge[0], node.y + nudge[1])
+      onNudge(node.id, nudge[0], nudge[1], event.altKey)
     }
   }
 
@@ -327,15 +473,29 @@ function NodeView({ node, selected, editMode, onSelect, onNodeMove }: NodeViewPr
     <g
       transform={`translate(${node.x} ${node.y})`}
       data-node-id={node.id}
+      data-multiselected={multiSelected ? 'true' : undefined}
       role="button"
       tabIndex={0}
       aria-pressed={selected}
       aria-label={label}
-      onClick={() => onSelect(node.id)}
+      onClick={(event) => onClick(node.id, event.ctrlKey || event.metaKey)}
       onKeyDown={handleKeyDown}
       className={`group outline-none ${editMode ? 'cursor-move' : 'cursor-pointer'}`}
     >
       <title>{label}</title>
+      {multiSelected && (
+        <rect
+          x={-5}
+          y={-5}
+          width={node.width + 10}
+          height={node.height + 10}
+          rx={14}
+          fill="none"
+          strokeWidth={1.5}
+          strokeDasharray="5 3"
+          className="stroke-brand-400"
+        />
+      )}
       {classes.halo && (
         <rect
           x={-HALO_INSET}

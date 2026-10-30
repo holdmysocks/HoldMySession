@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { applyCustomPositions, layoutProjectMap, type NodePositions } from '@/lib/map/layout'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { mapProjectsQuery, projectMapQuery, hookEventsQuery } from './project-map.queries'
-import { MapCanvas } from './MapCanvas'
+import { MapCanvas, type NodeMove } from './MapCanvas'
 import { NeedsYouPanel } from './NeedsYouPanel'
 import { NodeDetailPanel } from './NodeDetailPanel'
 import { HookEventsPanel } from './HookEventsPanel'
@@ -30,6 +30,8 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [panelsHidden, setPanelsHidden] = useState(false)
+  // In editor mode cards snap to a grid. Holding Alt while dragging places one freely.
+  const [snapToGrid, setSnapToGrid] = useState(true)
   // Card positions from the editor. They belong to a project and are saved on the server.
   const { positions, setPositions, isLoading: layoutLoading, saveFailed } = useMapLayout(selectedKey)
 
@@ -62,14 +64,14 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   // The editor reports where a card should now be. The first move saves where every card is now,
   // so the arrangement stays as it is. Cards that are not on the map now (archived sessions) keep
   // their saved place, and a new session or subagent is placed afresh each time it appears.
-  function handleNodeMove(nodeId: string, x: number, y: number) {
+  function handleNodesMove(moves: NodeMove[]) {
     if (!layout) return
     const next: NodePositions = {}
     for (const [id, position] of Object.entries(positions)) {
       if (id.startsWith('session:')) next[id] = position
     }
     for (const node of layout.nodes) next[node.id] = { x: node.x, y: node.y }
-    next[nodeId] = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 }
+    for (const move of moves) next[move.id] = { x: Math.round(move.x * 10) / 10, y: Math.round(move.y * 10) / 10 }
     setPositions(next)
   }
 
@@ -157,6 +159,17 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
           {editMode ? 'Editing layout' : 'Edit layout'}
         </button>
         {editMode && (
+          <label className="flex items-center gap-1.5 rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-300">
+            <input
+              type="checkbox"
+              checked={snapToGrid}
+              onChange={(e) => setSnapToGrid(e.target.checked)}
+              className="accent-brand-500"
+            />
+            Snap to grid
+          </label>
+        )}
+        {editMode && (
           <button
             type="button"
             onClick={handleResetLayout}
@@ -176,7 +189,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
         </button>
         <p className="text-xs text-gray-500">
           {editMode
-            ? 'Drag a card to move it, drag empty space to pan, scroll to zoom. Arrow keys nudge a focused card. Your layout is saved on the server and follows you to other devices.'
+            ? 'Drag a card to move it. It snaps to the grid, and holding Alt places it freely. Ctrl-click cards, or hold Ctrl and drag over empty space, to select several and move them together. Drag empty space to pan, scroll to zoom, arrow keys nudge. Your layout is saved on the server and follows you to other devices.'
             : 'Drag to pan, scroll to zoom.'}
         </p>
         {saveFailed && (
@@ -204,7 +217,8 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
               selectedId={selectedId}
               onSelect={setSelectedId}
               editMode={editMode}
-              onNodeMove={handleNodeMove}
+              onNodesMove={handleNodesMove}
+              snapToGrid={snapToGrid}
             />
           ) : (
             <p className="py-12 text-center text-sm text-gray-500">

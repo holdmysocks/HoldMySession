@@ -307,18 +307,18 @@ describe('MapCanvas pan, zoom and editor mode', () => {
   ])
   const node = layout.nodes[0]
 
-  function renderEditable(editMode: boolean) {
+  function renderEditable(editMode: boolean, snapToGrid = false) {
     const onSelect = vi.fn()
-    const onNodeMove = vi.fn()
+    const onNodesMove = vi.fn()
     const { container } = render(
       <PrivacyProvider>
-        <MapCanvas layout={layout} selectedId={null} onSelect={onSelect} editMode={editMode} onNodeMove={onNodeMove} />
+        <MapCanvas layout={layout} selectedId={null} onSelect={onSelect} editMode={editMode} onNodesMove={onNodesMove} snapToGrid={snapToGrid} />
       </PrivacyProvider>,
     )
     const svg = container.querySelector('svg[role="group"]')!
     const content = svg.querySelector(':scope > g')!
     const card = screen.getByRole('button', { name: /^Session, My App/ })
-    return { svg, content, card, onSelect, onNodeMove }
+    return { svg, content, card, onSelect, onNodesMove }
   }
 
   function drag(target: Element, from: [number, number], to: [number, number]) {
@@ -342,11 +342,11 @@ describe('MapCanvas pan, zoom and editor mode', () => {
   })
 
   it('pans, and does not move the card or select it, when a card is dragged outside editor mode', () => {
-    const { card, content, onSelect, onNodeMove } = renderEditable(false)
+    const { card, content, onSelect, onNodesMove } = renderEditable(false)
     drag(card, [100, 100], [160, 130])
     fireEvent.click(card)
     expect(content.getAttribute('transform')).toBe('translate(76 46) scale(1)')
-    expect(onNodeMove).not.toHaveBeenCalled()
+    expect(onNodesMove).not.toHaveBeenCalled()
     expect(onSelect).not.toHaveBeenCalled()
   })
 
@@ -359,18 +359,18 @@ describe('MapCanvas pan, zoom and editor mode', () => {
   })
 
   it('moves the card, not the map, when it is dragged in editor mode', () => {
-    const { card, content, onSelect, onNodeMove } = renderEditable(true)
+    const { card, content, onSelect, onNodesMove } = renderEditable(true)
     drag(card, [100, 100], [160, 130])
-    expect(onNodeMove).toHaveBeenLastCalledWith(node.id, node.x + 60, node.y + 30)
+    expect(onNodesMove).toHaveBeenLastCalledWith([{ id: node.id, x: node.x + 60, y: node.y + 30 }])
     expect(content.getAttribute('transform')).toBe('translate(16 16) scale(1)')
     fireEvent.click(card)
     expect(onSelect).not.toHaveBeenCalled()
   })
 
   it('still pans from empty space in editor mode', () => {
-    const { svg, content, onNodeMove } = renderEditable(true)
+    const { svg, content, onNodesMove } = renderEditable(true)
     drag(svg, [100, 100], [140, 100])
-    expect(onNodeMove).not.toHaveBeenCalled()
+    expect(onNodesMove).not.toHaveBeenCalled()
     expect(content.getAttribute('transform')).toBe('translate(56 16) scale(1)')
   })
 
@@ -378,14 +378,14 @@ describe('MapCanvas pan, zoom and editor mode', () => {
     const edit = renderEditable(true)
     fireEvent.keyDown(edit.card, { key: 'ArrowRight' })
     fireEvent.keyDown(edit.card, { key: 'ArrowUp' })
-    expect(edit.onNodeMove).toHaveBeenNthCalledWith(1, node.id, node.x + 10, node.y)
-    expect(edit.onNodeMove).toHaveBeenNthCalledWith(2, node.id, node.x, node.y - 10)
+    expect(edit.onNodesMove).toHaveBeenNthCalledWith(1, [{ id: node.id, x: node.x + 10, y: node.y }])
+    expect(edit.onNodesMove).toHaveBeenNthCalledWith(2, [{ id: node.id, x: node.x, y: node.y - 10 }])
   })
 
   it('does not move a card with the arrow keys outside editor mode', () => {
     const view = renderEditable(false)
     fireEvent.keyDown(view.card, { key: 'ArrowRight' })
-    expect(view.onNodeMove).not.toHaveBeenCalled()
+    expect(view.onNodesMove).not.toHaveBeenCalled()
   })
 
   it('zooms with the wheel around the pointer', () => {
@@ -408,5 +408,217 @@ describe('MapCanvas pan, zoom and editor mode', () => {
     expect(content.getAttribute('transform')).toContain('scale(1.25)')
     fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }))
     expect(screen.getByText('100%')).toBeTruthy()
+  })
+})
+
+describe('MapCanvas grid, multi-select and box select', () => {
+  const sessionInput = (id: string): MapSessionInput => ({
+    summary: summary(id),
+    agents: [],
+    subagentLastActivity: new Map(),
+    pendingQuestions: [],
+    lastNotificationAt: null,
+    totalTokens: 0,
+  })
+  // Two top-level sessions side by side: the first at x 0, the second at x 320.
+  const layout = buildLayout([sessionInput('aaaaaaaa-1111'), sessionInput('bbbbbbbb-2222')])
+  const [first, second] = layout.nodes
+
+  function renderTwo(options: { editMode?: boolean; snapToGrid?: boolean } = {}) {
+    const onSelect = vi.fn()
+    const onNodesMove = vi.fn()
+    const { container } = render(
+      <PrivacyProvider>
+        <MapCanvas
+          layout={layout}
+          selectedId={null}
+          onSelect={onSelect}
+          editMode={options.editMode ?? true}
+          snapToGrid={options.snapToGrid ?? false}
+          onNodesMove={onNodesMove}
+        />
+      </PrivacyProvider>,
+    )
+    const svg = container.querySelector('svg[role="group"]')!
+    const card = (index: number) => container.querySelectorAll('[data-node-id]')[index] as SVGGElement
+    return { container, svg, card, onSelect, onNodesMove }
+  }
+
+  function drag(target: Element, by: [number, number], init: object = {}) {
+    fireEvent.pointerDown(target, { pointerId: 1, button: 0, clientX: 100, clientY: 100, ...init })
+    fireEvent.pointerMove(target, { pointerId: 1, clientX: 100 + by[0], clientY: 100 + by[1], ...init })
+    fireEvent.pointerUp(target, { pointerId: 1, clientX: 100 + by[0], clientY: 100 + by[1], ...init })
+  }
+
+  it('snaps a dragged card to the grid', () => {
+    const { card, onNodesMove } = renderTwo({ snapToGrid: true })
+    drag(card(0), [47, 33])
+    expect(onNodesMove).toHaveBeenLastCalledWith([{ id: first.id, x: 40, y: 40 }])
+  })
+
+  it('places a card exactly where it is dropped while Alt is held', () => {
+    const { card, onNodesMove } = renderTwo({ snapToGrid: true })
+    drag(card(0), [47, 33], { altKey: true })
+    expect(onNodesMove).toHaveBeenLastCalledWith([{ id: first.id, x: 47, y: 33 }])
+  })
+
+  it('does not snap when the grid is off', () => {
+    const { card, onNodesMove } = renderTwo({ snapToGrid: false })
+    drag(card(0), [47, 33])
+    expect(onNodesMove).toHaveBeenLastCalledWith([{ id: first.id, x: 47, y: 33 }])
+  })
+
+  it('nudges by a grid step when the grid is on, and by 10 with Alt', () => {
+    const { card, onNodesMove } = renderTwo({ snapToGrid: true })
+    fireEvent.keyDown(card(0), { key: 'ArrowRight' })
+    expect(onNodesMove).toHaveBeenLastCalledWith([{ id: first.id, x: 20, y: 0 }])
+    fireEvent.keyDown(card(0), { key: 'ArrowRight', altKey: true })
+    expect(onNodesMove).toHaveBeenLastCalledWith([{ id: first.id, x: 10, y: 0 }])
+  })
+
+  describe('the grid', () => {
+    function stubSize() {
+      return vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+        x: 0, y: 0, left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, toJSON: () => ({}),
+      })
+    }
+
+    it('is drawn in editor mode with snapping on, and only then', () => {
+      const spy = stubSize()
+      expect(renderTwo({ snapToGrid: true }).container.querySelector('[data-grid]')).not.toBeNull()
+      spy.mockRestore()
+    })
+
+    it('is not drawn with snapping off, or outside editor mode', () => {
+      const spy = stubSize()
+      expect(renderTwo({ snapToGrid: false }).container.querySelector('[data-grid]')).toBeNull()
+      expect(renderTwo({ editMode: false, snapToGrid: true }).container.querySelectorAll('[data-grid]')).toHaveLength(0)
+      spy.mockRestore()
+    })
+  })
+
+  describe('selecting several cards', () => {
+    const picked = (container: HTMLElement) =>
+      Array.from(container.querySelectorAll('[data-multiselected="true"]')).map((el) => el.getAttribute('data-node-id'))
+
+    it('adds a card with Ctrl-click, and takes it out with another Ctrl-click', () => {
+      const { container, card, onSelect } = renderTwo()
+      fireEvent.click(card(0), { ctrlKey: true })
+      fireEvent.click(card(1), { ctrlKey: true })
+      expect(picked(container)).toEqual([first.id, second.id])
+      expect(onSelect).toHaveBeenCalledWith(second.id)
+      fireEvent.click(card(0), { ctrlKey: true })
+      expect(picked(container)).toEqual([second.id])
+    })
+
+    it('treats a plain click as selecting that card alone', () => {
+      const { container, card } = renderTwo()
+      fireEvent.click(card(0), { ctrlKey: true })
+      fireEvent.click(card(1), { ctrlKey: true })
+      fireEvent.click(card(1))
+      expect(picked(container)).toEqual([second.id])
+    })
+
+    it('moves every selected card together when one of them is dragged', () => {
+      const { card, onNodesMove } = renderTwo()
+      fireEvent.click(card(0), { ctrlKey: true })
+      fireEvent.click(card(1), { ctrlKey: true })
+      drag(card(1), [60, 40])
+      expect(onNodesMove).toHaveBeenLastCalledWith([
+        { id: first.id, x: first.x + 60, y: first.y + 40 },
+        { id: second.id, x: second.x + 60, y: second.y + 40 },
+      ])
+    })
+
+    it('keeps a group arranged when it snaps: the dragged card lands on the grid and the rest follow', () => {
+      const { card, onNodesMove } = renderTwo({ snapToGrid: true })
+      fireEvent.click(card(0), { ctrlKey: true })
+      fireEvent.click(card(1), { ctrlKey: true })
+      drag(card(0), [47, 33])
+      expect(onNodesMove).toHaveBeenLastCalledWith([
+        { id: first.id, x: 40, y: 40 },
+        { id: second.id, x: second.x + 40, y: second.y + 40 },
+      ])
+    })
+
+    it('moves only a card that is not selected, and selects it instead', () => {
+      const { container, card, onNodesMove } = renderTwo()
+      fireEvent.click(card(1), { ctrlKey: true })
+      drag(card(0), [30, 10])
+      expect(onNodesMove).toHaveBeenLastCalledWith([{ id: first.id, x: first.x + 30, y: first.y + 10 }])
+      expect(picked(container)).toEqual([first.id])
+    })
+
+    it('nudges the whole selection with the arrow keys', () => {
+      const { card, onNodesMove } = renderTwo()
+      fireEvent.click(card(0), { ctrlKey: true })
+      fireEvent.click(card(1), { ctrlKey: true })
+      fireEvent.keyDown(card(0), { key: 'ArrowDown' })
+      expect(onNodesMove).toHaveBeenLastCalledWith([
+        { id: first.id, x: first.x, y: first.y + 10 },
+        { id: second.id, x: second.x, y: second.y + 10 },
+      ])
+    })
+
+    it('drops the selection when empty space is clicked', () => {
+      const { container, svg, card } = renderTwo()
+      fireEvent.click(card(0), { ctrlKey: true })
+      expect(picked(container)).toHaveLength(1)
+      fireEvent.pointerDown(svg, { pointerId: 1, button: 0, clientX: 600, clientY: 400 })
+      fireEvent.pointerUp(svg, { pointerId: 1, clientX: 600, clientY: 400 })
+      expect(picked(container)).toEqual([])
+    })
+
+    it('does not select several outside editor mode', () => {
+      const { container, card } = renderTwo({ editMode: false })
+      fireEvent.click(card(0), { ctrlKey: true })
+      fireEvent.click(card(1), { ctrlKey: true })
+      expect(picked(container)).toEqual([])
+    })
+  })
+
+  describe('the selection box', () => {
+    const picked = (container: HTMLElement) =>
+      Array.from(container.querySelectorAll('[data-multiselected="true"]')).map((el) => el.getAttribute('data-node-id'))
+
+    function boxDrag(svg: Element, to: [number, number]) {
+      fireEvent.pointerDown(svg, { pointerId: 1, button: 0, clientX: 0, clientY: 0, ctrlKey: true })
+      fireEvent.pointerMove(svg, { pointerId: 1, clientX: to[0], clientY: to[1], ctrlKey: true })
+    }
+
+    it('is drawn while Ctrl is held and the pointer drags over empty space', () => {
+      const { container, svg } = renderTwo()
+      boxDrag(svg, [300, 200])
+      expect(container.querySelector('[data-marquee]')).not.toBeNull()
+      fireEvent.pointerUp(svg, { pointerId: 1, clientX: 300, clientY: 200 })
+      expect(container.querySelector('[data-marquee]')).toBeNull()
+    })
+
+    it('selects the cards it touches, and no others', () => {
+      const { container, svg } = renderTwo()
+      // The view starts 16px in, so this reaches map x 284: the first card (0 to 280) and not the second (from 320).
+      boxDrag(svg, [300, 200])
+      fireEvent.pointerUp(svg, { pointerId: 1, clientX: 300, clientY: 200 })
+      expect(picked(container)).toEqual([first.id])
+    })
+
+    it('selects several cards when it spans them, and they then move together', () => {
+      const { container, svg, card, onNodesMove } = renderTwo()
+      boxDrag(svg, [700, 200])
+      fireEvent.pointerUp(svg, { pointerId: 1, clientX: 700, clientY: 200 })
+      expect(picked(container)).toEqual([first.id, second.id])
+      drag(card(0), [20, 0])
+      expect(onNodesMove).toHaveBeenLastCalledWith([
+        { id: first.id, x: first.x + 20, y: first.y },
+        { id: second.id, x: second.x + 20, y: second.y },
+      ])
+    })
+
+    it('draws nothing and pans when Ctrl is held outside editor mode', () => {
+      const { container, svg } = renderTwo({ editMode: false })
+      boxDrag(svg, [300, 200])
+      expect(container.querySelector('[data-marquee]')).toBeNull()
+      expect(svg.querySelector(':scope > g')!.getAttribute('transform')).toBe('translate(316 216) scale(1)')
+    })
   })
 })
