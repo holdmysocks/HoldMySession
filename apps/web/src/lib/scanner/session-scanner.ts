@@ -4,7 +4,7 @@ import { getProjectsDir, getProjectsDirFor, getDataSources, extractSessionId } f
 import type { DataSource } from '../utils/claude-path'
 import { scanProjects, scanProjectsFrom } from './project-scanner'
 import { hasRecentRecord, isSessionActive } from './active-detector'
-import { backgroundTaskDir, hasRecentBackgroundTask } from './background-tasks'
+import { backgroundTaskDir, hasRunningBackgroundTask } from './background-tasks'
 import { parseSummary, parseFullScan } from '../parsers/session-parser'
 import type { SessionSummary } from '../parsers/types'
 import { truncateSessionName } from '../parsers/session-name'
@@ -35,8 +35,8 @@ async function applyFullScan(summary: SessionSummary, filePath: string): Promise
 
 /**
  * Whether a session is running now. A session is active when its transcript is being written
- * (see isSessionActive and hasRecentRecord), or when one of its background tasks wrote output
- * recently. The second case is the one the transcript cannot show.
+ * (see isSessionActive and hasRecentRecord), or when one of its background tasks is still running.
+ * The second case is the one the transcript cannot show.
  */
 async function sessionRunning(
   projectDirName: string,
@@ -47,7 +47,7 @@ async function sessionRunning(
   const transcriptActive =
     (await isSessionActive(projectDirName, sessionId, projectsDirOverride)) && hasRecentRecord(lastActiveAt)
   if (transcriptActive) return true
-  return hasRecentBackgroundTask(backgroundTaskDir(projectDirName, sessionId))
+  return hasRunningBackgroundTask(backgroundTaskDir(projectDirName, sessionId))
 }
 
 /**

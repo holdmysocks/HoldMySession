@@ -45,6 +45,8 @@ export interface MapNode {
   branch: string | null
   /** Session nodes only. The project's display name, shown as the node's primary label. */
   projectDisplayName: string | null
+  /** Session nodes only: background tasks still running. 0 for subagents. */
+  backgroundTaskCount: number
   /**
    * Session nodes only: how this session is linked to its parent. 'fork' when the transcript says
    * it was forked. 'sub-session' when the desktop app nested it under its parent. Null when top level.
@@ -95,6 +97,8 @@ export interface MapSessionInput {
   lastNotificationAt: string | null
   /** Session-level total tokens across input, output and cache. */
   totalTokens: number
+  /** Background tasks of this session that are still running. 0 when none. */
+  backgroundTaskCount?: number
 }
 
 export function tokenTotal(usage: TokenUsage | undefined): number {
@@ -181,6 +185,7 @@ function sessionNode(
     branch: summary.branch,
     projectDisplayName: summary.projectDisplayName,
     parentRelation: relation,
+    backgroundTaskCount: input.backgroundTaskCount ?? 0,
     status,
     needsYou: status === 'needs-you',
     expiredSubagentCount,
@@ -223,6 +228,7 @@ function subagentNode(sessionId: string, agent: AgentInvocation, index: number):
     branch: null,
     projectDisplayName: null,
     parentRelation: null,
+    backgroundTaskCount: 0,
     status: 'running',
     needsYou: false,
     expiredSubagentCount: 0,

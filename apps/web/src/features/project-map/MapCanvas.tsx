@@ -158,7 +158,26 @@ function NodeView({ node, selected, onSelect }: NodeViewProps) {
       ) : (
         <SubagentLines title={node.title} description={node.subtitle} dotClass={classes.dot} />
       )}
+      {isSession && node.backgroundTaskCount > 0 && (
+        <TaskChip count={node.backgroundTaskCount} x={node.width - 120} y={node.height - 22} />
+      )}
       {expired > 0 && <ExpiredChip count={expired} x={node.width - 48} y={node.height - 22} />}
+    </g>
+  )
+}
+
+/**
+ * "N tasks" chip: background tasks of this session that are still running. Green, because they
+ * are what keeps a quiet session green.
+ */
+function TaskChip({ count, x, y }: { count: number; x: number; y: number }) {
+  const label = `${count} ${count === 1 ? 'task' : 'tasks'}`
+  return (
+    <g aria-hidden="true">
+      <rect x={x} y={y} width={68} height={16} rx={8} strokeWidth={1} className="fill-gray-800 stroke-green-600" />
+      <text x={x + 34} y={y + 11.5} textAnchor="middle" className="fill-green-300 text-[10px] font-semibold">
+        {label}
+      </text>
     </g>
   )
 }

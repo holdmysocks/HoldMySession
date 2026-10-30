@@ -172,7 +172,7 @@ The hook is the only writer of this file. It always exits 0 and swallows errors,
 - **Message counts come from the first and last 15 lines** of each file, so a long session shows a count that is too low. This predates Phase 1 and is not fixed here. The sessions list and the map both show it.
 - **Permission prompts were not found in the transcript.** Only the Notification hook reveals them. Without the hook, a session waiting on one looks idle.
 - **An unanswered `AskUserQuestion` can belong to an abandoned session.** It is ignored once the session is idle, but an active session with a stale question still shows as needs-you.
-- **Background tasks are seen only when they write output.** A session counts as active when a task output file under `%TEMP%\claude\<project folder>\<session ID>\tasks\` was written in the last 2 minutes. A task that prints nothing may not touch its file, so it shows as idle until it writes. This is Windows only, because the folder is under the temp folder of the machine that runs Claude Code.
+- **Background tasks are counted from their output file.** A task is running while its output has no exit line. A finished task ends with `[exited with code N]`. Output older than 24 hours with no exit line is treated as finished. The exit line is confirmed on Linux task output. It is assumed to be the same on Windows, and worth checking on a finished task there.
 - **Subagents quiet for more than 5 minutes are not drawn**, even if they are still working. Running is judged from the transcript's last record, so a subagent that goes silent for longer than the window counts as expired until it writes again. The session's +N chip still counts it.
 - **Archive state lives in the desktop app's records, not the transcript.** The CLI transcript has no archive marker. The app's record (`isArchived`) is the source now used. A session with no desktop record cannot be archived as far as the dashboard can tell.
 - **The map reads only the primary data source.** On Windows, WSL sessions are listed on the Sessions page but not on the map.
@@ -251,4 +251,5 @@ Fixes for problems a Windows user reported with real data.
 
 ### Background tasks (2026-10-30, later still)
 
-- **Active while a background task writes.** A session is active when a task output in `%TEMP%\claude\<project folder>\<session ID>\tasks\` was written in the last 2 minutes, even if its transcript is quiet. Measured on a real 10-minute task, which wrote to its `.output` file while it ran. Code: `src/lib/scanner/background-tasks.ts`.
+- **Running tasks keep a session active.** A session is active while one of its background tasks is running, even if its transcript is quiet. A task is running while its output file under `%TEMP%\claude\<project folder>\<session ID>\tasks\` has no exit line. This also counts a task that prints nothing. Code: `src/lib/scanner/background-tasks.ts`.
+- **The card shows a green "N tasks" chip** with the number of running tasks.

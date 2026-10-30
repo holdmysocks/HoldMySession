@@ -6,6 +6,7 @@ import { scanAllSessionsWithPaths } from '@/lib/scanner/session-scanner'
 import type { SessionSummaryWithPath } from '@/lib/scanner/session-scanner'
 import { parseDetail } from '@/lib/parsers/session-parser'
 import { readSubagentLastActivity } from '@/lib/parsers/subagent-discovery'
+import { backgroundTaskDir, countRunningBackgroundTasks } from '@/lib/scanner/background-tasks'
 import type { AgentInvocation, SessionSummary } from '@/lib/parsers/types'
 import { findPendingQuestions } from '@/lib/map/pending-requests'
 import type { PendingQuestion } from '@/lib/map/pending-requests'
@@ -151,6 +152,7 @@ export const getProjectMap = createServerFn({ method: 'GET' })
         summary: session,
         agents: detail.agents,
         subagentLastActivity: await readSubagentLastActivity(sessionDir),
+        backgroundTaskCount: await countRunningBackgroundTasks(backgroundTaskDir(session.projectKey, session.sessionId)),
         pendingQuestions: detail.pendingQuestions,
         lastNotificationAt: notifications.get(session.sessionId) ?? null,
         totalTokens: detail.totalTokens,
