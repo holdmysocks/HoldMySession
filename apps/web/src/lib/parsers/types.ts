@@ -21,6 +21,11 @@ export interface SessionSummary {
   fileSizeBytes: number
   /** Total output tokens from assistant messages (lightweight streaming parse) */
   outputTokens?: number
+  /**
+   * `outputTokens` without any request an earlier-started session file already holds, so a fork's
+   * copy of its parent's history is not counted twice. Set on each scan. The project totals use it.
+   */
+  uniqueOutputTokens?: number
   /** Which DataSource this came from, e.g. 'primary', 'wsl-ubuntu-user' */
   sourceId?: string
   /** Display label for the source, e.g. 'Windows', 'WSL - Ubuntu' */
@@ -261,6 +266,8 @@ export interface RawJsonlMessage {
   /** Set on user lines Claude Code writes for itself (e.g. the caveat before a command). */
   isMeta?: boolean
   message?: {
+    /** The API's own ID for the message. Shared by every record a streamed response is written as. */
+    id?: string
     model?: string
     role?: string
     content?: Array<{
@@ -289,6 +296,7 @@ export interface RawJsonlMessage {
     message?: {
       type?: string
       message?: {
+        id?: string
         model?: string
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw JSONL content has arbitrary shape
         content?: Array<{ type: string; name?: string; id?: string; input?: Record<string, any> }>

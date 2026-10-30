@@ -195,6 +195,9 @@ export async function parseDetail(
   const agentProgressTokens = new Map<string, TokenUsage>()
   const agentProgressToolCalls = new Map<string, Record<string, number>>()
   const agentProgressModel = new Map<string, string>()
+  // Request IDs whose tokens an agent's progress messages added, so they can be dropped from the sink
+  // when the subagent's own file replaces them.
+  const agentProgressRequests = new Map<string, string[]>()
   const agentIdByToolUseId = new Map<string, string>()
 
   // Map for linking TaskCreate tool_use_id to pending task
@@ -235,7 +238,7 @@ export async function parseDetail(
       }
 
       // Deduplicate progress messages by requestId — same API call can appear multiple times
-      const progressRequestId = msg.requestId
+      const progressRequestId = apiCallKey(msg.requestId, msg.data?.message?.message?.id)
       const isNewProgressRequest = !progressRequestId || !seenRequestIds.has(progressRequestId)
       if (progressRequestId) seenRequestIds.add(progressRequestId)
 
@@ -271,6 +274,15 @@ export async function parseDetail(
 
         // Add to per-model tracking using model from progress message
         const modelId = msg.data?.message?.message?.model ?? 'unknown'
+        if (progressRequestId) {
+          requestSink?.set(progressRequestId, {
+            model: modelId !== 'unknown' ? modelId : '',
+            usage: { ...tokens },
+          })
+          const ids = agentProgressRequests.get(parentId) ?? []
+          ids.push(progressRequestId)
+          agentProgressRequests.set(parentId, ids)
+        }
         if (modelId !== 'unknown') {
           const modelExisting = tokensByModel[modelId] ?? {
             inputTokens: 0,
@@ -384,7 +396,7 @@ export async function parseDetail(
         }
 
         // Deduplicate by requestId — same API call can appear in multiple JSONL lines
-        const requestId = msg.requestId
+        const requestId = apiCallKey(msg.requestId, msg.message.id)
         const isNewRequest = !requestId || !seenRequestIds.has(requestId)
         if (requestId) seenRequestIds.add(requestId)
 
@@ -560,13 +572,21 @@ export async function parseDetail(
       if (!subagentFilePath) return
 
       try {
-        const detail = await parseSubagentDetail(subagentFilePath)
-        mergeSubagentData(
+        const subagentRequests: RequestUsageSink = new Map()
+        const detail = await parseSubagentDetail(subagentFilePath, subagentRequests)
+        const replacedProgress = mergeSubagentData(
           agent,
           detail,
           agentProgressTokens.get(agent.toolUseId),
           totalTokens,
           tokensByModel,
+        )
+        recordSubagentRequests(
+          requestSink,
+          subagentRequests,
+          detail,
+          agentProgressRequests.get(agent.toolUseId),
+          replacedProgress,
         )
       } catch {
         // Subagent file is not readable — skip
@@ -579,7 +599,9 @@ export async function parseDetail(
     if (matchedAgentIds.has(agentId)) continue
 
     try {
-      const detail = await parseSubagentDetail(subagentFilePath)
+      const subagentRequests: RequestUsageSink = new Map()
+      const detail = await parseSubagentDetail(subagentFilePath, subagentRequests)
+      recordSubagentRequests(requestSink, subagentRequests, detail, undefined, false)
 
       const hasTokens = detail.tokens.inputTokens > 0 || detail.tokens.outputTokens > 0
       const hasActivity = hasTokens || detail.skills.length > 0 || detail.totalToolUseCount > 0
@@ -711,6 +733,7 @@ interface SubagentDetail {
  */
 async function parseSubagentDetail(
   subagentFilePath: string,
+  requestSink?: RequestUsageSink,
 ): Promise<SubagentDetail> {
   const skills: SkillInvocation[] = []
   const tokens: TokenUsage = {
@@ -760,7 +783,7 @@ async function parseSubagentDetail(
 
     // Extract data from assistant messages
     if (msg.type === 'assistant' && msg.message) {
-      const requestId = msg.requestId
+      const requestId = apiCallKey(msg.requestId, msg.message.id)
 
       // Only count tokens once per API call (messages from same call share requestId)
       const isNewRequest = !requestId || !seenRequestIds.has(requestId)
@@ -779,6 +802,18 @@ async function parseSubagentDetail(
         tokens.cacheReadInputTokens += u.cache_read_input_tokens ?? 0
         tokens.cacheCreationInputTokens += u.cache_creation_input_tokens ?? 0
         tokens.thinkingTokens = (tokens.thinkingTokens ?? 0) + (u.output_tokens_details?.thinking_tokens ?? 0)
+        if (requestId) {
+          requestSink?.set(requestId, {
+            model: '',
+            usage: {
+              inputTokens: u.input_tokens ?? 0,
+              outputTokens: u.output_tokens ?? 0,
+              cacheReadInputTokens: u.cache_read_input_tokens ?? 0,
+              cacheCreationInputTokens: u.cache_creation_input_tokens ?? 0,
+              thinkingTokens: u.output_tokens_details?.thinking_tokens ?? 0,
+            },
+          })
+        }
       }
 
       // Extract tool calls and skills from content blocks
@@ -845,6 +880,38 @@ function buildContextWindowData(
 
 // --- Token merge helpers ---
 
+/**
+ * Identifies one API call, so a call written to the transcript several times, as a streamed
+ * response is, counts once. The request ID is used when the record has one. Some records have none,
+ * and then the API's message ID, which every record of the same call shares, stands in for it.
+ */
+function apiCallKey(requestId: string | undefined, messageId: string | undefined): string | undefined {
+  return requestId || messageId || undefined
+}
+
+/**
+ * Notes in the request sink which requests a subagent's file contributed, so a request that sits in
+ * more than one session can be counted once overall. A file whose tokens replaced the progress
+ * messages' tokens takes those progress requests out of the sink, since they no longer count.
+ * The tokens are filed under the subagent's model, the same one parseDetail adds them under.
+ */
+function recordSubagentRequests(
+  sink: RequestUsageSink | undefined,
+  subagentRequests: RequestUsageSink,
+  detail: SubagentDetail,
+  progressRequestIds: string[] | undefined,
+  replacedProgress: boolean,
+): void {
+  if (!sink) return
+  if (replacedProgress) {
+    for (const id of progressRequestIds ?? []) sink.delete(id)
+  }
+  if (!(detail.tokens.inputTokens > 0 || detail.tokens.outputTokens > 0)) return
+  for (const [id, entry] of subagentRequests) {
+    sink.set(id, { model: detail.model ?? '', usage: entry.usage })
+  }
+}
+
 function createEmptyTokenUsage(): TokenUsage {
   return {
     inputTokens: 0,
@@ -878,6 +945,8 @@ function subtractTokens(target: TokenUsage, source: TokenUsage): void {
  *   subtract progress tokens from session totals first, then add subagent tokens.
  * - If subagent has tokens but NO progress tokens: just add to totals.
  * - Merges tool calls, model, totalToolUseCount.
+ *
+ * Returns true when the progress tokens were taken out of the totals and replaced.
  */
 function mergeSubagentData(
   agent: AgentInvocation,
@@ -885,13 +954,15 @@ function mergeSubagentData(
   progressTokens: TokenUsage | undefined,
   totalTokens: TokenUsage,
   tokensByModel: Record<string, TokenUsage>,
-): void {
+): boolean {
+  let replacedProgress = false
   // Always set skills from subagent JSONL (most complete source)
   agent.skills = detail.skills
 
   // Token merge with double-count prevention
   if (detail.tokens.inputTokens > 0 || detail.tokens.outputTokens > 0) {
     if (progressTokens) {
+      replacedProgress = true
       // Progress tokens were already added to session totals — replace them
       // Subtract the progress tokens that were previously added
       subtractTokens(totalTokens, progressTokens)
@@ -940,6 +1011,8 @@ function mergeSubagentData(
   if (!agent.totalToolUseCount && detail.totalToolUseCount > 0) {
     agent.totalToolUseCount = detail.totalToolUseCount
   }
+
+  return replacedProgress
 }
 
 // --- Helpers ---
@@ -1010,6 +1083,10 @@ function extractToolResultText(block: {
 export interface FullScanResult {
   /** Total output tokens from assistant messages. */
   outputTokens: number
+  /** The part of `outputTokens` by request ID, so a request held by several session files counts once. */
+  requestOutputs: Map<string, number>
+  /** The part of `outputTokens` from records with no request ID, which cannot be matched across files. */
+  untrackedOutputTokens: number
   /** The newest `custom-title` in the whole file, or null. Found anywhere, not just at the ends. */
   customTitle: string | null
 }
@@ -1024,6 +1101,8 @@ export interface FullScanResult {
  */
 export async function parseFullScan(filePath: string): Promise<FullScanResult> {
   let outputTokens = 0
+  let untrackedOutputTokens = 0
+  const requestOutputs = new Map<string, number>()
   let customTitle: string | null = null
   const seenRequestIds = new Set<string>()
 
@@ -1038,16 +1117,18 @@ export async function parseFullScan(filePath: string): Promise<FullScanResult> {
       customTitle = msg.customTitle
     }
 
-    const requestId = msg.requestId
+    const requestId = apiCallKey(msg.requestId, msg.message?.id)
     if (requestId && seenRequestIds.has(requestId)) continue
     if (requestId) seenRequestIds.add(requestId)
 
     if (msg.type === 'assistant' && msg.message?.usage?.output_tokens) {
       outputTokens += msg.message.usage.output_tokens
+      if (requestId) requestOutputs.set(requestId, msg.message.usage.output_tokens)
+      else untrackedOutputTokens += msg.message.usage.output_tokens
     }
   }
 
-  return { outputTokens, customTitle }
+  return { outputTokens, customTitle, requestOutputs, untrackedOutputTokens }
 }
 
 /** Output tokens only. See parseFullScan. */

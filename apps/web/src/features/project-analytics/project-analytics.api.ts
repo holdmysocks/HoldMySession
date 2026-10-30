@@ -56,7 +56,8 @@ export function aggregateProjectAnalytics(
       totalSessions: sessions.length,
       activeSessions: sessions.filter((s) => s.isActive).length,
       totalMessages: sessions.reduce((sum, s) => sum + s.messageCount, 0),
-      outputTokens: sessions.reduce((sum, s) => sum + (s.outputTokens ?? 0), 0),
+      // Counted once across session files, so a fork's copy of its parent's history is not added again.
+      outputTokens: sessions.reduce((sum, s) => sum + (s.uniqueOutputTokens ?? s.outputTokens ?? 0), 0),
       totalDurationMs: sessions.reduce((sum, s) => sum + s.durationMs, 0),
       firstSessionAt: sessions.reduce(
         (min, s) => (s.startedAt < min ? s.startedAt : min),

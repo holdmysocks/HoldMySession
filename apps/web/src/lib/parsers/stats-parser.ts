@@ -145,21 +145,23 @@ function subtractClamped(target: TokenTotals, source: TokenTotals): void {
  * more than one file, and summing the files would count it twice. The session that started first
  * keeps a request, and every later copy is taken out of that session's token totals.
  *
- * Only main-conversation requests are handled. Subagent tokens follow their own rules in
- * parseDetail, which this leaves alone. Changes the details in place.
+ * Subagent requests count too: parseDetail files the ones that still add to a session's totals
+ * in the sink, so a subagent file copied into a fork is not counted twice either. `id` identifies a
+ * session file, not a session ID, since one session ID can exist in more than one folder. Changes
+ * the details in place.
  */
 export function removeDuplicateRequests(
-  sessions: ReadonlyArray<{ sessionId: string; startedAt: string }>,
+  sessions: ReadonlyArray<{ id: string; startedAt: string }>,
   details: Map<string, { totalTokens: TokenTotals; tokensByModel: Record<string, TokenTotals> }>,
   requestSinks: Map<string, RequestUsageSink>,
 ): void {
   const ordered = [...sessions].sort(
-    (a, b) => a.startedAt.localeCompare(b.startedAt) || a.sessionId.localeCompare(b.sessionId),
+    (a, b) => a.startedAt.localeCompare(b.startedAt) || a.id.localeCompare(b.id),
   )
   const claimed = new Set<string>()
   for (const session of ordered) {
-    const sink = requestSinks.get(session.sessionId)
-    const detail = details.get(session.sessionId)
+    const sink = requestSinks.get(session.id)
+    const detail = details.get(session.id)
     if (!sink || !detail) continue
     for (const [requestId, { model, usage }] of sink) {
       if (!claimed.has(requestId)) {
@@ -179,7 +181,11 @@ async function parseDetailsDeduplicated(
 ): Promise<Map<string, SessionDetail>> {
   const requestSinks = new Map<string, RequestUsageSink>()
   const details = await parseDetailsInBatches(sessions, 10, requestSinks)
-  removeDuplicateRequests(sessions, details, requestSinks)
+  removeDuplicateRequests(
+    sessions.map((s) => ({ id: s.filePath, startedAt: s.startedAt })),
+    details,
+    requestSinks,
+  )
   return details
 }
 
@@ -221,7 +227,8 @@ async function maybeEnrichWithRecentSessions(
 
 /**
  * Parse full session details in batches to limit concurrent file reads.
- * Returns a map of sessionId -> SessionDetail for sessions that parsed successfully.
+ * Returns a map of file path -> SessionDetail for sessions that parsed successfully. The file path
+ * is the key, not the session ID, because one session ID can exist in more than one project folder.
  */
 async function parseDetailsInBatches(
   sessions: SessionSummaryWithPath[],
@@ -236,9 +243,9 @@ async function parseDetailsInBatches(
       batch.map(async (s) => {
         try {
           const sink: RequestUsageSink = new Map()
-          requestSinks?.set(s.sessionId, sink)
+          requestSinks?.set(s.filePath, sink)
           return {
-            sessionId: s.sessionId,
+            filePath: s.filePath,
             detail: await parseDetail(
               s.filePath, s.sessionId, s.projectPath, s.projectName, sink,
             ),
@@ -250,7 +257,7 @@ async function parseDetailsInBatches(
     )
 
     for (const result of details) {
-      if (result) results.set(result.sessionId, result.detail)
+      if (result) results.set(result.filePath, result.detail)
     }
   }
 
@@ -315,7 +322,7 @@ async function mergeRecentSessions(stats: StatsCache): Promise<StatsCache> {
 
   for (const s of recentSessions) {
     const date = extractDateString(s.lastActiveAt ?? s.startedAt)
-    const detail = detailMap.get(s.sessionId)
+    const detail = detailMap.get(s.filePath)
 
     const cur = activityMap.get(date) ?? { messageCount: 0, sessionCount: 0, toolCallCount: 0 }
     cur.sessionCount += 1
@@ -588,7 +595,7 @@ export async function computeStatsFromSummaries(
 
     for (const s of summaries) {
       const d = (s.lastActiveAt ?? s.startedAt).split('T')[0]
-      const detail = detailMap.get(s.sessionId)
+      const detail = detailMap.get(s.filePath)
 
       const cur = activityMap.get(d) ?? { messageCount: 0, sessionCount: 0, toolCallCount: 0 }
       cur.sessionCount += 1

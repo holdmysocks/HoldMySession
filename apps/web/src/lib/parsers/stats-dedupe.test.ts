@@ -32,8 +32,8 @@ describe('removeDuplicateRequests', () => {
     // The fork is listed first, to show the order comes from the start times, not the list.
     removeDuplicateRequests(
       [
-        { sessionId: 'fork', startedAt: '2026-01-02T00:00:00Z' },
-        { sessionId: 'old', startedAt: '2026-01-01T00:00:00Z' },
+        { id: 'fork', startedAt: '2026-01-02T00:00:00Z' },
+        { id: 'old', startedAt: '2026-01-01T00:00:00Z' },
       ],
       details,
       sinks,
@@ -54,8 +54,8 @@ describe('removeDuplicateRequests', () => {
     ])
     removeDuplicateRequests(
       [
-        { sessionId: 'a', startedAt: '2026-01-01T00:00:00Z' },
-        { sessionId: 'b', startedAt: '2026-01-02T00:00:00Z' },
+        { id: 'a', startedAt: '2026-01-01T00:00:00Z' },
+        { id: 'b', startedAt: '2026-01-02T00:00:00Z' },
       ],
       details,
       sinks,
@@ -75,8 +75,8 @@ describe('removeDuplicateRequests', () => {
     ])
     removeDuplicateRequests(
       [
-        { sessionId: 'a', startedAt: '2026-01-01T00:00:00Z' },
-        { sessionId: 'b', startedAt: '2026-01-02T00:00:00Z' },
+        { id: 'a', startedAt: '2026-01-01T00:00:00Z' },
+        { id: 'b', startedAt: '2026-01-02T00:00:00Z' },
       ],
       details,
       sinks,
@@ -207,5 +207,137 @@ describe('reasoning tokens', () => {
       summary('fork', fork, '2026-03-02T10:00:00.000Z'),
     ])
     expect(stats!.modelUsage['claude-opus-5-5']).toMatchObject({ outputTokens: 300, thinkingTokens: 80 })
+  })
+})
+
+describe('duplicates across folders and subagents', () => {
+  let dir: string
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stats-dups-'))
+  })
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  const base = { sessionId: 's', cwd: '/w/app' }
+  const asst = (requestId: string, input: number, output: number, cacheRead: number, extra: object = {}) => ({
+    ...base, type: 'assistant', uuid: requestId, requestId, timestamp: '2026-03-01T10:01:00.000Z',
+    message: {
+      role: 'assistant', model: 'claude-opus-5-5', stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }],
+      usage: { input_tokens: input, output_tokens: output, cache_read_input_tokens: cacheRead, cache_creation_input_tokens: 0 },
+      ...extra,
+    },
+  })
+
+  function write(file: string, records: unknown[]): string {
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, records.map((r) => JSON.stringify(r)).join('\n') + '\n')
+    return file
+  }
+
+  const summary = (id: string, filePath: string, startedAt: string) =>
+    ({ sessionId: id, filePath, startedAt, lastActiveAt: startedAt, projectPath: '/w/app', projectName: 'app', projectDisplayName: 'App', cwd: '/w/app', durationMs: 1, messageCount: 1 }) as SessionSummaryWithPath
+
+  it('counts both files when one session ID exists in two folders, and each request once', async () => {
+    // The same session ID under two project folders: a resume from another directory.
+    const a = write(path.join(dir, 'folder-a', 's.jsonl'), [asst('r1', 10, 5, 1000), asst('r2', 20, 5, 2000)])
+    const b = write(path.join(dir, 'folder-b', 's.jsonl'), [asst('r1', 10, 5, 1000), asst('r2', 20, 5, 2000), asst('r3', 40, 5, 4000)])
+    const stats = await computeStatsFromSummaries([
+      summary('s', a, '2026-03-01T10:00:00.000Z'),
+      summary('s', b, '2026-03-02T10:00:00.000Z'),
+    ])
+    expect(stats!.modelUsage['claude-opus-5-5']).toMatchObject({ inputTokens: 70, outputTokens: 15, cacheReadInputTokens: 7000 })
+  })
+
+  it('counts a subagent file copied into a fork once', async () => {
+    const subagent = [asst('sub1', 100, 10, 9000), asst('sub2', 200, 20, 8000)]
+    const parent = write(path.join(dir, 'parent.jsonl'), [asst('m1', 1, 1, 100)])
+    write(path.join(dir, 'parent', 'subagents', 'agent-x.jsonl'), subagent)
+    const fork = write(path.join(dir, 'fork.jsonl'), [asst('m1', 1, 1, 100), asst('m2', 2, 2, 200)])
+    write(path.join(dir, 'fork', 'subagents', 'agent-x.jsonl'), subagent)
+    const stats = await computeStatsFromSummaries([
+      summary('parent', parent, '2026-03-01T10:00:00.000Z'),
+      summary('fork', fork, '2026-03-02T10:00:00.000Z'),
+    ])
+    // m1, m2, sub1 and sub2 once each.
+    expect(stats!.modelUsage['claude-opus-5-5']).toMatchObject({ inputTokens: 303, outputTokens: 33, cacheReadInputTokens: 17300 })
+  })
+
+  // A parent that dispatched a subagent: the main file has progress messages for it, and the
+  // subagent's own file holds the same API call with the full usage.
+  const dispatch = {
+    ...asst('m1', 1, 1, 100),
+    message: {
+      role: 'assistant', model: 'claude-opus-5-5', stop_reason: 'tool_use',
+      content: [{ type: 'tool_use', id: 'toolu_1', name: 'Task', input: { subagent_type: 'Explore', description: 'look' } }],
+      usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 100, cache_creation_input_tokens: 0 },
+    },
+  }
+  const progress = (requestId: string, input: number, output: number, cacheRead: number) => ({
+    ...base, type: 'progress', parentToolUseID: 'toolu_1', requestId, timestamp: '2026-03-01T10:02:00.000Z',
+    data: {
+      agentId: 'x',
+      message: { message: { model: 'claude-opus-5-5', content: [], usage: { input_tokens: input, output_tokens: output, cache_read_input_tokens: cacheRead, cache_creation_input_tokens: 0 } } },
+    },
+  })
+
+  it('keeps replacing progress tokens with the subagent file tokens, and still counts them once with a fork', async () => {
+    const parent = write(path.join(dir, 'parent.jsonl'), [dispatch, progress('sub1', 5, 1, 50)])
+    write(path.join(dir, 'parent', 'subagents', 'agent-x.jsonl'), [asst('sub1', 100, 10, 9000)])
+    const alone = await computeStatsFromSummaries([summary('parent', parent, '2026-03-01T10:00:00.000Z')])
+    // The main request plus the subagent's own figures, not the smaller progress figures added on top.
+    expect(alone!.modelUsage['claude-opus-5-5']).toMatchObject({ inputTokens: 101, outputTokens: 11, cacheReadInputTokens: 9100 })
+
+    // A fork holds the same history. It has the progress messages but not the subagent file.
+    const fork = write(path.join(dir, 'fork.jsonl'), [dispatch, progress('sub1', 5, 1, 50)])
+    const withFork = await computeStatsFromSummaries([
+      summary('parent', parent, '2026-03-01T10:00:00.000Z'),
+      summary('fork', fork, '2026-03-02T10:00:00.000Z'),
+    ])
+    expect(withFork!.modelUsage['claude-opus-5-5']).toMatchObject({ inputTokens: 101, outputTokens: 11, cacheReadInputTokens: 9100 })
+  })
+})
+
+describe('records without a request ID', () => {
+  let dir: string
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stats-noreq-'))
+  })
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  // A streamed response written three times, each with the same usage and message ID, and no request ID.
+  const noRequestId = (messageId: string, output: number, cacheRead: number) => ({
+    type: 'assistant', uuid: `${messageId}-${Math.random()}`, sessionId: 's', timestamp: '2026-03-01T10:01:00.000Z', cwd: '/w/app',
+    message: {
+      id: messageId, role: 'assistant', model: 'claude-opus-5-5', stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }],
+      usage: { input_tokens: 2, output_tokens: output, cache_read_input_tokens: cacheRead, cache_creation_input_tokens: 0 },
+    },
+  })
+
+  it('counts a call once, by its message ID, when it was written several times with no request ID', async () => {
+    const file = path.join(dir, 's.jsonl')
+    fs.writeFileSync(file, [noRequestId('msg_1', 455, 50_000), noRequestId('msg_1', 455, 50_000), noRequestId('msg_1', 455, 50_000), noRequestId('msg_2', 100, 60_000)].map((r) => JSON.stringify(r)).join('\n') + '\n')
+    const detail = await parseDetail(file, 's', '/w/app', 'app')
+    expect(detail.tokensByModel['claude-opus-5-5']).toMatchObject({ inputTokens: 4, outputTokens: 555, cacheReadInputTokens: 110_000 })
+  })
+
+  it('counts such a call once across a parent and a fork', async () => {
+    const parent = path.join(dir, 'parent.jsonl')
+    const fork = path.join(dir, 'fork.jsonl')
+    fs.writeFileSync(parent, [noRequestId('msg_1', 455, 50_000), noRequestId('msg_1', 455, 50_000)].map((r) => JSON.stringify(r)).join('\n') + '\n')
+    fs.writeFileSync(fork, [noRequestId('msg_1', 455, 50_000), noRequestId('msg_3', 10, 70_000)].map((r) => JSON.stringify(r)).join('\n') + '\n')
+    const summary = (id: string, filePath: string, startedAt: string) =>
+      ({ sessionId: id, filePath, startedAt, lastActiveAt: startedAt, projectPath: '/w/app', projectName: 'app', projectDisplayName: 'App', cwd: '/w/app', durationMs: 1, messageCount: 1 }) as SessionSummaryWithPath
+    const stats = await computeStatsFromSummaries([
+      summary('parent', parent, '2026-03-01T10:00:00.000Z'),
+      summary('fork', fork, '2026-03-02T10:00:00.000Z'),
+    ])
+    expect(stats!.modelUsage['claude-opus-5-5']).toMatchObject({ outputTokens: 465, cacheReadInputTokens: 120_000 })
   })
 })

@@ -19,7 +19,12 @@ vi.mock('../utils/claude-path', () => ({
 
 vi.mock('../parsers/session-parser', () => ({
   parseSummary: vi.fn(),
-  parseFullScan: vi.fn().mockResolvedValue({ outputTokens: 0, customTitle: null }),
+  parseFullScan: vi.fn().mockResolvedValue({
+    outputTokens: 0,
+    customTitle: null,
+    requestOutputs: new Map(),
+    untrackedOutputTokens: 0,
+  }),
 }))
 
 vi.mock('./active-detector', async (importOriginal) => {

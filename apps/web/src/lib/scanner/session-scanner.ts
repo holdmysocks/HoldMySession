@@ -10,27 +10,60 @@ import type { SessionSummary } from '../parsers/types'
 import { truncateSessionName } from '../parsers/session-name'
 import { resolveProjectDisplayName } from './project-display-name'
 import { desktopFlagsFor, loadDesktopSessionFlags } from '../desktop/desktop-records'
+import { uniqueOutputByFile } from './unique-output'
 
 /** Extended summary that includes the absolute JSONL file path (server-side only). */
 export interface SessionSummaryWithPath extends SessionSummary {
   filePath: string
 }
 
-// In-memory cache: sessionId -> { mtime, summary }
+/** What a full scan found about a file's output, kept so it can be matched against other files. */
+interface OutputDetail {
+  requestOutputs: Map<string, number>
+  untrackedOutputTokens: number
+}
+
+// In-memory cache: file path -> { mtime, summary, output detail }. Keyed by file, not session ID,
+// because one session ID can exist in more than one project folder.
 const summaryCache = new Map<
   string,
-  { mtimeMs: number; summary: SessionSummary }
+  { mtimeMs: number; summary: SessionSummary; output: OutputDetail }
 >()
+
+const NO_OUTPUT: OutputDetail = { requestOutputs: new Map(), untrackedOutputTokens: 0 }
+
+/**
+ * Sets `uniqueOutputTokens` on each scanned session: its output without the requests an
+ * earlier-started file already holds. The summaries are the copies returned by the scan.
+ */
+function applyUniqueOutput(
+  scanned: Array<{ summary: SessionSummary; filePath: string; output: OutputDetail }>,
+): void {
+  const unique = uniqueOutputByFile(
+    scanned.map(({ summary, filePath, output }) => ({
+      id: filePath,
+      startedAt: summary.startedAt,
+      requestOutputs: output.requestOutputs,
+      untrackedOutputTokens: output.untrackedOutputTokens,
+    })),
+  )
+  for (const { summary, filePath } of scanned) {
+    summary.uniqueOutputTokens = unique.get(filePath) ?? summary.outputTokens
+  }
+}
 
 /**
  * Fill the values that need the whole file: output tokens, and the newest custom-title,
  * which can sit anywhere in the file. Called only when a file is parsed (not on cache hits).
  */
-async function applyFullScan(summary: SessionSummary, filePath: string): Promise<void> {
+async function applyFullScan(summary: SessionSummary, filePath: string): Promise<OutputDetail> {
   const full = await parseFullScan(filePath).catch(() => null)
   summary.outputTokens = full?.outputTokens
   const customName = truncateSessionName(full?.customTitle ?? null)
   if (customName) summary.sessionName = customName
+  return full
+    ? { requestOutputs: full.requestOutputs, untrackedOutputTokens: full.untrackedOutputTokens }
+    : NO_OUTPUT
 }
 
 /**
@@ -57,6 +90,7 @@ async function sessionRunning(
 async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
   const projects = await scanProjects()
   const summaries: SessionSummaryWithPath[] = []
+  const scanned: Array<{ summary: SessionSummary; filePath: string; output: OutputDetail }> = []
 
   for (const project of projects) {
     const projectDisplayName = await resolveProjectDisplayName(project.projectPath, project.projectName)
@@ -72,11 +106,13 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
       if (!stat) continue
 
       // Check cache
-      const cached = summaryCache.get(sessionId)
+      const cached = summaryCache.get(filePath)
       if (cached && cached.mtimeMs === stat.mtimeMs) {
         // Refresh active status even for cached entries
         const active = await sessionRunning(project.dirName, sessionId, cached.summary.lastActiveAt)
-        summaries.push({ ...cached.summary, isActive: active, filePath, projectDisplayName })
+        const entry = { ...cached.summary, isActive: active, filePath, projectDisplayName }
+        summaries.push(entry)
+        scanned.push({ summary: entry, filePath, output: cached.output })
         continue
       }
 
@@ -93,16 +129,21 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
       if (summary) {
         const active = await sessionRunning(project.dirName, sessionId, summary.lastActiveAt)
         summary.isActive = active
-        await applyFullScan(summary, filePath)
+        const output = await applyFullScan(summary, filePath)
 
-        summaryCache.set(sessionId, {
+        summaryCache.set(filePath, {
           mtimeMs: stat.mtimeMs,
           summary,
+          output,
         })
-        summaries.push({ ...summary, filePath })
+        const entry = { ...summary, filePath }
+        summaries.push(entry)
+        scanned.push({ summary: entry, filePath, output })
       }
     }
   }
+
+  applyUniqueOutput(scanned)
 
   // Sort by last active, newest first
   summaries.sort(
@@ -144,6 +185,7 @@ export async function getActiveSessions(): Promise<SessionSummary[]> {
 export async function scanSessionsFromSource(source: DataSource): Promise<SessionSummary[]> {
   const projects = await scanProjectsFrom(source)
   const summaries: SessionSummary[] = []
+  const scanned: Array<{ summary: SessionSummary; filePath: string; output: OutputDetail }> = []
   const projectsDirOverride = source.id !== 'primary' ? getProjectsDirFor(source) : undefined
 
   for (const project of projects) {
@@ -156,17 +198,19 @@ export async function scanSessionsFromSource(source: DataSource): Promise<Sessio
       const stat = await fs.promises.stat(filePath).catch(() => null)
       if (!stat) continue
 
-      const cached = summaryCache.get(`${source.id}:${sessionId}`)
+      const cached = summaryCache.get(filePath)
       if (cached && cached.mtimeMs === stat.mtimeMs) {
         const active = await sessionRunning(project.dirName, sessionId, cached.summary.lastActiveAt, projectsDirOverride)
-        summaries.push({
+        const entry = {
           ...cached.summary,
           isActive: active,
           projectDisplayName,
           sourceId: source.id,
           sourceLabel: source.label,
           sourcePlatform: source.platform,
-        })
+        }
+        summaries.push(entry)
+        scanned.push({ summary: entry, filePath, output: cached.output })
         continue
       }
 
@@ -182,20 +226,24 @@ export async function scanSessionsFromSource(source: DataSource): Promise<Sessio
       if (summary) {
         const active = await sessionRunning(project.dirName, sessionId, summary.lastActiveAt, projectsDirOverride)
         summary.isActive = active
-        await applyFullScan(summary, filePath)
+        const output = await applyFullScan(summary, filePath)
         summary.sourceId = source.id
         summary.sourceLabel = source.label
         summary.sourcePlatform = source.platform
 
-        summaryCache.set(`${source.id}:${sessionId}`, {
+        summaryCache.set(filePath, {
           mtimeMs: stat.mtimeMs,
           summary,
+          output,
         })
-        summaries.push(summary)
+        const entry = { ...summary }
+        summaries.push(entry)
+        scanned.push({ summary: entry, filePath, output })
       }
     }
   }
 
+  applyUniqueOutput(scanned)
   return summaries
 }
 
