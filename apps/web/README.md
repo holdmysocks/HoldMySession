@@ -83,6 +83,10 @@ This dashboard gives you answers. It reads your local session files, parses the 
 
 Needs Node.js 22 or newer.
 
+### Desktop app (Windows and Mac)
+
+Download the zip for your system from the [releases page](https://github.com/holdmysocks/HoldMySession/releases), unzip it, and run HoldMySession. It opens a window, keeps running in the tray or menu bar when you close it, and is still at http://localhost:3000 in a browser. See [docs/desktop-app.md](docs/desktop-app.md).
+
 ### From source
 
 ```bash

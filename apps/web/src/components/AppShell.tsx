@@ -5,6 +5,7 @@ import { ActiveSessionsBadge } from '@/features/sessions/ActiveSessionsBadge'
 import { appInfoQuery } from '@/features/settings/app-info.queries'
 import { useHistoryRefresh } from '@/features/history/useHistoryRefresh'
 import { MachineFilter } from '@/features/link/MachineFilter'
+import { updateInfoQuery } from '@/features/updates/updates.queries'
 
 const NAV_ITEMS = [
   {
@@ -87,6 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const currentPath = matches[matches.length - 1]?.pathname ?? ''
   const wide = currentPath.startsWith('/map')
   const { data: appInfo } = useQuery(appInfoQuery)
+  const { data: update } = useQuery(updateInfoQuery)
   useHistoryRefresh()
   const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false)
 
@@ -156,12 +158,28 @@ export function AppShell({ children }: { children: ReactNode }) {
             <p className="text-xs text-gray-500">Read-only</p>
           </div>
           {appInfo && (
-            <p
-              className="mt-1.5 truncate text-[10px] text-gray-500"
-              title={`v${appInfo.version} · ${appInfo.appPath}`}
-            >
-              v{appInfo.version} · {appInfo.appPath}
-            </p>
+            <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] text-gray-500">
+              <a
+                href={update?.url ?? 'https://github.com/holdmysocks/HoldMySession/releases'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-gray-300"
+                title={`Releases · reading sessions from ${appInfo.appPath}`}
+              >
+                v{appInfo.version}
+              </a>
+              {update?.available && update.latest && (
+                <a
+                  href={update.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded bg-brand-500/20 px-1.5 py-0.5 font-medium text-brand-600 hover:bg-brand-500/30"
+                  title="A newer version is available"
+                >
+                  v{update.latest} available
+                </a>
+              )}
+            </div>
           )}
         </div>}
       </aside>

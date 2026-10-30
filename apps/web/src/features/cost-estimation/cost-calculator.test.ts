@@ -211,6 +211,7 @@ describe('getMergedPricing', () => {
       version: 1,
       subscriptionTier: 'pro',
       autoScan: { enabled: true, intervalMinutes: 15 },
+      checkForUpdates: true,
       link: { role: 'node', masterUrl: '', masterToken: '', nodeToken: '', listen: 'local' },
       dataSources: [],
       pricingOverrides: {
@@ -261,6 +262,7 @@ describe('getMergedPricing', () => {
       version: 1,
       subscriptionTier: 'pro',
       autoScan: { enabled: true, intervalMinutes: 15 },
+      checkForUpdates: true,
       link: { role: 'node', masterUrl: '', masterToken: '', nodeToken: '', listen: 'local' },
       pricingOverrides: overrides,
       dataSources: [],

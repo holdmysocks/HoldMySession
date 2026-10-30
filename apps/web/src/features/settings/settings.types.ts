@@ -40,6 +40,8 @@ export const SettingsSchema = z.object({
     .enum(['free', 'pro', 'max-5x', 'max-20x', 'teams', 'enterprise', 'api'])
     .default('pro'),
   autoScan: AutoScanSchema.default({ enabled: true, intervalMinutes: 15 }),
+  /** Ask GitHub now and then whether a newer release exists. Only the version number is compared. */
+  checkForUpdates: z.boolean().default(true),
   link: LinkSchema.default({ role: 'node', masterUrl: '', masterToken: '', nodeToken: '', listen: 'local' }),
   pricingOverrides: z
     .record(z.string(), ModelPricingOverrideSchema)
@@ -282,6 +284,7 @@ export const DEFAULT_SETTINGS: Settings = {
   version: 1,
   subscriptionTier: 'pro',
   autoScan: { enabled: true, intervalMinutes: 15 },
+  checkForUpdates: true,
   link: { role: 'node', masterUrl: '', masterToken: '', nodeToken: '', listen: 'local' },
   pricingOverrides: {},
   dataSources: [],

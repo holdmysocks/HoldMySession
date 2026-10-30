@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import type { HookEvent } from '@/lib/events/event-inbox'
 import { formatRelativeTime } from '@/lib/utils/format'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
@@ -14,8 +15,8 @@ export function HookEventsPanel({ events }: { events: HookEvent[] | undefined })
         <div className="space-y-2 text-sm text-gray-500">
           <p>No hook events yet.</p>
           <p>
-            Run <code className="font-mono text-xs text-gray-300">holdmysession --print-hook-config</code> to
-            get a snippet for <code className="font-mono text-xs text-gray-300">settings.json</code> in your Claude config directory.
+            Turn on <span className="text-gray-300">Needs you notifications</span> under Claude Code hooks in{' '}
+            <Link to="/settings" className="text-brand-300 hover:underline">Settings</Link>.
           </p>
         </div>
       ) : (

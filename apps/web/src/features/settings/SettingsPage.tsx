@@ -12,6 +12,8 @@ import { useTheme } from '@/features/theme/ThemeProvider'
 import { HistoryPanel } from '@/features/history/HistoryPanel'
 import { BackupPanel } from '@/features/history/BackupPanel'
 import { LinkPanel } from '@/features/link/LinkPanel'
+import { HooksPanel } from '@/features/hooks/HooksPanel'
+import { UpdatesPanel } from '@/features/updates/UpdatesPanel'
 import { LinkedNote } from '@/features/link/LinkedNote'
 import { ClockFormatSetting } from '@/features/time/ClockFormatSetting'
 import { PriceHistoryPanel } from '@/features/history/PriceHistoryPanel'
@@ -57,6 +59,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
       // The plan is kept as dated periods in the history database now. This field is only kept for older files.
       subscriptionTier: settings.subscriptionTier,
       autoScan: settings.autoScan,
+      checkForUpdates: settings.checkForUpdates,
       link: settings.link,
       pricingOverrides: overrides,
       dataSources: [],
@@ -171,9 +174,13 @@ function SettingsForm({ settings }: { settings: Settings }) {
 
       <ClockFormatSetting />
 
+      <UpdatesPanel />
+
       <HistoryPanel />
 
       <BackupPanel />
+
+      <HooksPanel />
 
       <LinkPanel />
 
