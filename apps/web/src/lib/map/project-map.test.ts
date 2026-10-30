@@ -132,7 +132,7 @@ describe('buildProjectMap: sessions', () => {
     const [node] = map.nodes
     expect(node.kind).toBe('session')
     expect(node.parentId).toBeNull()
-    expect(node.isFork).toBe(false)
+    expect(node.parentRelation).toBeNull()
     expect(node.title).toBe('Fix the router')
     expect(node.subtitle).toBe('abcdef12 · 12 msgs')
     expect(node.branch).toBe('feature/map')
@@ -352,7 +352,7 @@ describe('buildProjectMap: forks', () => {
     const map = build([fork, parent])
     const forkNode = map.nodes.find((n) => n.sessionId === 'fork-1')!
     expect(forkNode.parentId).toBe('session:parent-1')
-    expect(forkNode.isFork).toBe(true)
+    expect(forkNode.parentRelation).toBe('fork')
     expect(map.edges).toEqual([
       { id: `edge:session:fork-1`, from: 'session:parent-1', to: 'session:fork-1', kind: 'fork' },
     ])
@@ -364,7 +364,7 @@ describe('buildProjectMap: forks', () => {
     })
     const map = build([orphan])
     expect(map.nodes[0].parentId).toBeNull()
-    expect(map.nodes[0].isFork).toBe(false)
+    expect(map.nodes[0].parentRelation).toBeNull()
     expect(map.edges).toEqual([])
   })
 
@@ -387,7 +387,7 @@ describe('buildProjectMap: forks', () => {
     const map = build([parent, split])
     const splitNode = map.nodes.find((n) => n.sessionId === 'split-1')!
     expect(splitNode.parentId).toBeNull()
-    expect(splitNode.isFork).toBe(false)
+    expect(splitNode.parentRelation).toBeNull()
     expect(map.edges.filter((e) => e.kind === 'fork')).toEqual([])
     // The split session keeps its own subagents.
     expect(map.nodes.find((n) => n.kind === 'subagent')!.parentId).toBe('session:split-1')
@@ -397,6 +397,7 @@ describe('buildProjectMap: forks', () => {
     const nested = input({ summary: summary({ sessionId: 'nested-1', desktopParentId: 'parent-1' }) })
     const map = build([parent, nested])
     expect(map.nodes.find((n) => n.sessionId === 'nested-1')!.parentId).toBe('session:parent-1')
+    expect(map.nodes.find((n) => n.sessionId === 'nested-1')!.parentRelation).toBe('sub-session')
     expect(map.edges).toEqual([
       { id: 'edge:session:nested-1', from: 'session:parent-1', to: 'session:nested-1', kind: 'fork' },
     ])

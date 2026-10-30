@@ -20,9 +20,19 @@ export function expiredSubagentsLabel(count: number): string {
   return `${count} expired subagent${count === 1 ? '' : 's'} hidden`
 }
 
-export function kindLabel(node: Pick<MapNode, 'kind' | 'isFork'>): string {
+/** What a node is called in the UI: a subagent, a fork, a sub-session, or a plain session. */
+export function kindLabel(node: Pick<MapNode, 'kind' | 'parentRelation'>): string {
   if (node.kind === 'subagent') return 'Subagent'
-  return node.isFork ? 'Forked session' : 'Session'
+  if (node.parentRelation === 'fork') return 'Forked session'
+  if (node.parentRelation === 'sub-session') return 'Sub-session'
+  return 'Session'
+}
+
+/** The short tag shown on a card under its branch, for linked sessions. */
+export function relationTag(relation: MapNode['parentRelation']): string | null {
+  if (relation === 'fork') return 'fork'
+  if (relation === 'sub-session') return 'sub-session'
+  return null
 }
 
 /** claude-example-1 -> example-1, claude-example-2-20250101 -> example-2. Matches SessionCard. */

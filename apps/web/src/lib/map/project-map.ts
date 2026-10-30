@@ -15,6 +15,15 @@ import type { SessionStatus } from '../status/session-status'
 
 export type MapNodeKind = 'session' | 'subagent'
 
+/** How a session is linked to the session it hangs under. */
+export type ParentRelation = 'fork' | 'sub-session'
+
+/** The parent of one session, and how it is linked. */
+export interface ParentLink {
+  parentSessionId: string
+  relation: ParentRelation
+}
+
 /**
  * Session nodes use the shared session status. Subagent nodes are always 'running', because
  * expired subagents are not added to the map.
@@ -36,8 +45,11 @@ export interface MapNode {
   branch: string | null
   /** Session nodes only. The project's display name, shown as the node's primary label. */
   projectDisplayName: string | null
-  /** Session nodes only: true when this session is a fork of another session in the project. */
-  isFork: boolean
+  /**
+   * Session nodes only: how this session is linked to its parent. 'fork' when the transcript says
+   * it was forked. 'sub-session' when the desktop app nested it under its parent. Null when top level.
+   */
+  parentRelation: ParentRelation | null
   status: MapNodeStatus
   /** True when the session status is needs-you. */
   needsYou: boolean
@@ -115,28 +127,31 @@ export function sessionStatus(input: MapSessionInput, nowMs: number): SessionSta
  * (`lineageDetached`) is not linked, even though its transcript still names the parent.
  * A cycle (possible only in a damaged file) is cut so that the tree stays a tree.
  */
-export function forkParents(sessions: MapSessionInput[]): Map<string, string> {
+export function forkParents(sessions: MapSessionInput[]): Map<string, ParentLink> {
   const ids = new Set(sessions.map((s) => s.summary.sessionId))
-  const parentOf = new Map<string, string>()
+  const parentOf = new Map<string, ParentLink>()
 
   for (const { summary } of sessions) {
     if (summary.lineageDetached) continue
-    const parent = summary.forkedFrom?.sessionId ?? summary.desktopParentId ?? null
+    // A transcript's forkedFrom says where it was forked from. Without one, use the desktop app's nesting.
+    const forkedFrom = summary.forkedFrom?.sessionId
+    const parent = forkedFrom ?? summary.desktopParentId ?? null
+    const relation: ParentRelation = forkedFrom ? 'fork' : 'sub-session'
     if (parent && parent !== summary.sessionId && ids.has(parent)) {
-      parentOf.set(summary.sessionId, parent)
+      parentOf.set(summary.sessionId, { parentSessionId: parent, relation })
     }
   }
 
   for (const start of [...parentOf.keys()]) {
     const seen = new Set<string>([start])
-    let current = parentOf.get(start)
+    let current = parentOf.get(start)?.parentSessionId
     while (current !== undefined) {
       if (seen.has(current)) {
         parentOf.delete(start)
         break
       }
       seen.add(current)
-      current = parentOf.get(current)
+      current = parentOf.get(current)?.parentSessionId
     }
   }
 
@@ -150,6 +165,7 @@ function sessionSubtitle(summary: SessionSummary): string {
 function sessionNode(
   input: MapSessionInput,
   parentId: string | null,
+  relation: ParentRelation | null,
   nowMs: number,
   expiredSubagentCount: number,
 ): MapNode {
@@ -164,7 +180,7 @@ function sessionNode(
     subtitle: sessionSubtitle(summary),
     branch: summary.branch,
     projectDisplayName: summary.projectDisplayName,
-    isFork: parentId !== null,
+    parentRelation: relation,
     status,
     needsYou: status === 'needs-you',
     expiredSubagentCount,
@@ -206,7 +222,7 @@ function subagentNode(sessionId: string, agent: AgentInvocation, index: number):
     subtitle: agent.description,
     branch: null,
     projectDisplayName: null,
-    isFork: false,
+    parentRelation: null,
     status: 'running',
     needsYou: false,
     expiredSubagentCount: 0,
@@ -237,9 +253,9 @@ export function buildProjectMap(
 
   for (const input of sessions) {
     const sid = input.summary.sessionId
-    const parentSid = parentOf.get(sid)
-    const parentId = parentSid ? `session:${parentSid}` : null
-    const node = sessionNode(input, parentId, nowMs, expiredSubagentCount(input, nowMs))
+    const link = parentOf.get(sid)
+    const parentId = link ? `session:${link.parentSessionId}` : null
+    const node = sessionNode(input, parentId, link?.relation ?? null, nowMs, expiredSubagentCount(input, nowMs))
     nodes.push(node)
     if (parentId) {
       edges.push({ id: `edge:${node.id}`, from: parentId, to: node.id, kind: 'fork' })

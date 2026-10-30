@@ -21,9 +21,10 @@ describe('statusLabel', () => {
 
 describe('kindLabel', () => {
   it('distinguishes sessions, forks and subagents', () => {
-    expect(kindLabel({ kind: 'session', isFork: false })).toBe('Session')
-    expect(kindLabel({ kind: 'session', isFork: true })).toBe('Forked session')
-    expect(kindLabel({ kind: 'subagent', isFork: false })).toBe('Subagent')
+    expect(kindLabel({ kind: 'session', parentRelation: null })).toBe('Session')
+    expect(kindLabel({ kind: 'session', parentRelation: 'fork' })).toBe('Forked session')
+    expect(kindLabel({ kind: 'session', parentRelation: 'sub-session' })).toBe('Sub-session')
+    expect(kindLabel({ kind: 'subagent', parentRelation: null })).toBe('Subagent')
   })
 })
 

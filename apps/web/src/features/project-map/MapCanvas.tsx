@@ -2,7 +2,7 @@ import type { KeyboardEvent } from 'react'
 import type { PositionedEdge, PositionedNode, ProjectLayout } from '@/lib/map/layout'
 import type { MapNodeStatus } from '@/lib/map/project-map'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
-import { expiredSubagentsLabel, shortModelName, statusLabel, truncateLabel } from './format-node'
+import { expiredSubagentsLabel, kindLabel, relationTag, shortModelName, statusLabel, truncateLabel } from './format-node'
 
 interface MapCanvasProps {
   layout: ProjectLayout
@@ -99,7 +99,7 @@ function NodeView({ node, selected, onSelect }: NodeViewProps) {
   const model = isSession ? shortModelName(node.model) : null
   const expired = isSession ? node.expiredSubagentCount : 0
   const label = [
-    isSession ? (node.isFork ? 'Forked session' : 'Session') : 'Subagent',
+    kindLabel(node),
     projectLabel,
     sessionTitle,
     statusLabel(node.status),
@@ -153,7 +153,7 @@ function NodeView({ node, selected, onSelect }: NodeViewProps) {
           branch={branch}
           subtitle={node.subtitle}
           model={model}
-          isFork={node.isFork}
+          relation={relationTag(node.parentRelation)}
         />
       ) : (
         <SubagentLines title={node.title} description={node.subtitle} dotClass={classes.dot} />
@@ -188,14 +188,14 @@ function SessionLines({
   branch,
   subtitle,
   model,
-  isFork,
+  relation,
 }: {
   sessionTitle: string
   dotClass: string
   branch: string | null
   subtitle: string
   model: string | null
-  isFork: boolean
+  relation: string | null
 }) {
   return (
     <>
@@ -211,9 +211,9 @@ function SessionLines({
           {truncateLabel(branch, 40)}
         </text>
       )}
-      {(model || isFork) && (
+      {(model || relation) && (
         <text x={16} y={79} className="fill-gray-500 font-mono text-[11px]">
-          {[isFork ? 'fork' : null, model].filter(Boolean).join(' · ')}
+          {[relation, model].filter(Boolean).join(' · ')}
         </text>
       )}
     </>
