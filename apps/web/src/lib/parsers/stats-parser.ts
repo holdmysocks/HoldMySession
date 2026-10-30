@@ -176,7 +176,7 @@ export function removeDuplicateRequests(
 }
 
 /** Parses the sessions in full, with every request counted once across all of them. */
-async function parseDetailsDeduplicated(
+export async function parseDetailsDeduplicated(
   sessions: SessionSummaryWithPath[],
 ): Promise<Map<string, SessionDetail>> {
   const requestSinks = new Map<string, RequestUsageSink>()

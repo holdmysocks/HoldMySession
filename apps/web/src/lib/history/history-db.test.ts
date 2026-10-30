@@ -1,0 +1,36 @@
+import { describe, it, expect } from 'vitest'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
+import { openHistoryDb, schemaVersion, LATEST_SCHEMA_VERSION, getMeta, migrate } from './history-db'
+import { openSqlite } from './sqlite'
+
+describe('history database', () => {
+  it('creates the schema, a machine id and the timezone on a new database', () => {
+    const db = openHistoryDb(':memory:')
+    expect(schemaVersion(db)).toBe(LATEST_SCHEMA_VERSION)
+    expect(getMeta(db, 'machine_id')).toMatch(/^[0-9a-f-]{36}$/)
+    expect(getMeta(db, 'timezone')).toBeTruthy()
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((r) => r.name)
+    expect(tables).toEqual(expect.arrayContaining(['meta', 'sessions', 'usage_daily', 'scan_log']))
+  })
+
+  it('keeps its data and machine id when opened again', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hist-'))
+    const file = path.join(dir, 'history.db')
+    const first = openHistoryDb(file)
+    const id = getMeta(first, 'machine_id')
+    first.close()
+    const second = openHistoryDb(file)
+    expect(getMeta(second, 'machine_id')).toBe(id)
+    second.close()
+    fs.rmSync(dir, { recursive: true })
+  })
+
+  it('refuses a database written by a newer version, and leaves it alone', () => {
+    const db = openSqlite(':memory:')
+    db.exec(`PRAGMA user_version = ${LATEST_SCHEMA_VERSION + 1}`)
+    expect(() => migrate(db)).toThrow(/newer|Update the app/)
+    expect(schemaVersion(db)).toBe(LATEST_SCHEMA_VERSION + 1)
+  })
+})

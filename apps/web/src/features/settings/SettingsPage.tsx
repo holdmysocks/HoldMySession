@@ -11,6 +11,7 @@ import { TierSelector } from './TierSelector'
 import { PricingTableEditor } from './PricingTableEditor'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { useTheme } from '@/features/theme/ThemeProvider'
+import { HistoryPanel } from '@/features/history/HistoryPanel'
 
 export function SettingsPage() {
   const { data: settings, isLoading } = useQuery(settingsQuery)
@@ -167,6 +168,8 @@ function SettingsForm({ settings }: { settings: Settings }) {
           </div>
         </div>
       </div>
+
+      <HistoryPanel />
 
       {/* Subscription Tier */}
       <div className="mt-6">
