@@ -74,6 +74,7 @@ The map info line and the Sessions page each show the count, as **N hidden (no p
 The Claude desktop app keeps two flags per session in its own store, not in the transcript. The dashboard reads them from `src/lib/desktop/desktop-records.ts`. Read-only.
 
 - **Archived.** `isArchived: true` hides the session from the map, the project dropdown, the Sessions list and the sidebar badge. The map info line and the Sessions page show **N archived hidden**. A session that is archived and also has no project is counted as archived.
+- **Older transcripts of one session.** One desktop session can have several transcripts. When the app moves on to a new one, for example after a rewind, the record's `cliSessionId` names the current transcript and `priorCliSessionIds` lists the older ones. The app shows a single session, so the dashboard does too: only the current transcript is a session, and the older ones are hidden everywhere, whether or not the session is archived. They are not counted in **archived hidden**, so one archived session counts once. A listed ID that has a record of its own is a session in its own right and is never hidden this way. A transcript with no record at all, such as a plain terminal session, is shown as before.
 - **Split to top level.** `lineageDetached: true` means the user split the session from its parent in the desktop app. The transcript and `spawnedFrom` still name the parent, so the map draws no parent link for it, and it is a top-level node. Its own forks and subagents stay under it. A fork of a split session is still linked to the split session.
 
 **Where the flags come from.** The app writes one file per session, `local_<id>.json`, under `%APPDATA%\Claude\claude-code-sessions\<account>\<org>\`. The record's `cliSessionId` is the transcript session ID, which is the join key. On a machine without that folder, the flags are all false. Set `CLAUDE_DESKTOP_SESSIONS_DIR` to read the records from another folder.
@@ -261,6 +262,10 @@ Fixes for problems a Windows user reported with real data.
 
 - **Archived sessions hidden.** Read from the desktop app's session record (`isArchived`), joined to the transcript by `cliSessionId`. Shown as **N archived hidden** on the map and the Sessions page.
 - **Split sessions.** Read from `lineageDetached` in the same record. The map draws no parent link for them, so they are top-level nodes.
+
+### Older transcripts hidden (2026-10-30, latest)
+
+- A desktop session that was rewound or resumed leaves older transcripts behind. The dashboard showed them as extra sessions with the same name, and kept showing the older transcripts of an archived session. It now reads `priorCliSessionIds` from the record and hides every older transcript. Code: `src/lib/desktop/desktop-records.ts`, `src/lib/map/session-visibility.ts`.
 - **New module.** `src/lib/desktop/desktop-records.ts`, with tests. Stats and project analytics are unchanged.
 
 ### Ordering, parent links and activity (2026-10-30, later)

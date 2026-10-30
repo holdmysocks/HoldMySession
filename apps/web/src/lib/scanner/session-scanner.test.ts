@@ -91,6 +91,8 @@ function flags(cliSessionId: string, overrides: Partial<DesktopSessionFlags> = {
     parentLocalId: null,
     cwd: null,
     parentCliSessionId: null,
+    priorCliSessionIds: [],
+    superseded: false,
     ...overrides,
   }
 }
@@ -439,6 +441,36 @@ describe('session-scanner', () => {
 
       expect(byId.get('session-abc')).toMatchObject({ isArchived: true, lineageDetached: false })
       expect(byId.get('session-def')).toMatchObject({ isArchived: false, lineageDetached: true })
+    })
+
+    it('marks an older transcript of a desktop session as superseded, and leaves the current one alone', async () => {
+      const {
+        scanAllSessionsWithPaths,
+        mockScanProjects,
+        mockParseSummary,
+        mockIsSessionActive,
+        mockStat,
+      } = await importScanner()
+      const { loadDesktopSessionFlags } = await import('../desktop/desktop-records')
+
+      mockScanProjects.mockResolvedValue([
+        makeProject({ sessionFiles: ['session-abc.jsonl', 'session-def.jsonl'] }),
+      ])
+      mockStat.mockResolvedValue({ mtimeMs: 1000, size: 1024 })
+      mockParseSummary.mockImplementation(async (_path: string, sessionId: string) =>
+        makeSummary({ sessionId }),
+      )
+      mockIsSessionActive.mockResolvedValue(false)
+      vi.mocked(loadDesktopSessionFlags).mockResolvedValue(
+        new Map([
+          ['session-abc', flags('session-abc', { superseded: true })],
+          ['session-def', flags('session-def')],
+        ]),
+      )
+
+      const byId = new Map((await scanAllSessionsWithPaths()).map((s) => [s.sessionId, s]))
+      expect(byId.get('session-abc')).toMatchObject({ isSuperseded: true })
+      expect(byId.get('session-def')).toMatchObject({ isSuperseded: false })
     })
 
     it('takes the project folder from the desktop record when the transcript has no working directory', async () => {

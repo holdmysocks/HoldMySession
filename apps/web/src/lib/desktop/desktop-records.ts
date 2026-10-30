@@ -37,6 +37,16 @@ export interface DesktopSessionFlags {
    * session is not nested, or the parent has no record on this machine.
    */
   parentCliSessionId: string | null
+  /**
+   * `priorCliSessionIds`: the older transcripts of this same desktop session, left behind when the
+   * app moved on to a new transcript (for example after a rewind). Only `cliSessionId` is current.
+   */
+  priorCliSessionIds: string[]
+  /**
+   * True on the entry made for an older transcript named in another record's `priorCliSessionIds`.
+   * Such a transcript is a former version of its session, not a session of its own.
+   */
+  superseded: boolean
 }
 
 /**
@@ -81,6 +91,10 @@ export function parseDesktopRecord(value: unknown): DesktopSessionFlags | null {
     parentLocalId: nestingParentLocalId(record.spawnedFrom),
     cwd: typeof record.cwd === 'string' && record.cwd.trim() !== '' ? record.cwd : null,
     parentCliSessionId: null,
+    priorCliSessionIds: Array.isArray(record.priorCliSessionIds)
+      ? record.priorCliSessionIds.filter((id): id is string => typeof id === 'string' && id !== '')
+      : [],
+    superseded: false,
   }
 }
 
@@ -156,6 +170,21 @@ export async function readDesktopSessionFlags(dir: string): Promise<Map<string, 
       parentCliSessionId: parent && parent !== record.cliSessionId ? parent : null,
     })
   }
+
+  // The older transcripts of each session get an entry of their own, so they can be told apart
+  // from sessions. An ID that has a record of its own is a session in its own right, and is left alone.
+  for (const record of records) {
+    for (const priorId of record.priorCliSessionIds) {
+      if (priorId === record.cliSessionId || byCliSessionId.has(priorId)) continue
+      byCliSessionId.set(priorId, {
+        ...record,
+        cliSessionId: priorId,
+        parentCliSessionId: null,
+        priorCliSessionIds: [],
+        superseded: true,
+      })
+    }
+  }
   return byCliSessionId
 }
 
@@ -175,6 +204,7 @@ export function desktopFlagsFor(
   lineageDetached: boolean
   desktopActivityAt: string | null
   desktopParentId: string | null
+  isSuperseded: boolean
 } {
   const record = flags.get(sessionId)
   return {
@@ -183,5 +213,6 @@ export function desktopFlagsFor(
     desktopActivityAt:
       record?.lastActivityAt != null ? new Date(record.lastActivityAt).toISOString() : null,
     desktopParentId: record?.parentCliSessionId ?? null,
+    isSuperseded: record?.superseded ?? false,
   }
 }

@@ -29,7 +29,17 @@ describe('parseDesktopRecord', () => {
       parentLocalId: 'local_0',
       cwd: null,
       parentCliSessionId: null,
+      priorCliSessionIds: [],
+      superseded: false,
     })
+  })
+
+  it('reads the older transcripts of a session, keeping only non-empty strings', () => {
+    expect(
+      parseDesktopRecord({ cliSessionId: 'now', priorCliSessionIds: ['old-1', '', 7, null, 'old-2'] })?.priorCliSessionIds,
+    ).toEqual(['old-1', 'old-2'])
+    expect(parseDesktopRecord({ cliSessionId: 'now', priorCliSessionIds: 'old' })?.priorCliSessionIds).toEqual([])
+    expect(parseDesktopRecord({ cliSessionId: 'now' })?.priorCliSessionIds).toEqual([])
   })
 
   it('does not nest a user fork or a side question under the session it came from', () => {
@@ -60,6 +70,8 @@ describe('parseDesktopRecord', () => {
       parentLocalId: null,
       cwd: null,
       parentCliSessionId: null,
+      priorCliSessionIds: [],
+      superseded: false,
     })
     expect(parseDesktopRecord({ cliSessionId: 'abc', isArchived: 'yes', lineageDetached: null })).toMatchObject({
       isArchived: false,
@@ -176,6 +188,7 @@ describe('desktopFlagsFor', () => {
       lineageDetached: false,
       desktopActivityAt: null,
       desktopParentId: null,
+      isSuperseded: false,
     })
   })
 
@@ -192,6 +205,8 @@ describe('desktopFlagsFor', () => {
           parentLocalId: 'local_parent',
           cwd: null,
           parentCliSessionId: 'cli-parent',
+          priorCliSessionIds: [],
+          superseded: false,
         },
       ],
     ])
@@ -200,6 +215,70 @@ describe('desktopFlagsFor', () => {
       lineageDetached: false,
       desktopActivityAt: new Date(1793280587490).toISOString(),
       desktopParentId: 'cli-parent',
+      isSuperseded: false,
     })
+  })
+})
+
+describe('older transcripts of a session', () => {
+  let dir: string
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-prior-'))
+  })
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  function writeRecord(relative: string, body: unknown) {
+    const full = path.join(dir, relative)
+    fs.mkdirSync(path.dirname(full), { recursive: true })
+    fs.writeFileSync(full, JSON.stringify(body))
+  }
+
+  // Shaped like a real record: one desktop session whose app moved on to a new transcript twice.
+  const session = (extra: object = {}) => ({
+    sessionId: 'local_ui',
+    cliSessionId: 'current-1906',
+    title: 'UI',
+    isArchived: false,
+    priorCliSessionIds: ['old-4ee8', 'old-a9c7'],
+    rewindEdges: [{ parent: 'old-4ee8', child: 'old-a9c7' }, { parent: 'old-a9c7', child: 'current-1906' }],
+    ...extra,
+  })
+
+  it('marks each older transcript as superseded, and the current one as a session', async () => {
+    writeRecord('a/b/local_ui.json', session())
+    const flags = await readDesktopSessionFlags(dir)
+    expect(desktopFlagsFor(flags, 'current-1906').isSuperseded).toBe(false)
+    expect(desktopFlagsFor(flags, 'old-4ee8').isSuperseded).toBe(true)
+    expect(desktopFlagsFor(flags, 'old-a9c7').isSuperseded).toBe(true)
+  })
+
+  it('gives an older transcript its record\'s archived flag, so it is hidden either way', async () => {
+    writeRecord('a/b/local_ui.json', session({ isArchived: true }))
+    const flags = await readDesktopSessionFlags(dir)
+    expect(desktopFlagsFor(flags, 'old-4ee8')).toMatchObject({ isArchived: true, isSuperseded: true })
+    expect(desktopFlagsFor(flags, 'current-1906')).toMatchObject({ isArchived: true, isSuperseded: false })
+  })
+
+  it('leaves a transcript alone that has a record of its own, even if another record lists it', async () => {
+    writeRecord('a/b/local_ui.json', session())
+    writeRecord('a/b/local_other.json', { sessionId: 'local_other', cliSessionId: 'old-a9c7', title: 'Own session' })
+    const flags = await readDesktopSessionFlags(dir)
+    expect(desktopFlagsFor(flags, 'old-a9c7')).toMatchObject({ isSuperseded: false })
+    expect(desktopFlagsFor(flags, 'old-4ee8').isSuperseded).toBe(true)
+  })
+
+  it('does not mark the current transcript superseded when a record lists itself', async () => {
+    writeRecord('a/b/local_ui.json', session({ priorCliSessionIds: ['current-1906', 'old-4ee8'] }))
+    const flags = await readDesktopSessionFlags(dir)
+    expect(desktopFlagsFor(flags, 'current-1906').isSuperseded).toBe(false)
+  })
+
+  it('knows nothing about a transcript no record mentions', async () => {
+    writeRecord('a/b/local_ui.json', session())
+    expect(desktopFlagsFor(await readDesktopSessionFlags(dir), 'cli-terminal').isSuperseded).toBe(false)
   })
 })

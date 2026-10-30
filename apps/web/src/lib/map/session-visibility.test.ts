@@ -136,3 +136,40 @@ describe('visibility with expired subagents', () => {
     expect(map.nodes[0].expiredSubagentCount).toBe(1)
   })
 })
+
+describe('superseded transcripts', () => {
+  // One desktop session with three transcripts, an archived one with two, and a plain session.
+  const sessions = [
+    { sessionId: 'ui-current', cwd: '/work/app', isArchived: false, isSuperseded: false },
+    { sessionId: 'ui-old-1', cwd: '/work/app', isArchived: false, isSuperseded: true },
+    { sessionId: 'ui-old-2', cwd: '/work/app', isArchived: false, isSuperseded: true },
+    { sessionId: 'gone-current', cwd: '/work/app', isArchived: true, isSuperseded: false },
+    { sessionId: 'gone-old', cwd: '/work/app', isArchived: true, isSuperseded: true },
+    { sessionId: 'plain', cwd: '/work/app' },
+    { sessionId: 'no-project-old', cwd: null, isSuperseded: true },
+  ]
+
+  it('shows only the current transcript of a session, and never an older one', () => {
+    expect(filterVisibleSessions(sessions).map((s) => s.sessionId)).toEqual(['ui-current', 'plain'])
+    expect(isVisible({ cwd: '/work/app', isSuperseded: true })).toBe(false)
+  })
+
+  it('hides the older transcripts of an archived session too, which is why they used to show', () => {
+    expect(filterVisibleSessions(sessions).map((s) => s.sessionId)).not.toContain('gone-old')
+  })
+
+  it('counts an archived session once, however many transcripts it has', () => {
+    expect(filterArchivedSessions(sessions).map((s) => s.sessionId)).toEqual(['gone-current'])
+  })
+
+  it('does not count an older transcript as a session with no project', () => {
+    expect(filterHiddenSessions(sessions)).toEqual([])
+  })
+
+  it('leaves out of every count only the older transcripts, and puts the rest in exactly one group', () => {
+    const superseded = sessions.filter((s) => s.isSuperseded).length
+    const counted =
+      filterVisibleSessions(sessions).length + filterHiddenSessions(sessions).length + filterArchivedSessions(sessions).length
+    expect(counted).toBe(sessions.length - superseded)
+  })
+})
