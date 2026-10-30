@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import {
-  BACKGROUND_TASK_MAX_AGE_MS,
+  BACKGROUND_TASK_QUIET_MS,
   backgroundTaskDir,
   countRunningBackgroundTasks,
   hasExitLine,
@@ -23,6 +23,12 @@ describe('hasExitLine', () => {
   it('is true when the output ends with an exit line', () => {
     expect(hasExitLine('started\n\n[exited with code 0]')).toBe(true)
     expect(hasExitLine('[exited with code 1]\n')).toBe(true)
+    expect(hasExitLine('started\r\n[exited with code 0]\r\n')).toBe(true)
+  })
+
+  it('is true for a bare "exit code" line and for a little trailing text', () => {
+    expect(hasExitLine('work\nexit code 0\n')).toBe(true)
+    expect(hasExitLine('[exited with code 0]\n\n')).toBe(true)
   })
 
   it('is false while the task has printed no exit line', () => {
@@ -60,33 +66,40 @@ describe('countRunningBackgroundTasks', () => {
     fs.utimesSync(file, when, when)
   }
 
-  it('counts a quiet task with no exit line as running, however long ago it last wrote', async () => {
-    output('sleep.output', 'started\n', NOW - 60 * 60_000)
+  it('counts a task that wrote recently and has no exit line', async () => {
+    output('sleep.output', 'tick 1\n', NOW - 30_000)
     expect(await countRunningBackgroundTasks(dir, NOW)).toBe(1)
     expect(await hasRunningBackgroundTask(dir, NOW)).toBe(true)
+  })
+
+  it('does not count a task with no exit line that has been silent past the quiet window', async () => {
+    output('killed.output', 'started\n', NOW - BACKGROUND_TASK_QUIET_MS - 60_000)
+    expect(await countRunningBackgroundTasks(dir, NOW)).toBe(0)
+    expect(await hasRunningBackgroundTask(dir, NOW)).toBe(false)
   })
 
   it('does not count a task that has exited, even if it wrote a moment ago', async () => {
     output('done.output', 'started\n\n[exited with code 0]', NOW - 1_000)
     expect(await countRunningBackgroundTasks(dir, NOW)).toBe(0)
-    expect(await hasRunningBackgroundTask(dir, NOW)).toBe(false)
+  })
+
+  it('does not count an output that is empty', async () => {
+    output('empty.output', '', NOW)
+    expect(await countRunningBackgroundTasks(dir, NOW)).toBe(0)
   })
 
   it('counts only the running tasks among several', async () => {
     output('running-a.output', 'tick 1\n', NOW)
-    output('running-b.output', '', NOW)
+    output('running-b.output', 'tick 2\n', NOW - 1_000)
     output('finished.output', 'x\n[exited with code 0]', NOW)
+    output('empty.output', '', NOW)
+    output('killed.output', 'started\n', NOW - BACKGROUND_TASK_QUIET_MS - 1)
     output('notes.txt', 'tick', NOW)
     expect(await countRunningBackgroundTasks(dir, NOW)).toBe(2)
   })
 
   it('does not count a subagent transcript kept in the tasks folder', async () => {
     output('agent-a1.output', '{"type":"user","timestamp":"2026-01-01"}\n{"type":"assistant","timestamp":"2026-01-01"}\n', NOW)
-    expect(await countRunningBackgroundTasks(dir, NOW)).toBe(0)
-  })
-
-  it('treats an output older than the maximum age as finished', async () => {
-    output('stale.output', 'started\n', NOW - BACKGROUND_TASK_MAX_AGE_MS - 60_000)
     expect(await countRunningBackgroundTasks(dir, NOW)).toBe(0)
   })
 
