@@ -6,7 +6,7 @@ import { readProjectLayout, writeProjectLayout } from './layout-store'
 
 describe('layout store', () => {
   let home: string
-  const file = () => path.join(home, '.claude-dashboard', 'map-layouts.json')
+  const file = () => path.join(home, 'map-layouts.json')
 
   beforeEach(() => {
     home = fs.mkdtempSync(path.join(os.tmpdir(), 'layout-store-'))

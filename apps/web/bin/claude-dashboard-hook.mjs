@@ -6,14 +6,20 @@
 // Log path must match getEventLogPath() in src/lib/events/event-inbox.ts.
 
 import { appendFile, mkdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 
 const RECORDED_EVENTS = new Set(['Notification', 'Stop']);
 
+// Must match dataDir() in src/lib/data-dir.ts. The hook cannot import from src/, and the hook test checks the two agree.
+// It never copies the old folder: until the dashboard has started and done that, it keeps writing to the old one.
 function eventLogPath() {
-  const home = process.env.CLAUDE_DASHBOARD_HOME || join(homedir(), '.claude-dashboard');
-  return join(home, 'events.jsonl');
+  const override = process.env.HOLDMYSESSION_DIR || process.env.CLAUDE_DASHBOARD_DIR || process.env.CLAUDE_DASHBOARD_HOME;
+  if (override) return join(override, 'events.jsonl');
+  const next = join(homedir(), '.holdmysession');
+  const legacy = join(homedir(), '.claude-dashboard');
+  return join(existsSync(next) || !existsSync(legacy) ? next : legacy, 'events.jsonl');
 }
 
 async function readStdin() {

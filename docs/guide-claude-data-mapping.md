@@ -33,12 +33,12 @@ The Claude config directory is resolved in this order (`apps/web/src/lib/utils/c
 | Config dir | `C:\Users\<you>\.claude` |
 | Transcript | `C:\Users\<you>\.claude\projects\D--MCLA\<session-id>.jsonl` |
 | Subagent transcript | `C:\Users\<you>\.claude\projects\D--MCLA\<session-id>\subagents\agent-<agentId>.jsonl` |
-| Dashboard hook log | `C:\Users\<you>\.claude-dashboard\events.jsonl` |
+| Dashboard hook log | `C:\Users\<you>\.holdmysession\events.jsonl` |
 | Recorded cwd | `D:\MCLA` (the directory name `D--MCLA` is only a key) |
 
 The `D--MCLA` example comes from the rule above: `D`, `:` and `\` each become `-`.
 
-`CLAUDE_DASHBOARD_HOME` is not a Claude variable. It sets where the dashboard keeps its own hook log (`events.jsonl`), default `~/.claude-dashboard`. The dashboard never writes under the Claude config directory.
+`HOLDMYSESSION_DIR` is not a Claude variable. It sets where the dashboard keeps its own data (settings, map layouts, cache, the hook log `events.jsonl`, and the history database), default `~/.holdmysession`. The older `CLAUDE_DASHBOARD_DIR` and `CLAUDE_DASHBOARD_HOME` still work. The folder was called `~/.claude-dashboard` before; the dashboard copies it to the new name the first time it starts, and leaves the old one in place. The dashboard never writes under the Claude config directory.
 
 ## Directory layout
 
@@ -179,7 +179,7 @@ Notification input (Documented; the fields and the matcher values also appear in
 
 ### What the dashboard records
 
-`bin/claude-dashboard-hook.mjs` appends one line to `~/.claude-dashboard/events.jsonl` (or `CLAUDE_DASHBOARD_HOME/events.jsonl`) for `Notification` and `Stop`:
+`bin/claude-dashboard-hook.mjs` appends one line to `~/.holdmysession/events.jsonl` (or `HOLDMYSESSION_DIR/events.jsonl`) for `Notification` and `Stop`:
 
 ```json
 {"ts":"2026-10-29T10:03:00.000Z","event":"Notification","sessionId":"<id>","cwd":"/path","message":"Claude needs your permission to use Bash","notificationType":"permission_prompt","title":null}

@@ -72,14 +72,14 @@ describe('getEventLogPath', () => {
     expect(getEventLogPath()).toBe(path.join('/custom/home', 'events.jsonl'))
   })
 
-  it('defaults to ~/.claude-dashboard when the variable is unset', () => {
+  it('defaults to ~/.holdmysession when the variable is unset', () => {
     delete process.env.CLAUDE_DASHBOARD_HOME
-    expect(getEventLogPath()).toBe(path.join(os.homedir(), '.claude-dashboard', 'events.jsonl'))
+    expect(getEventLogPath()).toBe(path.join(os.homedir(), '.holdmysession', 'events.jsonl'))
   })
 
   it('treats an empty variable as unset', () => {
     process.env.CLAUDE_DASHBOARD_HOME = ''
-    expect(getEventLogPath()).toBe(path.join(os.homedir(), '.claude-dashboard', 'events.jsonl'))
+    expect(getEventLogPath()).toBe(path.join(os.homedir(), '.holdmysession', 'events.jsonl'))
   })
 })
 

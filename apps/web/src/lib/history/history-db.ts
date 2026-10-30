@@ -1,19 +1,11 @@
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { openSqlite, type Db } from './sqlite'
-
-/**
- * Where the dashboard keeps its own data. `CLAUDE_DASHBOARD_DIR` moves it, so a packaged app or a
- * copy on another machine can point anywhere. Nothing here is ever written under ~/.claude.
- */
-export function dashboardDataDir(): string {
-  return process.env.CLAUDE_DASHBOARD_DIR || path.join(os.homedir(), '.claude-dashboard')
-}
+import { dataDir } from '@/lib/data-dir'
 
 export function historyDbPath(): string {
-  return path.join(dashboardDataDir(), 'history.db')
+  return path.join(dataDir(), 'history.db')
 }
 
 /**
@@ -75,6 +67,57 @@ const MIGRATIONS: string[] = [
     message TEXT
   );
   `,
+  // 2: the machine is part of the key, so rows from two machines can never collide when histories are joined.
+  `
+  CREATE TABLE sessions_v2 (
+    machine_id TEXT NOT NULL,
+    session_key TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    project_key TEXT NOT NULL,
+    project_path TEXT NOT NULL,
+    project_display_name TEXT NOT NULL,
+    session_name TEXT,
+    started_at TEXT NOT NULL,
+    last_active_at TEXT NOT NULL,
+    duration_ms INTEGER NOT NULL DEFAULT 0,
+    message_count INTEGER NOT NULL DEFAULT 0,
+    tool_call_count INTEGER NOT NULL DEFAULT 0,
+    on_disk INTEGER NOT NULL DEFAULT 1,
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    PRIMARY KEY (machine_id, session_key)
+  );
+  INSERT INTO sessions_v2
+    SELECT machine_id, session_key, session_id, project_key, project_path, project_display_name, session_name,
+      started_at, last_active_at, duration_ms, message_count, tool_call_count, on_disk, first_seen_at, last_seen_at
+    FROM sessions;
+
+  CREATE TABLE usage_daily_v2 (
+    machine_id TEXT NOT NULL,
+    session_key TEXT NOT NULL,
+    day TEXT NOT NULL,
+    model TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    thinking_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (machine_id, session_key, day, model),
+    FOREIGN KEY (machine_id, session_key) REFERENCES sessions_v2 (machine_id, session_key)
+  );
+  INSERT INTO usage_daily_v2
+    SELECT s.machine_id, u.session_key, u.day, u.model, u.input_tokens, u.output_tokens, u.thinking_tokens,
+      u.cache_read_tokens, u.cache_write_tokens
+    FROM usage_daily u JOIN sessions s ON s.session_key = u.session_key;
+
+  DROP TABLE usage_daily;
+  DROP TABLE sessions;
+  ALTER TABLE sessions_v2 RENAME TO sessions;
+  ALTER TABLE usage_daily_v2 RENAME TO usage_daily;
+  CREATE INDEX sessions_project ON sessions (project_key);
+  CREATE INDEX sessions_started ON sessions (started_at);
+  CREATE INDEX usage_daily_day ON usage_daily (day);
+  `,
 ]
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length
@@ -87,14 +130,14 @@ export function schemaVersion(db: Db): number {
  * Brings a database up to the latest schema. Each step runs in a transaction, so a failure leaves
  * the database at the last good version. A file written by a newer app is refused, not changed.
  */
-export function migrate(db: Db): void {
+export function migrate(db: Db, target: number = LATEST_SCHEMA_VERSION): void {
   const version = schemaVersion(db)
   if (version > LATEST_SCHEMA_VERSION) {
     throw new Error(
       `history.db is schema version ${version}, but this app only knows up to ${LATEST_SCHEMA_VERSION}. Update the app.`,
     )
   }
-  for (let v = version; v < LATEST_SCHEMA_VERSION; v++) {
+  for (let v = version; v < target; v++) {
     db.exec('BEGIN')
     try {
       db.exec(MIGRATIONS[v])

@@ -65,7 +65,7 @@ This dashboard gives you answers. It reads your local session files, parses the 
 **Cost estimation**
 - Configurable API pricing per model (Claude Sonnet 4, Opus 4, Haiku, etc.)
 - Subscription tier support (Free, Pro, Max 5x/20x) with appropriate rate adjustments
-- Settings persisted to `~/.claude-dashboard/settings.json`
+- Settings persisted to `~/.holdmysession/settings.json`
 
 ![Settings Page](screenshots/settings-page.png)
 
@@ -185,7 +185,7 @@ apps/web/src/
 2. **Parsing** -- Session files are parsed to extract metadata (project, branch, duration, model), tool calls, agent dispatches, token usage, and errors.
 3. **Server Functions** -- TanStack Start server functions (`createServerFn`) expose parsed data to the client via type-safe RPC. All file I/O stays on the server.
 4. **React Query** -- The UI fetches data through React Query with automatic background refetch for live updates. Active sessions use adaptive polling intervals.
-5. **Caching** -- Parsed session summaries and heatmap data are cached in memory (mtime-based invalidation) and on disk (`~/.claude-dashboard/cache/`) for fast startup.
+5. **Caching** -- Parsed session summaries and heatmap data are cached in memory (mtime-based invalidation) and on disk (`~/.holdmysession/cache/`) for fast startup.
 
 ## Development
 

@@ -26,7 +26,7 @@ The dashboard reads the Claude config directory on Windows, which is `%USERPROFI
 3. **Notifications (optional).** Run `claude-dashboard --print-hook-config`. Merge the `hooks` block into `%USERPROFILE%\.claude\settings.json`. The printed command points at the hook script's absolute path, quoted if the path has spaces.
 4. **WSL.** When the dashboard runs on Windows, WSL distributions with a `.claude` folder under `\\wsl$` are listed as extra data sources. They appear in the Sessions list. **They do not appear on the map** (see limitations).
 
-**Not verified:** the hook command on Windows. We do not know whether Claude Code on Windows runs the hook through `cmd`, PowerShell or Git Bash. The hook script itself is tested on Linux only. Check that a Notification event lands in `%USERPROFILE%\.claude-dashboard\events.jsonl` after you trigger one.
+**Not verified:** the hook command on Windows. We do not know whether Claude Code on Windows runs the hook through `cmd`, PowerShell or Git Bash. The hook script itself is tested on Linux only. Check that a Notification event lands in `%USERPROFILE%\.holdmysession\events.jsonl` after you trigger one.
 
 ## What the map shows
 
@@ -50,7 +50,7 @@ The dashboard reads the Claude config directory on Windows, which is `%USERPROFI
 - **Edit layout.** The **Edit layout** button turns on the editor. Drag a card to move it anywhere. Dragging empty space still pans. Edges follow the cards. Outside the editor, dragging a card pans the map, and a click still selects it.
 - **Grid.** In the editor, cards snap to a 20-unit grid, drawn as dots (hidden when zoomed out below 35%). Hold **Alt** while dragging to place a card freely. The **Snap to grid** checkbox turns snapping off, and then no grid is drawn. The arrow keys move a focused card by one grid step with snapping on, or by 10 units without it, and with Alt held.
 - **Selecting several cards.** In the editor, **Ctrl-click** (or Cmd-click) adds a card to the selection, or takes it out. **Hold Ctrl and drag over empty space** to draw a selection box; it selects every card it touches or contains. Selected cards have a dashed outline. Dragging any selected card moves them all by the same amount, and with snapping on the dragged card lands on the grid and the others keep their arrangement around it. The arrow keys nudge the whole selection. Dragging a card that is not selected selects it alone. Clicking empty space clears the selection. Outside the editor none of this applies: Ctrl and a drag simply pans.
-- **The layout is saved on the server**, per project, in `~/.claude-dashboard/map-layouts.json`, next to `settings.json`. Anyone who opens the dashboard from another device sees the same arrangement. Moves show at once and are saved about half a second after the last one. A failed save is kept and retried, and a notice shows meanwhile. The last save wins if two devices edit at the same time. Nothing is written to `~/.claude`, so the map stays read-only. Positions saved in a browser by an earlier version are not used.
+- **The layout is saved on the server**, per project, in `~/.holdmysession/map-layouts.json`, next to `settings.json`. Anyone who opens the dashboard from another device sees the same arrangement. Moves show at once and are saved about half a second after the last one. A failed save is kept and retried, and a notice shows meanwhile. The last save wins if two devices edit at the same time. Nothing is written to `~/.claude`, so the map stays read-only. Positions saved in a browser by an earlier version are not used.
 - **The first move saves where every card is**, so the arrangement stays put. After that:
   - A **new top-level session** goes to the right of everything, level with the top row, and brings its own forks and subagents with it.
   - A **new subagent or fork of a session already on the map** lands at its normal automatic position, even if that overlaps another card. Move it if you want it elsewhere.
@@ -137,7 +137,7 @@ The side panel shows tokens, duration, tool calls, model and the dispatch time. 
 
 ### Hook events
 
-`bin/claude-dashboard-hook.mjs` appends one line per `Notification` or `Stop` event to `~/.claude-dashboard/events.jsonl` (or `$CLAUDE_DASHBOARD_HOME/events.jsonl`):
+`bin/claude-dashboard-hook.mjs` appends one line per `Notification` or `Stop` event to `~/.holdmysession/events.jsonl` (or `$HOLDMYSESSION_DIR/events.jsonl`):
 
 ```json
 {"ts":"2026-10-29T10:03:00.000Z","event":"Notification","sessionId":"<id>","cwd":"/path/to/project","message":"Claude needs your permission to use Bash","notificationType":"permission_prompt","title":null}
@@ -212,11 +212,11 @@ Steps 1 and 2 are maintenance and should run after each Claude Code upgrade. Ste
 
 2. **Measure the active-folder rule.** Count how many real sessions are written in the last 2 minutes but have no folder. If the number is large, look for another signal, such as the `sessions/` directory once its format is confirmed.
 
-3. **Option: Stop-hook inbox (Phase 2).** A message written by the dashboard goes into an inbox under `~/.claude-dashboard/`, and a Stop hook delivers it when Claude finishes a turn. Changes: `bin/claude-dashboard-hook.mjs` (returns pending messages in the hook's output format, confirmed for the installed version first), an inbox module under `src/lib/`, and a composer in `src/features/project-map/`. Which hook output shape delivers a message, and how a message reaches an idle session, is a design decision. Review it with an architect before implementing.
+3. **Option: Stop-hook inbox (Phase 2).** A message written by the dashboard goes into an inbox under `~/.holdmysession/`, and a Stop hook delivers it when Claude finishes a turn. Changes: `bin/claude-dashboard-hook.mjs` (returns pending messages in the hook's output format, confirmed for the installed version first), an inbox module under `src/lib/`, and a composer in `src/features/project-map/`. Which hook output shape delivers a message, and how a message reaches an idle session, is a design decision. Review it with an architect before implementing.
 
 4. **Option: headless resume for idle sessions (Phase 2).** `claude --resume <id> -p "<message>"` for sessions that are not running. Spawn with `execFile`, never a shell string. Add a per-session lock, a timeout, and a clear UI state while it runs. Handle the case where the session is open in a terminal.
 
-5. **Option: session links beyond forks (Phase 2).** Store links under `~/.claude-dashboard/`, never `~/.claude`. Add a link kind to `MapEdge` in `src/lib/map/project-map.ts`, and have `src/lib/map/layout.ts` draw it. Decide the link model first.
+5. **Option: session links beyond forks (Phase 2).** Store links under `~/.holdmysession/`, never `~/.claude`. Add a link kind to `MapEdge` in `src/lib/map/project-map.ts`, and have `src/lib/map/layout.ts` draw it. Decide the link model first.
 
 6. **Cost per node.** Add per-model token totals to `MapNode`, then reuse `src/features/cost-estimation/cost-calculator.ts` in the details panel.
 
@@ -254,7 +254,7 @@ Fixes for problems a Windows user reported with real data.
 
 - New **Map** page at `/map` with a per-project map of sessions and their subagents, dispatch edges, a Needs you panel, a recent hook events panel, and a details panel.
 - Open `AskUserQuestion` calls are detected from session transcripts.
-- Opt-in `Notification` and `Stop` hooks write to `~/.claude-dashboard/events.jsonl`. Print the snippet with `claude-dashboard --print-hook-config`.
+- Opt-in `Notification` and `Stop` hooks write to `~/.holdmysession/events.jsonl`. Print the snippet with `claude-dashboard --print-hook-config`.
 - New `--print-hook-config` CLI flag and help text.
 - Read-only: no writes to `~/.claude`.
 
@@ -290,7 +290,7 @@ Fixes for problems a Windows user reported with real data.
 ### Horizontal layout, saved layouts and dynamic links (2026-10-30, latest)
 
 - **Branches grow downward.** The automatic layout is now rows instead of columns: top-level sessions side by side, forks and subagents below.
-- **Layouts are saved on the server** in `~/.claude-dashboard/map-layouts.json`, not in the browser. New top-level sessions go to the right, and new subagents and forks land at their normal position. Code: `src/lib/map/layout-store.ts`, `src/features/project-map/use-map-layout.ts`, `applyCustomPositions` in `src/lib/map/layout.ts`.
+- **Layouts are saved on the server** in `~/.holdmysession/map-layouts.json`, not in the browser. New top-level sessions go to the right, and new subagents and forks land at their normal position. Code: `src/lib/map/layout-store.ts`, `src/features/project-map/use-map-layout.ts`, `applyCustomPositions` in `src/lib/map/layout.ts`.
 - **Links adapt to where the other card is**: bottom to top below, side to side beside, and out of a side into the top or bottom on a diagonal. They follow the cards when moved.
 
 ### Grid and multi-select in the editor (2026-10-30, latest)

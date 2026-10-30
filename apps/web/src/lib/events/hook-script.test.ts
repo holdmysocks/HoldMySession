@@ -176,4 +176,32 @@ describe('bin/claude-dashboard-hook.mjs', () => {
     const parsed = parseEventLines(logLines().join('\n'), 10)
     expect(parsed.map((e) => e.sessionId)).toEqual(['valid'])
   })
+
+  describe('which folder it writes to', () => {
+    const payload = JSON.stringify({ hook_event_name: 'Stop', session_id: 's', cwd: '/w' })
+    function runIn(userHome: string) {
+      const env = { ...process.env, HOME: userHome, USERPROFILE: userHome } as Record<string, string | undefined>
+      for (const name of ['HOLDMYSESSION_DIR', 'CLAUDE_DASHBOARD_DIR', 'CLAUDE_DASHBOARD_HOME']) delete env[name]
+      return spawnSync(process.execPath, [HOOK_SCRIPT], { input: payload, encoding: 'utf-8', env, timeout: 15_000 })
+    }
+
+    it('uses ~/.holdmysession on a fresh machine', () => {
+      runIn(home)
+      expect(fs.existsSync(path.join(home, '.holdmysession', 'events.jsonl'))).toBe(true)
+    })
+
+    it('keeps using the old folder until the dashboard has copied it across', () => {
+      fs.mkdirSync(path.join(home, '.claude-dashboard'))
+      runIn(home)
+      expect(fs.existsSync(path.join(home, '.claude-dashboard', 'events.jsonl'))).toBe(true)
+      expect(fs.existsSync(path.join(home, '.holdmysession'))).toBe(false)
+    })
+
+    it('uses the new folder once it exists, even if the old one is still there', () => {
+      fs.mkdirSync(path.join(home, '.claude-dashboard'))
+      fs.mkdirSync(path.join(home, '.holdmysession'))
+      runIn(home)
+      expect(fs.existsSync(path.join(home, '.holdmysession', 'events.jsonl'))).toBe(true)
+    })
+  })
 })

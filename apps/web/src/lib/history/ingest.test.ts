@@ -98,4 +98,15 @@ describe('ingestSessions', () => {
     ingestSessions(db, [{ summary: summary('a', { sessionName: null }), detail: null }])
     expect(db.prepare("SELECT session_name FROM sessions WHERE session_id = 'a'").get()).toMatchObject({ session_name: 'name a' })
   })
+
+  it('leaves another machine\'s sessions alone when marking missing ones', () => {
+    const db = openHistoryDb(':memory:')
+    ingestSessions(db, [entry('mine', { m: usage({ inputTokens: 1 }) }, [[1, 'm']])])
+    db.prepare(
+      `INSERT INTO sessions VALUES ('other-machine', 'proj:theirs', 'theirs', 'proj', '/p', 'P', 'n', 'a', 'b', 1, 1, 1, 1, 'x', 'y')`,
+    ).run()
+    const result = ingestSessions(db, [entry('mine', { m: usage({ inputTokens: 1 }) }, [[1, 'm']])])
+    expect(result.missing).toBe(0)
+    expect(db.prepare("SELECT on_disk FROM sessions WHERE machine_id = 'other-machine'").get()).toMatchObject({ on_disk: 1 })
+  })
 })

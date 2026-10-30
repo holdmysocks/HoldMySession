@@ -399,7 +399,7 @@ Claude stores session data as JSONL (JSON Lines). Custom parsers extract structu
 Mtime-based cache with atomic writes. Prevents re-parsing unchanged files.
 
 **Key file:** `lib/cache/disk-cache.ts`
-- Location: `~/.claude-dashboard/cache/`
+- Location: `~/.holdmysession/cache/`
 - Invalidation: source file mtime comparison
 - Atomic writes: write to tmp → rename
 
@@ -465,7 +465,7 @@ docker compose up                     # Run via Docker Compose
 |---|---|---|
 | `CLAUDE_CONFIG_DIR` | Claude config directory (holds `projects/`) | `~/.claude` |
 | `CLAUDE_HOME` | Older alias of `CLAUDE_CONFIG_DIR`; used when that is unset | `~/.claude` |
-| `CLAUDE_DASHBOARD_HOME` | Folder for the hook event log (`events.jsonl`); the cache and settings stay in `~/.claude-dashboard` | `~/.claude-dashboard` |
+| `HOLDMYSESSION_DIR` | Folder for all of the dashboard's own data: settings, map layouts, cache, hook log, history database. `CLAUDE_DASHBOARD_DIR` and `CLAUDE_DASHBOARD_HOME` still work | `~/.holdmysession` |
 | `NODE_ENV` | Runtime environment | `development` |
 
 ---

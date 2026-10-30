@@ -1,16 +1,18 @@
 # History database
 
-The dashboard keeps its own copy of your usage in one SQLite file, `~/.claude-dashboard/history.db`, so the history survives `~/.claude` being cleared. Copy the file to another machine to bring the history with you. Set `CLAUDE_DASHBOARD_DIR` to keep it somewhere else. Nothing is ever written under `~/.claude`.
+The dashboard keeps its own copy of your usage in one SQLite file, `~/.holdmysession/history.db`, so the history survives `~/.claude` being cleared. Copy the file to another machine to bring the history with you. Set `HOLDMYSESSION_DIR` to keep it somewhere else. Nothing is ever written under `~/.claude`.
 
 It uses the SQLite module built into Node 22 (`node:sqlite`), so nothing needs compiling.
 
 ## Status
 
-Steps 1 and 2 are done: the database, migrations, and the scan that fills it. Stats, pricing history and subscription history do not read from it yet.
+Done: the database, migrations, the scan that fills it, the data folder rename (`src/lib/data-dir.ts`) and the machine in the keys. Stats, pricing history and subscription history do not read from it yet.
 
 ## Tables
 
 - `meta`: the machine id, creation time and timezone.
+
+Every row in `sessions` and `usage_daily` carries the `machine_id` it came from, and the machine is part of the primary key.
 - `sessions`: one row per session, with its name, project, times and counts. A session whose transcript has gone stays, with `on_disk = 0`.
 - `usage_daily`: tokens per session, local day and model. Each request is counted once across all sessions, using the same de-duplication as Stats. A model's tokens are spread over the days it replied, in proportion to its replies that day, and the totals are exact.
 - `scan_log`: one row per scan, with how many sessions were seen, added and missing, and any error.
@@ -27,8 +29,8 @@ Settings, under History database, shows the file, the session count, the days co
 
 Build order from here. Each step is its own commit.
 
-1. **Data folder rename.** Move the dashboard's own data from `~/.claude-dashboard` to `~/.holdmysession`. One function decides the folder, and the settings, map layouts, cache, hook log and history database all use it. `HOLDMYSESSION_DIR` overrides it, and the older `CLAUDE_DASHBOARD_DIR` and `CLAUDE_DASHBOARD_HOME` still work. On first start the old folder is copied across, not moved, and left in place. The hook script uses the same rule, so notifications keep working.
-2. **Keys that include the machine.** A migration makes `machine_id` part of the keys of `sessions` and `usage_daily`, so rows from two machines can never collide. Done before anything else is stored, while there is only one machine's data.
+1. **Data folder rename (done).** Move the dashboard's own data from `~/.claude-dashboard` to `~/.holdmysession`. One function decides the folder, and the settings, map layouts, cache, hook log and history database all use it. `HOLDMYSESSION_DIR` overrides it, and the older `CLAUDE_DASHBOARD_DIR` and `CLAUDE_DASHBOARD_HOME` still work. On first start the old folder is copied across, not moved, and left in place. The hook script uses the same rule, so notifications keep working.
+2. **Keys that include the machine (done).** A migration makes `machine_id` part of the keys of `sessions` and `usage_daily`, so rows from two machines can never collide. Done before anything else is stored, while there is only one machine's data.
 3. **Stats read from the database**, compared against today's numbers first.
 4. **Dated pricing.** An append-only list of price entries per model, each either "from date D onward" or "window D1 to D2". To price a day, replay the entries in the order they were made, each painting its range over the ones before. A note can be attached to an entry.
 5. **Subscription history.** Tier, monthly price and start date as dated rows (Pro $20, then Max 20x $200 from October 10 as the first test case), the savings against API cost, a monthly view, and a second number on the cost card.

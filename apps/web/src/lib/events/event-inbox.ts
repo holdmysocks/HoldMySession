@@ -1,5 +1,5 @@
 import * as fs from 'node:fs/promises'
-import * as os from 'node:os'
+import { dataDir } from '@/lib/data-dir'
 import * as path from 'node:path'
 import { z } from 'zod'
 
@@ -27,8 +27,7 @@ export type HookEvent = z.infer<typeof HookEventSchema>
  * so it repeats this logic; the hook test checks the two agree.
  */
 export function getEventLogPath(): string {
-  const home = process.env.CLAUDE_DASHBOARD_HOME || path.join(os.homedir(), '.claude-dashboard')
-  return path.join(home, 'events.jsonl')
+  return path.join(dataDir(), 'events.jsonl')
 }
 
 /**

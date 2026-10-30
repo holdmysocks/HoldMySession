@@ -78,22 +78,22 @@ export function ingestSessions(db: Db, entries: IngestEntry[], now: Date = new D
   const machineId = getMeta(db, 'machine_id') ?? ''
   const result: IngestResult = { added: 0, updated: 0, missing: 0 }
 
-  const exists = db.prepare('SELECT 1 AS found FROM sessions WHERE session_key = ?')
+  const exists = db.prepare('SELECT 1 AS found FROM sessions WHERE machine_id = ? AND session_key = ?')
   const upsert = db.prepare(`
-    INSERT INTO sessions (session_key, session_id, project_key, project_path, project_display_name, session_name,
-      started_at, last_active_at, duration_ms, message_count, tool_call_count, on_disk, first_seen_at, last_seen_at, machine_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
-    ON CONFLICT (session_key) DO UPDATE SET
+    INSERT INTO sessions (machine_id, session_key, session_id, project_key, project_path, project_display_name, session_name,
+      started_at, last_active_at, duration_ms, message_count, tool_call_count, on_disk, first_seen_at, last_seen_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+    ON CONFLICT (machine_id, session_key) DO UPDATE SET
       project_path = excluded.project_path, project_display_name = excluded.project_display_name,
       session_name = COALESCE(excluded.session_name, sessions.session_name),
       started_at = excluded.started_at, last_active_at = excluded.last_active_at, duration_ms = excluded.duration_ms,
       message_count = excluded.message_count, tool_call_count = excluded.tool_call_count,
       on_disk = 1, last_seen_at = excluded.last_seen_at
   `)
-  const clearUsage = db.prepare('DELETE FROM usage_daily WHERE session_key = ?')
+  const clearUsage = db.prepare('DELETE FROM usage_daily WHERE machine_id = ? AND session_key = ?')
   const addUsage = db.prepare(`
-    INSERT INTO usage_daily (session_key, day, model, input_tokens, output_tokens, thinking_tokens, cache_read_tokens, cache_write_tokens)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO usage_daily (machine_id, session_key, day, model, input_tokens, output_tokens, thinking_tokens, cache_read_tokens, cache_write_tokens)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   inTransaction(db, () => {
@@ -103,10 +103,11 @@ export function ingestSessions(db: Db, entries: IngestEntry[], now: Date = new D
       if (seen.has(key)) continue // the same session in two data sources: the first one wins
       seen.add(key)
 
-      if (exists.get(key)) result.updated += 1
+      if (exists.get(machineId, key)) result.updated += 1
       else result.added += 1
 
       upsert.run(
+        machineId,
         key,
         summary.sessionId,
         summary.projectKey,
@@ -120,27 +121,26 @@ export function ingestSessions(db: Db, entries: IngestEntry[], now: Date = new D
         detail ? Object.values(detail.toolFrequency).reduce((a, b) => a + b, 0) : summary.toolCallCount,
         stamp,
         stamp,
-        machineId,
       )
 
       if (!detail) continue
-      clearUsage.run(key)
+      clearUsage.run(machineId, key)
       for (const [day, models] of usageByDay(summary, detail)) {
         for (const [model, row] of models) {
           addUsage.run(
-            key, day, model,
+            machineId, key, day, model,
             row.input_tokens, row.output_tokens, row.thinking_tokens, row.cache_read_tokens, row.cache_write_tokens,
           )
         }
       }
     }
 
-    const stored = db.prepare('SELECT session_key FROM sessions WHERE on_disk = 1').all()
-    const markGone = db.prepare('UPDATE sessions SET on_disk = 0 WHERE session_key = ?')
+    const stored = db.prepare('SELECT session_key FROM sessions WHERE on_disk = 1 AND machine_id = ?').all(machineId)
+    const markGone = db.prepare('UPDATE sessions SET on_disk = 0 WHERE machine_id = ? AND session_key = ?')
     for (const row of stored) {
       const key = String(row.session_key)
       if (!seen.has(key)) {
-        markGone.run(key)
+        markGone.run(machineId, key)
         result.missing += 1
       }
     }

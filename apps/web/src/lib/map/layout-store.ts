@@ -1,5 +1,5 @@
 import * as fs from 'node:fs'
-import * as os from 'node:os'
+import { dataDir } from '@/lib/data-dir'
 import * as path from 'node:path'
 import type { NodePositions } from './layout'
 import { LayoutFileSchema, type LayoutFile } from './layout-schema'
@@ -12,13 +12,12 @@ import { LayoutFileSchema, type LayoutFile } from './layout-schema'
  * Server only: it uses the file system. Import it from a server function's handler.
  */
 
-const DIR = '.claude-dashboard'
 const FILE = 'map-layouts.json'
 
 const EMPTY: LayoutFile = { version: 1, projects: {} }
 
-function layoutFilePath(baseDir: string): string {
-  return path.join(baseDir, DIR, FILE)
+function layoutFilePath(dir: string): string {
+  return path.join(dir, FILE)
 }
 
 /** The whole file. Missing, unreadable or invalid gives an empty one. */
@@ -34,7 +33,7 @@ async function readFile(baseDir: string): Promise<LayoutFile> {
 /** The saved positions for a project. Empty when nothing was saved. */
 export async function readProjectLayout(
   projectKey: string,
-  baseDir: string = os.homedir(),
+  baseDir: string = dataDir(),
 ): Promise<NodePositions> {
   const file = await readFile(baseDir)
   return Object.hasOwn(file.projects, projectKey) ? file.projects[projectKey] : {}
@@ -51,7 +50,7 @@ let queue: Promise<unknown> = Promise.resolve()
 export function writeProjectLayout(
   projectKey: string,
   positions: NodePositions,
-  baseDir: string = os.homedir(),
+  baseDir: string = dataDir(),
 ): Promise<void> {
   const run = queue.then(async () => {
     const file = await readFile(baseDir)

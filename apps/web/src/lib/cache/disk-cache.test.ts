@@ -47,9 +47,9 @@ describe('disk-cache', () => {
   }
 
   describe('getCacheDir', () => {
-    it('should return path to .claude-dashboard/cache in home directory', () => {
+    it('should return path to .holdmysession/cache in home directory', () => {
       const cacheDir = getCacheDir()
-      expect(cacheDir).toContain('.claude-dashboard')
+      expect(cacheDir).toContain('.holdmysession')
       expect(cacheDir).toContain('cache')
     })
   })

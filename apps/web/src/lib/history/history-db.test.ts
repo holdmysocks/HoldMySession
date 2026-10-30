@@ -34,3 +34,23 @@ describe('history database', () => {
     expect(schemaVersion(db)).toBe(LATEST_SCHEMA_VERSION + 1)
   })
 })
+
+describe('migration 2: the machine is part of the key', () => {
+  it('keeps existing rows, gives the usage rows their machine, and lets two machines share a session key', () => {
+    const db = openSqlite(':memory:')
+    db.exec('PRAGMA foreign_keys = ON')
+    migrate(db, 1)
+    db.prepare(
+      `INSERT INTO sessions VALUES ('k', 's', 'p', '/p', 'P', 'name', 'a', 'b', 1, 2, 3, 1, 'x', 'y', 'machine-1')`,
+    ).run()
+    db.prepare(`INSERT INTO usage_daily VALUES ('k', '2026-03-01', 'm', 1, 2, 3, 4, 5)`).run()
+
+    migrate(db)
+    expect(schemaVersion(db)).toBe(LATEST_SCHEMA_VERSION)
+    expect(db.prepare('SELECT machine_id, session_name FROM sessions').get()).toMatchObject({ machine_id: 'machine-1', session_name: 'name' })
+    expect(db.prepare('SELECT machine_id, output_tokens FROM usage_daily').get()).toMatchObject({ machine_id: 'machine-1', output_tokens: 2 })
+
+    db.prepare(`INSERT INTO sessions VALUES ('machine-2', 'k', 's', 'p', '/p', 'P', 'other', 'a', 'b', 1, 2, 3, 1, 'x', 'y')`).run()
+    expect(Number(db.prepare('SELECT COUNT(*) AS n FROM sessions').get()!.n)).toBe(2)
+  })
+})
