@@ -241,3 +241,11 @@ The Claude desktop app writes one JSON file per session, `local_<id>.json`, unde
 ## Background task output (Windows)
 
 Claude Code writes each background task's output to `%TEMP%\claude\<project folder>\<session ID>\tasks\<task ID>.output`. The folder name is the same as the transcript's project folder, and the session ID is the transcript's file name. A running task's file has no exit line. When the task exits, the file ends with a line like `[exited with code 0]`. The dashboard counts a task as running when its file has no exit line, is not empty, is not a subagent transcript, and was written in the last 10 minutes. A session with a running task is active. Killed or silent tasks drop out after 10 minutes. The exit line is confirmed on Linux task output. Windows output has not been confirmed yet. The transcript records nothing about background tasks.
+
+## Stats totals: where they come from
+
+- The Stats page reads `~/.claude/stats-cache.json` when it exists. When it does not, which is the case on some machines, every Stats number is computed from the session transcripts instead, one file at a time.
+- **Total Tokens** is input plus output tokens. Cache reads and cache writes are left out, although they are usually far larger. **Estimated Cost** prices all four categories at the list prices on the Settings page, so it is an API-equivalent estimate, not a subscription bill.
+- **Each API request is counted once across all sessions.** A forked or resumed session's file can hold its parent's earlier messages, with the same `requestId` and the same usage. The session that started first keeps a request, and later copies are removed from the later session's totals. Code: `removeDuplicateRequests` in `src/lib/parsers/stats-parser.ts`. On one real history this affected 5,563 of 55,776 requests, about 13% of the total.
+- **Not yet de-duplicated:** subagent tokens (they follow their own progress-versus-file rule in `parseDetail`) and the per-session output-token figure behind the Projects tab's "Output Tokens" column, which still sums each file on its own.
+- A model ID missing from the pricing table is priced as Sonnet 4.

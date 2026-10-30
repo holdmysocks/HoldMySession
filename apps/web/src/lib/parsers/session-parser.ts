@@ -156,11 +156,22 @@ export async function parseSummary(
  * Stream-parse the full session file for detail view.
  * Processes line-by-line to handle large files.
  */
+/** The main-conversation API requests a parse counted, by request ID. Used to count each only once overall. */
+export type RequestUsageSink = Map<string, { model: string; usage: TokenUsage }>
+
+/**
+ * Full parse of one session file.
+ *
+ * `requestSink`, when given, is filled with every main-conversation request whose tokens this
+ * parse counted (not subagent or progress ones), so a caller that parses many sessions can tell
+ * which requests more than one session file contains, as a fork's copy of its parent's history does.
+ */
 export async function parseDetail(
   filePath: string,
   sessionId: string,
   projectPath: string,
   projectName: string,
+  requestSink?: RequestUsageSink,
 ): Promise<SessionDetail> {
   const turns: Turn[] = []
   const nameState = createSessionNameState()
@@ -381,6 +392,7 @@ export async function parseDetail(
           // Track per-model token usage
           if (msg.message.model) {
             const modelId = msg.message.model
+            if (requestId) requestSink?.set(requestId, { model: modelId, usage: { ...tokens } })
             const existing = tokensByModel[modelId] ?? {
               inputTokens: 0,
               outputTokens: 0,

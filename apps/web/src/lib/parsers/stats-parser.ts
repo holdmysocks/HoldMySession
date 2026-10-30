@@ -5,7 +5,7 @@ import { readDiskCache, writeDiskCache } from '../cache/disk-cache'
 import { StatsCacheSchema, type StatsCache } from './types'
 import type { SessionDetail, SessionSummary } from './types'
 import { scanAllSessionsWithPaths, type SessionSummaryWithPath } from '@/lib/scanner/session-scanner'
-import { parseDetail } from '@/lib/parsers/session-parser'
+import { parseDetail, type RequestUsageSink } from '@/lib/parsers/session-parser'
 
 let cachedStats: { mtimeMs: number; data: StatsCache } | null = null
 
@@ -121,6 +121,64 @@ export async function parseStatsMultiSource(): Promise<StatsCache | null> {
   return mergeStatsCaches(validCaches)
 }
 
+interface TokenTotals {
+  inputTokens: number
+  outputTokens: number
+  cacheReadInputTokens: number
+  cacheCreationInputTokens: number
+}
+
+function subtractClamped(target: TokenTotals, source: TokenTotals): void {
+  target.inputTokens = Math.max(0, target.inputTokens - source.inputTokens)
+  target.outputTokens = Math.max(0, target.outputTokens - source.outputTokens)
+  target.cacheReadInputTokens = Math.max(0, target.cacheReadInputTokens - source.cacheReadInputTokens)
+  target.cacheCreationInputTokens = Math.max(0, target.cacheCreationInputTokens - source.cacheCreationInputTokens)
+}
+
+/**
+ * Counts each API request once across all the given sessions. A forked or resumed session's file
+ * can contain its parent's earlier messages, so the same request, with the same tokens, sits in
+ * more than one file, and summing the files would count it twice. The session that started first
+ * keeps a request, and every later copy is taken out of that session's token totals.
+ *
+ * Only main-conversation requests are handled. Subagent tokens follow their own rules in
+ * parseDetail, which this leaves alone. Changes the details in place.
+ */
+export function removeDuplicateRequests(
+  sessions: ReadonlyArray<{ sessionId: string; startedAt: string }>,
+  details: Map<string, { totalTokens: TokenTotals; tokensByModel: Record<string, TokenTotals> }>,
+  requestSinks: Map<string, RequestUsageSink>,
+): void {
+  const ordered = [...sessions].sort(
+    (a, b) => a.startedAt.localeCompare(b.startedAt) || a.sessionId.localeCompare(b.sessionId),
+  )
+  const claimed = new Set<string>()
+  for (const session of ordered) {
+    const sink = requestSinks.get(session.sessionId)
+    const detail = details.get(session.sessionId)
+    if (!sink || !detail) continue
+    for (const [requestId, { model, usage }] of sink) {
+      if (!claimed.has(requestId)) {
+        claimed.add(requestId)
+        continue
+      }
+      subtractClamped(detail.totalTokens, usage)
+      const byModel = detail.tokensByModel[model]
+      if (byModel) subtractClamped(byModel, usage)
+    }
+  }
+}
+
+/** Parses the sessions in full, with every request counted once across all of them. */
+async function parseDetailsDeduplicated(
+  sessions: SessionSummaryWithPath[],
+): Promise<Map<string, SessionDetail>> {
+  const requestSinks = new Map<string, RequestUsageSink>()
+  const details = await parseDetailsInBatches(sessions, 10, requestSinks)
+  removeDuplicateRequests(sessions, details, requestSinks)
+  return details
+}
+
 /**
  * If stats data is stale (lastComputedDate is before today), merge in recent sessions.
  * Uses a 60-second in-memory cache to avoid re-scanning on every request.
@@ -164,6 +222,7 @@ async function maybeEnrichWithRecentSessions(
 async function parseDetailsInBatches(
   sessions: SessionSummaryWithPath[],
   batchSize: number = 10,
+  requestSinks?: Map<string, RequestUsageSink>,
 ): Promise<Map<string, SessionDetail>> {
   const results = new Map<string, SessionDetail>()
 
@@ -172,10 +231,12 @@ async function parseDetailsInBatches(
     const details = await Promise.all(
       batch.map(async (s) => {
         try {
+          const sink: RequestUsageSink = new Map()
+          requestSinks?.set(s.sessionId, sink)
           return {
             sessionId: s.sessionId,
             detail: await parseDetail(
-              s.filePath, s.sessionId, s.projectPath, s.projectName,
+              s.filePath, s.sessionId, s.projectPath, s.projectName, sink,
             ),
           }
         } catch {
@@ -211,7 +272,7 @@ async function mergeRecentSessions(stats: StatsCache): Promise<StatsCache> {
   }
 
   // Parse full details for recent sessions (batched, max 10 concurrent)
-  const detailMap = await parseDetailsInBatches(recentSessions)
+  const detailMap = await parseDetailsDeduplicated(recentSessions)
 
   // Build a mutable copy of dailyActivity keyed by date
   const activityMap = new Map<string, { messageCount: number; sessionCount: number; toolCallCount: number }>()
@@ -500,7 +561,7 @@ export async function computeStatsFromSummaries(
 ): Promise<StatsCache | null> {
   try {
     // Parse full details for token and tool data
-    const detailMap = await parseDetailsInBatches(summaries)
+    const detailMap = await parseDetailsDeduplicated(summaries)
 
     // Group by date and aggregate
     const activityMap = new Map<string, { messageCount: number; sessionCount: number; toolCallCount: number }>()
