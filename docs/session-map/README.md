@@ -269,7 +269,7 @@ Fixes for problems a Windows user reported with real data.
 - **Subagents use the last record's timestamp** from the end of their transcript, not the file's modification time.
 - **Order follows the desktop app.** Top-level sessions are ordered by the desktop record's `lastActivityAt`, falling back to the transcript's last record. The order was checked against the app's sidebar.
 - **Nesting follows `spawnedFrom`.** The app nests a session under its parent with `spawnedFrom`, which is written either as a string or as an object with `sessionId`. The map now links those children, as it does forks. The card says **sub-session** for these, and **fork** for a child linked by the transcript's `forkedFrom`.
-- **Layout.** Session nodes are 280 by 92 px and subagent cards 200 by 60 px. The project name is no longer on the card.
+- **Layout.** Session nodes are 280 by 100 px and subagent cards 200 by 60 px. Every card size and gap is a multiple of the editor's 20-unit grid, and the automatic layout is snapped to it, so cards line up both ways. The project name is no longer on the card.
 
 ### Background tasks (2026-10-30, later still)
 

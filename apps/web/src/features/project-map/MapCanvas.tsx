@@ -586,20 +586,20 @@ function SessionLines({
 }) {
   return (
     <>
-      <circle cx={16} cy={21} r={5} className={dotClass} />
-      <text x={30} y={26} className="fill-gray-100 text-[15px] font-semibold">
+      <circle cx={16} cy={24} r={5} className={dotClass} />
+      <text x={30} y={29} className="fill-gray-100 text-[15px] font-semibold">
         {truncateLabel(sessionTitle, 28)}
       </text>
-      <text x={16} y={46} className="fill-gray-400 text-[12px]">
+      <text x={16} y={51} className="fill-gray-400 text-[12px]">
         {truncateLabel(subtitle, 36)}
       </text>
       {branch && (
-        <text x={16} y={63} className="fill-gray-500 text-[11px]">
+        <text x={16} y={69} className="fill-gray-500 text-[11px]">
           {truncateLabel(branch, 40)}
         </text>
       )}
       {(model || relation) && (
-        <text x={16} y={79} className="fill-gray-500 font-mono text-[11px]">
+        <text x={16} y={87} className="fill-gray-500 font-mono text-[11px]">
           {[relation, model].filter(Boolean).join(' · ')}
         </text>
       )}

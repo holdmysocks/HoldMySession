@@ -1,4 +1,5 @@
 import type { MapEdge, MapNode, ProjectMap } from './project-map'
+import { snapToGrid } from './editing'
 
 /**
  * Pure tree layout for the project map. Each depth is a row: top-level sessions side by side in
@@ -11,14 +12,14 @@ import type { MapEdge, MapNode, ProjectMap } from './project-map'
  */
 
 export const SESSION_WIDTH = 280
-export const SESSION_HEIGHT = 92
-/** Multiples of the editor's 20-unit grid, so a subagent card's edges line up with the grid. */
+/** Every size and gap is a multiple of the editor's 20-unit grid, so cards line up on it both ways. */
+export const SESSION_HEIGHT = 100
 export const SUBAGENT_WIDTH = 200
 export const SUBAGENT_HEIGHT = 60
 /** Gap between the bottom of one row and the top of the next. Room for the link lines. */
-export const ROW_GAP = 70
+export const ROW_GAP = 80
 /** Gap between sibling blocks under the same parent. */
-export const SIBLING_GAP = 16
+export const SIBLING_GAP = 20
 /** Gap between top-level session blocks. */
 export const BLOCK_GAP = 40
 
@@ -236,16 +237,21 @@ export function layoutProjectMap(map: ProjectMap): ProjectLayout {
     blockLeft += width + (index < roots.length - 1 ? BLOCK_GAP : 0)
   })
 
+  // Centring a parent over its children can land a card on a half step of the grid. Snap every
+  // card to the grid. Gaps are at least one grid step wide and a snap moves a card by at most half
+  // of one, so nothing that was apart can touch.
+  const onGrid = positioned.map((node) => ({ ...node, x: snapToGrid(node.x), y: snapToGrid(node.y) }))
+
   // Placement visits parents first. Return nodes in model order, so keyboard focus follows the
   // order of sessions and then subagents.
   const modelOrder = new Map(map.nodes.map((node, index) => [node.id, index]))
-  positioned.sort((a, b) => (modelOrder.get(a.id) ?? 0) - (modelOrder.get(b.id) ?? 0))
+  onGrid.sort((a, b) => (modelOrder.get(a.id) ?? 0) - (modelOrder.get(b.id) ?? 0))
 
   return {
-    nodes: positioned,
-    edges: buildEdges(map.edges, positioned),
-    width: roots.length === 0 ? 0 : blockLeft,
-    height: roots.length === 0 ? 0 : y - ROW_GAP,
+    nodes: onGrid,
+    edges: buildEdges(map.edges, onGrid),
+    width: onGrid.reduce((max, node) => Math.max(max, node.x + node.width), 0),
+    height: onGrid.reduce((max, node) => Math.max(max, node.y + node.height), 0),
   }
 }
 

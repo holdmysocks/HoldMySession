@@ -453,3 +453,37 @@ describe('edgePath next to another card', () => {
     }
   })
 })
+
+describe('the automatic layout sits on the editor grid', () => {
+  const shapes: Array<[string, MapSessionInput[]]> = [
+    ['a lone session', [input('a', 0)]],
+    ['one subagent', [input('a', 1)]],
+    ['two subagents, which centre the session on a half step', [input('a', 2)]],
+    ['three subagents', [input('a', 3)]],
+    ['five subagents', [input('a', 5)]],
+    ['several top-level sessions with different numbers of subagents', [input('a', 2), input('b', 1), input('c', 0), input('d', 4)]],
+    ['forks and subagents together', [input('p', 2), input('f1', 3, 'p'), input('f2', 0, 'p'), input('g', 2, 'f1'), input('q', 1)]],
+  ]
+
+  it.each(shapes)('puts every card of %s on the grid, in position and size', (_name, sessions) => {
+    const { nodes } = layoutProjectMap(mapOf(sessions))
+    for (const node of nodes) {
+      expect([node.x % 20, node.y % 20, node.width % 20, node.height % 20]).toEqual([0, 0, 0, 0])
+    }
+  })
+
+  it.each(shapes)('keeps %s free of overlaps after snapping', (_name, sessions) => {
+    expectNoOverlaps(layoutProjectMap(mapOf(sessions)).nodes)
+  })
+
+  it('puts the bottom of every card on the grid too, so cards line up vertically as well as across', () => {
+    const { nodes } = layoutProjectMap(mapOf([input('a', 2), input('b', 1, 'a')]))
+    for (const node of nodes) expect((node.y + node.height) % 20).toBe(0)
+  })
+
+  it('keeps the reported size equal to the farthest card edge', () => {
+    const layout = layoutProjectMap(mapOf([input('a', 2), input('b', 0)]))
+    expect(layout.width).toBe(Math.max(...layout.nodes.map((n) => n.x + n.width)))
+    expect(layout.height).toBe(Math.max(...layout.nodes.map((n) => n.y + n.height)))
+  })
+})
