@@ -35,8 +35,6 @@ Then open http://localhost:3000.
 
 ### Sessions
 
-![Session detail](screenshots/session-detail-full.png)
-
 - A searchable, sortable list of every session, filtered by status, project, model and date. Active sessions are marked live.
 - **Agent delegation timeline:** a Gantt-style view of every subagent a session dispatched, in order, with how long each ran and the tokens it used. Zoom in on busy workflows.
 - **Context window:** a live breakdown of input, output and cache tokens against the window size, which is found for you: your `/autocompact` setting if you set one, otherwise the model's window.
@@ -50,8 +48,6 @@ Then open http://localhost:3000.
 - **Unlinked Sessions:** sessions with no working folder, or in a folder whose name starts with `scratch`, are grouped as one entry instead of one row each.
 - Export any of it as CSV or JSON.
 
-![Projects](screenshots/stats-projects.png)
-
 ### History database
 
 Stats come from HoldMySession's own SQLite file, `~/.holdmysession/history.db`, not straight from Claude's files, so your history survives Claude clearing its folder.
@@ -63,9 +59,9 @@ Stats come from HoldMySession's own SQLite file, `~/.holdmysession/history.db`, 
 
 ### Session Map
 
-The **Map** shows one project's sessions as a tree: each session, its forks as children, and its running subagents as small cards, coloured by status (needs you, active, recent, idle). A side panel lists what is waiting on you and recent hook events. Drag to pan, scroll to zoom, and use **Edit layout** to arrange cards; the arrangement is saved and follows you to other devices. Details in [docs/session-map/README.md](docs/session-map/README.md).
-
 ![Session map](screenshots/session-map.png)
+
+The **Map** shows one project's sessions as a tree: each session, its forks as children, and its running subagents as small cards, coloured by status (needs you, active, recent, idle). A side panel lists what is waiting on you and recent hook events. Drag to pan, scroll to zoom, and use **Edit layout** to arrange cards; the arrangement is saved and follows you to other devices. Details in [docs/session-map/README.md](docs/session-map/README.md).
 
 ### Several computers
 
@@ -78,8 +74,6 @@ Link machines to see them all in one place. One install is the **master** and th
 ### Projects settings
 
 Choose how scratch sessions appear (grouped as Unlinked Sessions, listed folder by folder, or hidden), name them by session name, and hide any project on any machine from lists and dropdowns. Hiding changes lists only; every total, chart and cost still counts everything.
-
-![Projects settings](screenshots/settings-page.png)
 
 ### Claude Code hooks
 
