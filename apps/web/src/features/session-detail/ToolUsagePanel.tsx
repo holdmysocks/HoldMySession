@@ -13,7 +13,7 @@ export function ToolUsagePanel({
 
   if (sorted.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+      <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
         <h3 className="text-sm font-semibold text-gray-300">Tool Usage</h3>
         <p className="mt-2 text-xs text-gray-500">No tools used</p>
       </div>
@@ -21,7 +21,7 @@ export function ToolUsagePanel({
   }
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
       <h3 className="text-sm font-semibold text-gray-300">Tool Usage</h3>
       <p className="mt-1 text-xs text-gray-500">
         {sorted.length} tools, {sorted.reduce((sum, [, n]) => sum + n, 0)} calls

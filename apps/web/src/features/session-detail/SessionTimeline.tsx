@@ -71,7 +71,7 @@ export function SessionTimeline({ turns, agents = [], skills = [] }: Props) {
   return (
     <div className="space-y-4">
       {/* Root-level summary */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+      <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
         {/* Counts row */}
         <div className="flex items-center gap-4">
           <StatBadge

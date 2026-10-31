@@ -75,7 +75,7 @@ export function BackupPanel() {
         newest 10 backups are kept. A restore keeps this machine's identity from the backup, so a copied database carries on
         as the same machine.
       </p>
-      <div className="mt-3 space-y-3 rounded-xl border border-gray-800 bg-gray-900/50 p-4 text-xs text-gray-400">
+      <div className="mt-3 space-y-3 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-xs text-gray-400">
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"

@@ -158,7 +158,7 @@ export function TimelineEventsChart({
   }
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
       {/* Header stats */}
       <div className="mb-3 flex flex-wrap items-center gap-4">
         <StatBadge label="User commands" value={userCommands} color="blue" />

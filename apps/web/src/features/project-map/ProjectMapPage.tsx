@@ -87,7 +87,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   }
 
   if (projectsQuery.isLoading) {
-    return <div className="h-64 animate-pulse rounded-xl bg-gray-900/50" />
+    return <div className="h-64 animate-pulse rounded-2xl bg-gray-900" />
   }
 
   if (projectsQuery.error) {
@@ -218,7 +218,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
           className="h-[calc(100vh-18rem)] min-h-[28rem] min-w-0 overflow-hidden rounded-2xl border border-gray-800 bg-gray-950"
         >
           {mapQuery.isLoading || layoutLoading ? (
-            <div className="h-64 animate-pulse rounded-xl bg-gray-900/50" />
+            <div className="h-64 animate-pulse rounded-2xl bg-gray-900" />
           ) : mapQuery.error ? (
             <p className="py-12 text-center text-sm text-red-400">
               Failed to load map: {mapQuery.error.message}

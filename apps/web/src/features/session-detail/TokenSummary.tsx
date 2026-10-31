@@ -24,7 +24,7 @@ export function TokenSummary({ tokens }: { tokens: TokenUsage }) {
   ]
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
       <h3 className="text-sm font-semibold text-gray-300">
         Token Usage{' '}
         <span

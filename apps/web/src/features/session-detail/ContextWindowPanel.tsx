@@ -65,7 +65,7 @@ export function ContextWindowPanel({ contextWindow, tokens }: Props) {
   }))
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-300">Context Window</h3>
@@ -334,7 +334,7 @@ function TokenFallback({ tokens }: { tokens: TokenUsage }) {
   ]
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
       <h3 className="text-sm font-semibold text-gray-300">Token Usage</h3>
       <p className="mt-1 text-2xl font-bold text-gray-100">
         {formatTokenCount(activeTotal)}

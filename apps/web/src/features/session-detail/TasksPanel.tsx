@@ -27,7 +27,7 @@ export function TasksPanel({ tasks }: { tasks: TaskItem[] }) {
   const total = tasks.filter((t) => t.status !== 'deleted').length
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
       <h3 className="text-sm font-semibold text-gray-300">Tasks</h3>
       <p className="mt-1 text-xs text-gray-500">
         {completed}/{total} completed

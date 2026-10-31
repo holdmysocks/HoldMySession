@@ -90,7 +90,7 @@ export function AgentDispatchesPanel({
   })
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
       <button
         type="button"
         aria-expanded={open}
@@ -210,7 +210,7 @@ export function SkillInvocationsPanel({
   if (totalCount === 0) return null
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
       <h3 className="text-sm font-semibold text-gray-300">Skill Invocations</h3>
       <p className="mt-1 text-xs text-gray-500">
         {groups.length} unique skill{groups.length !== 1 ? 's' : ''},{' '}

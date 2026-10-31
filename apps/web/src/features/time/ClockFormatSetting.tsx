@@ -14,7 +14,7 @@ export function ClockFormatSetting() {
     <div className="mt-6">
       <h2 className="text-sm font-semibold text-gray-300">Time format</h2>
       <p className="mt-1 text-[10px] text-gray-500">Show times of day on a 12-hour or 24-hour clock. Saved in this browser.</p>
-      <div className="mt-3 flex items-center justify-between rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+      <div className="mt-3 flex items-center justify-between rounded-2xl border border-gray-800 bg-gray-900 p-4">
         <span className="text-xs text-gray-300">
           Clock <span className="ml-2 font-mono text-gray-500">{example}</span>
         </span>

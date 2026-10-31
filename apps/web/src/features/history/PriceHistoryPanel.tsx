@@ -74,7 +74,7 @@ export function PriceHistoryPanel() {
         days with no entry.
       </p>
       <LinkedNote what="price changes" />
-      <div className="mt-3 space-y-4 rounded-xl border border-gray-800 bg-gray-900/50 p-4 text-xs text-gray-400">
+      <div className="mt-3 space-y-4 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-xs text-gray-400">
         <label className="flex items-center gap-2">
           <span>Model</span>
           <select value={modelId} onChange={(e) => setModelId(e.target.value)} className={input}>

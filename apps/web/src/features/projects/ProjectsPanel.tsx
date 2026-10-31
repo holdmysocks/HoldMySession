@@ -45,7 +45,7 @@ export function ProjectsPanel() {
         <p className="mt-1 text-[10px] text-gray-500">
           Sessions that ran in a folder whose name starts with "scratch", or in no folder at all.
         </p>
-        <div className="mt-3 space-y-3 rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+        <div className="mt-3 space-y-3 rounded-2xl border border-gray-800 bg-gray-900 p-4">
           <div role="radiogroup" aria-label="Scratch sessions" className="space-y-2">
             {SCRATCH_MODES.map((mode) => (
               <label key={mode} className="flex cursor-pointer items-start gap-2 text-xs">
@@ -85,12 +85,12 @@ export function ProjectsPanel() {
           className="mt-3 w-full max-w-xs rounded-lg border border-gray-700 bg-gray-800/50 px-3 py-1.5 text-xs text-gray-200 placeholder-gray-500 outline-none focus:border-brand-500"
         />
         <div className="mt-3 space-y-3">
-          {!machines && <div className="h-24 animate-pulse rounded-xl bg-gray-900/50" />}
+          {!machines && <div className="h-24 animate-pulse rounded-2xl bg-gray-900" />}
           {machines?.map((machine) => {
             const projects = machine.projects.filter((p) => !q || p.displayName.toLowerCase().includes(q) || p.projectPath.toLowerCase().includes(q))
             const hiddenHere = machine.projects.filter((p) => isProjectHidden(prefs, machine.machineId, p.projectPath)).length
             return (
-              <div key={machine.machineId} className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+              <div key={machine.machineId} className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
                 {several && (
                   <p className="mb-2 text-xs font-medium text-gray-200">
                     {machine.name}

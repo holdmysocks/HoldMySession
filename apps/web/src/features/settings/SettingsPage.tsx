@@ -31,7 +31,7 @@ export function SettingsPage({ tab, onTab }: { tab: SettingsTab; onTab: (tab: Se
     return (
       <div className="space-y-4">
         <div className="h-8 w-48 animate-pulse rounded bg-gray-800" />
-        <div className="h-64 animate-pulse rounded-xl bg-gray-900/50" />
+        <div className="h-64 animate-pulse rounded-2xl bg-gray-900" />
       </div>
     )
   }
@@ -79,7 +79,7 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
           Hide project names, file paths, and branch names across the dashboard.
           Useful when screen-sharing or recording demos.
         </p>
-        <div className="mt-3 rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+        <div className="mt-3 rounded-2xl border border-gray-800 bg-gray-900 p-4">
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-300">Enable privacy mode</span>
             <div className="flex items-center gap-2">
@@ -166,7 +166,7 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
           rates.
         </p>
         <LinkedNote what="price overrides" />
-        <div className="mt-3 rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+        <div className="mt-3 rounded-2xl border border-gray-800 bg-gray-900 p-4">
           <PricingTableEditor
             overrides={overrides}
             onChange={handleOverridesChange}
@@ -180,7 +180,7 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
         <button
           type="button"
           onClick={handleReset}
-          className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-400 transition-colors hover:border-gray-600 hover:text-gray-300"
+          className="rounded-full border border-gray-700 px-3 py-1.5 text-xs text-gray-400 transition-colors hover:border-gray-600 hover:text-gray-300"
         >
           Reset to Defaults
         </button>
@@ -198,7 +198,7 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
             type="button"
             onClick={handleSave}
             disabled={!isDirty || mutation.isPending}
-            className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-colors ${
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
               isDirty && !mutation.isPending
                 ? 'bg-brand-600 text-gray-100 hover:bg-brand-500'
                 : 'cursor-not-allowed bg-gray-800 text-gray-500'
@@ -217,8 +217,8 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-gray-100">Settings</h1>
-      <div role="tablist" aria-label="Settings sections" className="mt-4 flex flex-wrap gap-1 border-b border-gray-800">
+      <h1 className="font-display text-3xl font-extrabold text-gray-100">Settings</h1>
+      <div role="tablist" aria-label="Settings sections" className="mt-4 flex flex-wrap gap-2">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -228,8 +228,8 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
             aria-selected={active.id === t.id}
             aria-controls="settings-panel"
             onClick={() => onTab(t.id)}
-            className={`-mb-px border-b-2 px-3 py-2 text-xs transition-colors ${
-              active.id === t.id ? 'border-brand-500 text-gray-100' : 'border-transparent text-gray-400 hover:text-gray-200'
+            className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
+              active.id === t.id ? 'border-brand-400 text-brand-400' : 'border-gray-700 text-gray-400 hover:text-gray-200'
             }`}
           >
             {t.label}

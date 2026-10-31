@@ -27,7 +27,7 @@ export function DesktopPanel() {
   return (
     <div className="mt-6">
       <h2 className="text-sm font-semibold text-gray-300">Desktop app</h2>
-      <div className="mt-3 space-y-2 rounded-xl border border-gray-800 bg-gray-900/50 p-4 text-xs text-gray-400">
+      <div className="mt-3 space-y-2 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-xs text-gray-400">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-gray-200">{mac ? 'Open at login' : 'Start with Windows'}</p>

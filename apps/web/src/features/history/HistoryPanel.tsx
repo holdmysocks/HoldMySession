@@ -40,7 +40,7 @@ export function HistoryPanel() {
         A copy of your usage kept by the dashboard, so it survives the Claude folder being cleared. Copy the file to
         move your history to another machine.
       </p>
-      <div className="mt-3 rounded-xl border border-gray-800 bg-gray-900/50 p-4 text-xs text-gray-400">
+      <div className="mt-3 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-xs text-gray-400">
         {!status ? (
           <p>Loading…</p>
         ) : status.error ? (

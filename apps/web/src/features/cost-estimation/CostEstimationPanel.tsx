@@ -13,7 +13,7 @@ export function CostEstimationPanel({ tokensByModel }: CostEstimationPanelProps)
 
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+      <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
         <div className="h-6 w-32 animate-pulse rounded bg-gray-800" />
       </div>
     )
@@ -21,7 +21,7 @@ export function CostEstimationPanel({ tokensByModel }: CostEstimationPanelProps)
 
   if (!cost || cost.totalUSD === 0) {
     return (
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+      <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
         <h3 className="text-sm font-semibold text-gray-300">Cost Estimation</h3>
         <p className="mt-2 text-xs text-gray-500">No token data available</p>
       </div>
@@ -29,7 +29,7 @@ export function CostEstimationPanel({ tokensByModel }: CostEstimationPanelProps)
   }
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-300">Cost Estimation</h3>

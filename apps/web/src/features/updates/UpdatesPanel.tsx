@@ -35,7 +35,7 @@ export function UpdatesPanel() {
   return (
     <div className="mt-6">
       <h2 className="text-sm font-semibold text-gray-300">About and updates</h2>
-      <div className="mt-3 space-y-4 rounded-xl border border-gray-800 bg-gray-900/50 p-4 text-xs text-gray-400">
+      <div className="mt-3 space-y-4 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-xs text-gray-400">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-gray-200">

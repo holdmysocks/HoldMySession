@@ -17,11 +17,11 @@ export function ProjectAnalytics() {
           {Array.from({ length: 3 }).map((_, i) => (
             <div
               key={i}
-              className="h-20 animate-pulse rounded-xl bg-gray-900/50"
+              className="h-20 animate-pulse rounded-2xl bg-gray-900"
             />
           ))}
         </div>
-        <div className="h-64 animate-pulse rounded-xl bg-gray-900/50" />
+        <div className="h-64 animate-pulse rounded-2xl bg-gray-900" />
       </div>
     )
   }
@@ -82,7 +82,7 @@ function SummaryCard({
   sub?: string
 }) {
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
       <p className="text-xs text-gray-400">{label}</p>
       <p className="mt-1 truncate text-xl font-bold text-gray-100">{value}</p>
       {sub && <p className="mt-0.5 text-xs text-gray-500">{sub}</p>}

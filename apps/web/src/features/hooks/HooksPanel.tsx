@@ -43,7 +43,7 @@ export function HooksPanel() {
         turning it off removes only that entry. Everything else in the file is kept, and a copy is saved in the dashboard's
         own folder first. This is the only thing HoldMySession ever writes under your Claude folder.
       </p>
-      <div className="mt-3 space-y-3 rounded-xl border border-gray-800 bg-gray-900/50 p-4 text-xs text-gray-400">
+      <div className="mt-3 space-y-3 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-xs text-gray-400">
         {ROWS.map((row) => {
           const on = state[row.kind]
           return (

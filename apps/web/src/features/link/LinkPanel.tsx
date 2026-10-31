@@ -29,7 +29,7 @@ export function LinkPanel() {
         (names, projects, times and token counts, never transcripts), and it shows all of them, with a machine filter on
         every page. The master also holds the prices and the plan, which linked nodes read from it.
       </p>
-      <div className="mt-3 space-y-4 rounded-xl border border-gray-800 bg-gray-900/50 p-4 text-xs text-gray-400">
+      <div className="mt-3 space-y-4 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-xs text-gray-400">
         <div role="radiogroup" aria-label="Role of this machine" className="flex flex-wrap items-center gap-3">
           <span className="text-gray-300">This machine is a</span>
           <div className="flex overflow-hidden rounded-lg border border-gray-800">

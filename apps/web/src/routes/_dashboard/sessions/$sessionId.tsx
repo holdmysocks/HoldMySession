@@ -44,7 +44,7 @@ function SessionDetailPage() {
     return (
       <div className="space-y-4">
         <div className="h-8 w-48 animate-pulse rounded bg-gray-800" />
-        <div className="h-64 animate-pulse rounded-xl bg-gray-900/50" />
+        <div className="h-64 animate-pulse rounded-2xl bg-gray-900" />
       </div>
     )
   }
