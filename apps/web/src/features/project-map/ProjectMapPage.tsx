@@ -57,6 +57,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   const sessionNodes = nodes.filter((n) => n.kind === 'session')
   const activeCount = sessionNodes.filter((n) => n.status === 'active').length
   const needsYouCount = sessionNodes.filter((n) => n.status === 'needs-you').length
+  const firstNeedsYou = sessionNodes.find((n) => n.status === 'needs-you')
   // Expired subagents are not drawn, so their count comes from the session nodes' chips.
   const expiredSubagentTotal = sessionNodes.reduce((sum, n) => sum + n.expiredSubagentCount, 0)
   // Sessions with no project, and archived sessions, are left out of the map and counted by the server.
@@ -212,11 +213,23 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
         )}
       </div>
 
-      <div className={`mt-3 grid gap-4 ${panelsHidden ? '' : 'lg:grid-cols-[minmax(0,1fr)_320px]'}`}>
+      <div className="mt-3">
         <section
           aria-label="Project map"
-          className="h-[calc(100vh-18rem)] min-h-[28rem] min-w-0 overflow-hidden rounded-2xl border border-gray-800 bg-gray-950"
+          className={`relative min-w-0 overflow-hidden rounded-2xl border border-gray-800 bg-gray-950 ${
+            panelsHidden ? 'h-[calc(100vh-18rem)] min-h-[28rem]' : 'h-[calc(100vh-24rem)] min-h-[22rem]'
+          }`}
         >
+          {needsYouCount > 0 && firstNeedsYou && (
+            <button
+              type="button"
+              onClick={() => setSelectedId(firstNeedsYou.id)}
+              className="absolute left-3 top-3 z-10 flex items-center gap-2 rounded-full border border-yellow-400 bg-gray-900/90 px-3 py-1.5 text-xs font-medium text-yellow-300 shadow-lg"
+            >
+              <span className="h-2 w-2 rounded-full bg-yellow-400" />
+              {needsYouCount === 1 ? '1 session needs you' : `${needsYouCount} sessions need you`}
+            </button>
+          )}
           {mapQuery.isLoading || layoutLoading ? (
             <div className="h-64 animate-pulse rounded-2xl bg-gray-900" />
           ) : mapQuery.error ? (
@@ -241,9 +254,11 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
         </section>
 
         {!panelsHidden && (
-          <div className="space-y-4">
-            <NeedsYouPanel nodes={nodes} onSelect={setSelectedId} />
-            <NodeDetailPanel node={selectedNode} projectKey={selectedKey} machineId={machineId} />
+          <div className="mt-4 space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <NeedsYouPanel nodes={nodes} onSelect={setSelectedId} selectedId={selectedId} />
+              <NodeDetailPanel node={selectedNode} projectKey={selectedKey} machineId={machineId} />
+            </div>
             <HookEventsPanel events={eventsQuery.data} />
           </div>
         )}

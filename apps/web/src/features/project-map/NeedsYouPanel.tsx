@@ -6,9 +6,11 @@ import { truncateLabel } from './format-node'
 export function NeedsYouPanel({
   nodes,
   onSelect,
+  selectedId,
 }: {
   nodes: MapNode[]
   onSelect: (nodeId: string) => void
+  selectedId?: string | null
 }) {
   const { privacyMode, anonymizeSessionName } = usePrivacy()
   const waiting = nodes.filter((n) => n.kind === 'session' && n.needsYou)
@@ -27,7 +29,9 @@ export function NeedsYouPanel({
                 <button
                   type="button"
                   onClick={() => onSelect(node.id)}
-                  className="w-full rounded-xl border border-gray-800 px-3 py-2 text-left transition-colors hover:border-brand-500/60 hover:bg-gray-900"
+                  className={`w-full rounded-xl border px-3 py-2 text-left transition-colors hover:bg-gray-800 ${
+                    selectedId === node.id ? 'border-yellow-400' : 'border-gray-700'
+                  }`}
                 >
                   <span className="block truncate text-sm font-medium text-gray-100">{title}</span>
                   {question ? (
