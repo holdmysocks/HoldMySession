@@ -14,8 +14,9 @@ import {
 } from '@/features/project-analytics/project-analytics.queries'
 import { StatsOverview } from '@/features/stats/StatsOverview'
 import { tokensByModelOf } from '@/features/stats/stats-tokens'
+import { ProjectsRanked } from '@/features/project-analytics/ProjectsRanked'
+import { ProjectHeader } from '@/features/project-analytics/ProjectHeader'
 import { ProjectAnalytics } from '@/features/project-analytics/ProjectAnalytics'
-import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import {
   dailyActivityToCSV,
   dailyTokensToCSV,
@@ -72,7 +73,6 @@ const TABS = [
 function StatsPage() {
   const { tab, project, range } = Route.useSearch()
   const navigate = Route.useNavigate()
-  const { anonymizeProjectName } = usePrivacy()
   const scope = useMachineScope()
   const machineId = scope.machineId
   const { data: allStats, isLoading } = useQuery(statsQueryFor(machineId))
@@ -169,37 +169,27 @@ function StatsPage() {
 
       {/* Tab content */}
       {tab === 'overview' ? (
-        <StatsOverview
-          stats={stats}
-          isLoading={isLoading}
-          cost={cost}
-          costNote={costNote}
-          plan={plan}
-          weekUSD={weekUSD}
-          totalDurationMs={projects.reduce((sum, p) => sum + p.totalDurationMs, 0)}
-          fourthCard={{ label: 'Projects', value: String(linkedProjectCount) }}
-          emptyMessage="No stats data found. Check ~/.claude/stats-cache.json"
-        />
-      ) : tab === 'by-project' ? (
-        <div>
-          {projects.length > 0 && selectedProject && (
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 text-sm text-gray-400">
-                <span>Project</span>
-                <select
-                  value={selectedProject.projectPath}
-                  onChange={(e) => navigate({ search: { tab: 'by-project', project: e.target.value } })}
-                  className="max-w-xs rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-100 focus:border-brand-500 focus:outline-none"
-                >
-                  {projects.map((p) => (
-                    <option key={p.projectPath} value={p.projectPath}>
-                      {p.isUnlinked ? p.displayName : anonymizeProjectName(p.displayName)} ({p.totalSessions})
-                    </option>
-                  ))}
-                </select>
-              </label>
+        <>
+          <StatsOverview
+            stats={stats}
+            isLoading={isLoading}
+            cost={cost}
+            costNote={costNote}
+            plan={plan}
+            weekUSD={weekUSD}
+            totalDurationMs={projects.reduce((sum, p) => sum + p.totalDurationMs, 0)}
+            fourthCard={{ label: 'Projects', value: String(linkedProjectCount) }}
+            emptyMessage="No stats data found. Check ~/.claude/stats-cache.json"
+          />
+          {projects.length > 0 && (
+            <div className="mt-4">
+              <ProjectsRanked projects={projects} />
             </div>
           )}
+        </>
+      ) : tab === 'by-project' ? (
+        <div>
+          {selectedProject && <ProjectHeader project={selectedProject} />}
           {projectData && projects.length === 0 ? (
             <div className="py-12 text-center text-sm text-gray-500">
               No projects found. Sessions will appear here once scanned.
