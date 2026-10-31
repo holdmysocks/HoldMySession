@@ -17,10 +17,6 @@ export const selectors = {
     costPanel: 'text=Cost',
     errorPanel: 'text=Errors',
   },
-  stats: {
-    overviewTab: 'button:has-text("Overview")',
-    projectsTab: 'button:has-text("Projects")',
-  },
   settings: {
     saveButton: 'button:has-text("Save")',
     resetButton: 'button:has-text("Reset")',
