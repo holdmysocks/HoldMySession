@@ -6,11 +6,11 @@ import { formatTokenCount } from '@/lib/utils/format'
 import { activityFlavor, flavorReserve } from './activity-flavor'
 
 const INTENSITY_COLORS = [
-  'var(--color-gray-800)', // Level 0: warm gray-800 (no activity)
-  '#3d2a1e', // Level 1: dark terracotta
-  '#a8512eb3', // Level 2: brand-700 at ~70% opacity
-  '#d97757cc', // Level 3: brand-500 at ~80% opacity
-  '#e09070', // Level 4: brand-400 (most intense)
+  'var(--color-gray-800)', // Level 0: no activity
+  'color-mix(in srgb, var(--color-brand-400) 24%, var(--color-gray-800))',
+  'color-mix(in srgb, var(--color-brand-400) 48%, var(--color-gray-800))',
+  'color-mix(in srgb, var(--color-brand-400) 74%, var(--color-gray-800))',
+  'var(--color-brand-400)', // Level 4: most intense
 ] as const
 
 const DAY_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', ''] as const
@@ -206,7 +206,7 @@ export function ContributionHeatmap({
 
   if (days.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+      <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
         <h3 className="text-sm font-semibold text-gray-300">Activity</h3>
         <div className="flex h-32 items-center justify-center">
           <p className="text-sm text-gray-500">No activity data available</p>
@@ -216,7 +216,7 @@ export function ContributionHeatmap({
   }
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
       <h3 className="text-sm font-semibold text-gray-300">Activity</h3>
       <p className="mt-1 text-xs text-gray-500">Token usage intensity over the past year, or since your first day of use</p>
 

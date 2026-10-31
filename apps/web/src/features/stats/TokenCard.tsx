@@ -7,11 +7,11 @@ import type { TokenBreakdown } from './token-breakdown'
  * the answer, and the reasoning the model did before answering. The three add up to the total.
  * Only the total shows at first. The arrow opens the breakdown.
  */
-export function TokenCard({ breakdown }: { breakdown: TokenBreakdown }) {
+export function TokenCard({ breakdown, hero }: { breakdown: TokenBreakdown; hero?: boolean }) {
   const [open, setOpen] = useState(false)
   const detailId = useId()
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className={hero ? '' : 'rounded-2xl border border-gray-800 bg-gray-900 p-4'}>
       <button
         type="button"
         aria-expanded={open}
@@ -31,7 +31,16 @@ export function TokenCard({ breakdown }: { breakdown: TokenBreakdown }) {
           <path d="M4 6l4 4 4-4" />
         </svg>
       </button>
-      <p className="mt-1 text-xl font-bold text-gray-100">{formatTokenCount(breakdown.total)}</p>
+      <p
+        className={
+          hero
+            ? 'mt-1 font-display text-5xl font-extrabold leading-none text-brand-400 sm:text-6xl'
+            : 'mt-1 text-xl font-bold text-gray-100'
+        }
+        style={hero ? { textShadow: '0 0 28px var(--hms-glow)' } : undefined}
+      >
+        {formatTokenCount(breakdown.total)}
+      </p>
       {open && (
         <dl id={detailId} className="mt-2 space-y-0.5 text-xs text-gray-500">
           <TokenRow label="Input (prompt)" value={breakdown.input} />

@@ -83,6 +83,10 @@ function StatsPage() {
   const cost = datedCost ?? sessionCost
   const { data: subscription } = useQuery(subscriptionQuery)
   const costNote = subscription ? savingsText(subscription.summary, formatUSD) : null
+  const plan =
+    subscription && subscription.summary.firstDay && subscription.summary.months.length > 0
+      ? subscription.summary
+      : null
 
   // Projects the by-project tab can show: real projects first, the unlinked group last.
   const projects = useMemo(() => {
@@ -109,7 +113,7 @@ function StatsPage() {
     <div>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-100">Stats</h1>
+          <h1 className="font-display text-3xl font-extrabold text-gray-100">Stats</h1>
           <p className="mt-1 text-sm text-gray-400">
             Usage analytics and project insights
           </p>
@@ -120,15 +124,15 @@ function StatsPage() {
       </div>
 
       {/* Tab bar */}
-      <div className="mt-4 flex gap-1 border-b border-gray-800">
+      <div className="mt-4 flex flex-wrap gap-2">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => navigate({ search: { tab: t.id, project } })}
-            className={`px-4 py-2 text-sm border-b-2 transition-colors ${
+            className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
               tab === t.id
-                ? 'border-brand-500 text-gray-100'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-brand-400 text-brand-400'
+                : 'border-gray-700 text-gray-400 hover:text-gray-200'
             }`}
           >
             {t.label}
@@ -143,6 +147,7 @@ function StatsPage() {
           isLoading={isLoading}
           cost={cost}
           costNote={costNote}
+          plan={plan}
           totalDurationMs={projects.reduce((sum, p) => sum + p.totalDurationMs, 0)}
           fourthCard={{ label: 'Projects', value: String(linkedProjectCount) }}
           emptyMessage="No stats data found. Check ~/.claude/stats-cache.json"

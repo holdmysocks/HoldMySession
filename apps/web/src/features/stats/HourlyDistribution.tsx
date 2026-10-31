@@ -12,9 +12,9 @@ export function HourlyDistribution({
   const maxCount = Math.max(...hours.map((h) => h.count), 1)
 
   return (
-    <div className="flex flex-col rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="flex flex-col rounded-2xl border border-gray-800 bg-gray-900 p-4">
       <h3 className="text-sm font-semibold text-gray-300">
-        Hourly Distribution
+        When you start sessions
       </h3>
       <p className="mt-1 text-xs text-gray-500">
         Session starts by hour of day
@@ -34,7 +34,7 @@ export function HourlyDistribution({
                 className="absolute bottom-0 w-full rounded-t transition-colors"
                 style={{
                   height: `${height}%`,
-                  backgroundColor: `rgba(217, 119, 87, ${0.2 + intensity * 0.6})`,
+                  backgroundColor: `color-mix(in srgb, var(--color-brand-400) ${Math.round(25 + intensity * 75)}%, transparent)`,
                 }}
               />
               {/* Tooltip on hover */}

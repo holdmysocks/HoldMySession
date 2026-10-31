@@ -11,8 +11,8 @@ import {
 import { format, parseISO, startOfISOWeek } from 'date-fns'
 import type { DailyModelTokens } from '@/lib/parsers/types'
 import { formatTokenCount } from '@/lib/utils/format'
+import { modelColor, TOP_MODELS } from './model-colors'
 
-const COLORS = ['#d97757', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#b07cc5']
 
 type Granularity = 'daily' | 'weekly'
 
@@ -167,7 +167,7 @@ export function TokenTrendChart({ data }: { data: DailyModelTokens[] }) {
   const [granularity, setGranularity] = useState<Granularity>('daily')
 
   const { topModels, hasOther } = useMemo(
-    () => getTopModels(data, 5),
+    () => getTopModels(data, TOP_MODELS),
     [data],
   )
 
@@ -186,7 +186,7 @@ export function TokenTrendChart({ data }: { data: DailyModelTokens[] }) {
 
   if (data.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+      <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
         <h3 className="text-sm font-semibold text-gray-300">
           Token Usage Over Time
         </h3>
@@ -201,7 +201,7 @@ export function TokenTrendChart({ data }: { data: DailyModelTokens[] }) {
   }
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-gray-300">
@@ -211,11 +211,11 @@ export function TokenTrendChart({ data }: { data: DailyModelTokens[] }) {
             Total tokens by model per day
           </p>
         </div>
-        <div className="flex rounded-lg border border-gray-700 text-xs">
+        <div className="flex rounded-full border border-gray-700 text-xs">
           <button
             type="button"
             onClick={() => setGranularity('daily')}
-            className={`rounded-l-lg px-3 py-1 ${
+            className={`rounded-l-full px-3 py-1 ${
               granularity === 'daily'
                 ? 'bg-gray-700 text-gray-100'
                 : 'text-gray-400 hover:text-gray-300'
@@ -226,7 +226,7 @@ export function TokenTrendChart({ data }: { data: DailyModelTokens[] }) {
           <button
             type="button"
             onClick={() => setGranularity('weekly')}
-            className={`rounded-r-lg px-3 py-1 ${
+            className={`rounded-r-full px-3 py-1 ${
               granularity === 'weekly'
                 ? 'bg-gray-700 text-gray-100'
                 : 'text-gray-400 hover:text-gray-300'
@@ -237,7 +237,16 @@ export function TokenTrendChart({ data }: { data: DailyModelTokens[] }) {
         </div>
       </div>
 
-      <div className="mt-4 h-72">
+      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
+        {allModelKeys.map((model, i) => (
+          <span key={model} className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: modelColor(i, model === 'Other') }} />
+            {model}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-3 h-72 [&_.recharts-area-curve]:[filter:drop-shadow(0_0_6px_var(--hms-glow))]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-gray-800)" />
@@ -259,9 +268,10 @@ export function TokenTrendChart({ data }: { data: DailyModelTokens[] }) {
                 type="monotone"
                 dataKey={model}
                 stackId="1"
-                stroke={COLORS[i % COLORS.length]}
-                fill={COLORS[i % COLORS.length]}
-                fillOpacity={0.6}
+                stroke={modelColor(i, model === 'Other')}
+                strokeWidth={2}
+                fill={modelColor(i, model === 'Other')}
+                fillOpacity={0.14}
               />
             ))}
           </AreaChart>
