@@ -129,7 +129,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
           <select
             value={selectedValue}
             onChange={(e) => handleProjectChange(e.target.value)}
-            className="max-w-xs rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-100 focus:border-brand-500 focus:outline-none"
+            className="max-w-xs rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-100 focus:border-brand-500 focus:outline-none"
           >
             {machineGroups.map((group) => {
               const options = group.projects.map((p) => (
@@ -163,7 +163,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
           type="button"
           aria-pressed={editMode}
           onClick={() => setEditMode((on) => !on)}
-          className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+          className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
             editMode
               ? 'border-brand-500 bg-brand-500/15 text-brand-600'
               : 'border-gray-800 bg-gray-900 text-gray-300 hover:text-gray-100'
@@ -172,7 +172,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
           {editMode ? 'Editing layout' : 'Edit layout'}
         </button>
         {editMode && (
-          <label className="flex items-center gap-1.5 rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-300">
+          <label className="flex items-center gap-1.5 rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-300">
             <input
               type="checkbox"
               checked={snapToGrid}
@@ -187,7 +187,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
             type="button"
             onClick={handleResetLayout}
             disabled={!hasCustomLayout}
-            className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-300 hover:text-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-300 hover:text-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Reset layout
           </button>
@@ -196,7 +196,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
           type="button"
           aria-pressed={panelsHidden}
           onClick={() => setPanelsHidden((hidden) => !hidden)}
-          className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-300 hover:text-gray-100"
+          className="rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-300 hover:text-gray-100"
         >
           {panelsHidden ? 'Show panels' : 'Hide panels'}
         </button>
@@ -215,7 +215,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
       <div className={`mt-3 grid gap-4 ${panelsHidden ? '' : 'lg:grid-cols-[minmax(0,1fr)_320px]'}`}>
         <section
           aria-label="Project map"
-          className="h-[calc(100vh-18rem)] min-h-[28rem] min-w-0 overflow-hidden rounded-xl border border-gray-800 bg-gray-950"
+          className="h-[calc(100vh-18rem)] min-h-[28rem] min-w-0 overflow-hidden rounded-2xl border border-gray-800 bg-gray-950"
         >
           {mapQuery.isLoading || layoutLoading ? (
             <div className="h-64 animate-pulse rounded-xl bg-gray-900/50" />
@@ -255,7 +255,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
 function Header() {
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-100">Session Map</h1>
+      <h1 className="font-display text-3xl font-extrabold text-gray-100">Session Map</h1>
       <p className="mt-1 text-sm text-gray-400">
         Sessions in a project, with the subagents they dispatched. Read-only: the editor only moves cards, and the arrangement is saved by the dashboard, not in your Claude config.
       </p>

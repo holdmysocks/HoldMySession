@@ -27,7 +27,7 @@ export function NeedsYouPanel({
                 <button
                   type="button"
                   onClick={() => onSelect(node.id)}
-                  className="w-full rounded-lg border border-gray-800 px-3 py-2 text-left transition-colors hover:border-brand-500/60 hover:bg-gray-900"
+                  className="w-full rounded-xl border border-gray-800 px-3 py-2 text-left transition-colors hover:border-brand-500/60 hover:bg-gray-900"
                 >
                   <span className="block truncate text-sm font-medium text-gray-100">{title}</span>
                   {question ? (

@@ -116,14 +116,14 @@ describe('SessionCard', () => {
     }
   })
 
-  it('gives a completed session the brand border with no pulse', () => {
+  it('gives a completed session the indigo border with no pulse', () => {
     const { container } = render(
       <PrivacyProvider>
         <SessionCard session={mockSession} status="completed" />
       </PrivacyProvider>
     )
     const link = container.firstElementChild as HTMLElement
-    expect(link.className).toContain('border-brand-500')
+    expect(link.className).toContain('border-indigo-400')
     expect(link.className).not.toContain('status-pulse')
     expect(screen.getByText('Completed')).toBeTruthy()
   })

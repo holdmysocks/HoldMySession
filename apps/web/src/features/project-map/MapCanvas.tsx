@@ -42,7 +42,7 @@ const STATUS_CLASSES: Record<
   },
   active: { stroke: 'stroke-green-500', dot: 'fill-green-400', halo: 'fill-green-500 status-halo-active' },
   running: { stroke: 'stroke-green-500', dot: 'fill-green-400', halo: 'fill-green-500 status-halo-active' },
-  completed: { stroke: 'stroke-brand-500', dot: 'fill-brand-500' },
+  completed: { stroke: 'stroke-indigo-400', dot: 'fill-indigo-400' },
   idle: { stroke: 'stroke-gray-600', dot: 'fill-gray-500' },
 }
 

@@ -8,7 +8,7 @@ import type { SessionStatus } from '@/lib/status/session-status'
 export const STATUS_BORDER: Record<SessionStatus, string> = {
   'needs-you': 'border-yellow-400',
   active: 'border-green-500',
-  completed: 'border-brand-500',
+  completed: 'border-indigo-400',
   idle: 'border-gray-600',
 }
 

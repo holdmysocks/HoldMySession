@@ -10,7 +10,7 @@ export function PanelShell({
   children: ReactNode
 }) {
   return (
-    <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+    <section className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-100">{title}</h2>
         {count !== undefined && (

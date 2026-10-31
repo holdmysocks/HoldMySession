@@ -9,7 +9,7 @@ describe('STATUS_BORDER', () => {
     expect(STATUS_BORDER).toEqual({
       'needs-you': 'border-yellow-400',
       active: 'border-green-500',
-      completed: 'border-brand-500',
+      completed: 'border-indigo-400',
       idle: 'border-gray-600',
     })
   })

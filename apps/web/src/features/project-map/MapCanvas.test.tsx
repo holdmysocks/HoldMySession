@@ -283,7 +283,7 @@ describe('MapCanvas status styling', () => {
 
   it('gives a completed session a solid brand border and no halo', () => {
     const { body, halo } = renderWith({ isActive: false, lastStopReason: 'end_turn' })
-    expect(body).toContain('stroke-brand-500')
+    expect(body).toContain('stroke-indigo-400')
     expect(halo).toBeNull()
   })
 
