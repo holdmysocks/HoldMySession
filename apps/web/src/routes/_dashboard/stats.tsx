@@ -3,6 +3,9 @@ import { useMemo } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
+import { format } from 'date-fns'
+import { addDays } from '@/lib/pricing/price-timeline'
+import { costFrom, filterStatsRange, RANGES, rangeStartDay } from '@/features/stats/stats-range'
 import { statsQueryFor } from '@/features/stats/stats.queries'
 import { useMachineScope } from '@/features/link/useMachineScope'
 import {
@@ -24,11 +27,12 @@ import { ExportDropdown } from '@/components/ExportDropdown'
 import { useSessionCost } from '@/features/cost-estimation/useSessionCost'
 import { historyCostQuery } from '@/features/history/price-history.queries'
 import { subscriptionQuery } from '@/features/history/subscription.queries'
-import { savingsText } from '@/lib/pricing/subscription'
+import { savingsText, summarizeSubscription } from '@/lib/pricing/subscription'
 import type { StatsCache } from '@/lib/parsers/types'
 
 const statsSearchSchema = z.object({
   tab: z.enum(['overview', 'by-project', 'projects']).default('overview').catch('overview'),
+  range: z.enum(RANGES).default('all').catch('all'),
   /** The project shown on the by-project tab: a project path, or the unlinked group's key. */
   project: z.string().optional().catch(undefined),
 })
@@ -66,12 +70,15 @@ const TABS = [
 ] as const
 
 function StatsPage() {
-  const { tab, project } = Route.useSearch()
+  const { tab, project, range } = Route.useSearch()
   const navigate = Route.useNavigate()
   const { anonymizeProjectName } = usePrivacy()
   const scope = useMachineScope()
   const machineId = scope.machineId
-  const { data: stats, isLoading } = useQuery(statsQueryFor(machineId))
+  const { data: allStats, isLoading } = useQuery(statsQueryFor(machineId))
+  const today = format(new Date(), 'yyyy-MM-dd')
+  const startDay = rangeStartDay(range, today)
+  const stats = useMemo(() => (allStats ? filterStatsRange(allStats, startDay) : allStats), [allStats, startDay])
   const { data: projectData } = useQuery(projectAnalyticsQueryFor(machineId))
 
   // Convert stats.modelUsage to Record<string, TokenUsage> for cost calculation
@@ -80,13 +87,15 @@ function StatsPage() {
   const { cost: sessionCost } = useSessionCost(tokensByModel)
   // Priced day by day from the history database when it can be, else all at today's prices.
   const { data: datedCost } = useQuery(historyCostQuery(undefined, true, machineId))
-  const cost = datedCost ?? sessionCost
+  const cost = datedCost ? { totalUSD: costFrom(datedCost.byDay, startDay) } : sessionCost
   const { data: subscription } = useQuery(subscriptionQuery)
   const costNote = subscription ? savingsText(subscription.summary, formatUSD) : null
-  const plan =
-    subscription && subscription.summary.firstDay && subscription.summary.months.length > 0
-      ? subscription.summary
-      : null
+  const plan = useMemo(() => {
+    if (!subscription || !datedCost) return null
+    const summary = summarizeSubscription(subscription.periods, datedCost.byDay, today, startDay ?? undefined)
+    return summary.firstDay && summary.months.length > 0 ? summary : null
+  }, [subscription, datedCost, today, startDay])
+  const weekUSD = datedCost ? costFrom(datedCost.byDay, addDays(today, -6)) : null
 
   // Projects the by-project tab can show: real projects first, the unlinked group last.
   const projects = useMemo(() => {
@@ -140,6 +149,24 @@ function StatsPage() {
         ))}
       </div>
 
+      {tab === 'overview' && (
+        <div role="group" aria-label="Time range" className="mt-4 flex flex-wrap gap-2">
+          {RANGES.map((r) => (
+            <button
+              key={r}
+              type="button"
+              aria-pressed={range === r}
+              onClick={() => navigate({ search: (prev) => ({ ...prev, range: r }) })}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                range === r ? 'border-brand-400 text-brand-400' : 'border-gray-700 text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              {r === 'all' ? 'All' : r}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Tab content */}
       {tab === 'overview' ? (
         <StatsOverview
@@ -148,6 +175,7 @@ function StatsPage() {
           cost={cost}
           costNote={costNote}
           plan={plan}
+          weekUSD={weekUSD}
           totalDurationMs={projects.reduce((sum, p) => sum + p.totalDurationMs, 0)}
           fourthCard={{ label: 'Projects', value: String(linkedProjectCount) }}
           emptyMessage="No stats data found. Check ~/.claude/stats-cache.json"

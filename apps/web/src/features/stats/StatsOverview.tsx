@@ -15,6 +15,8 @@ interface StatsOverviewProps {
   /** Shown under the cost: what the subscription cost against API prices. Overall stats only. */
   costNote?: string | null
   /** The plan compared with API prices. Overall stats only. */
+  /** API-price cost of the last seven days. */
+  weekUSD?: number | null
   plan?: { apiUSD: number; paidUSD: number; savedUSD: number } | null
   totalDurationMs: number
   /** The last card of the first row. The overall overview shows the project count there. */
@@ -33,6 +35,7 @@ export function StatsOverview({
   cost,
   costNote,
   plan,
+  weekUSD,
   totalDurationMs,
   fourthCard,
   emptyMessage,
@@ -100,12 +103,13 @@ export function StatsOverview({
               </p>
             )}
           </div>
-          {plan && (
+          {(plan || (weekUSD ?? 0) > 0.005) && (
             <div className="mt-4 flex flex-wrap gap-2 md:justify-end">
-              {multiple !== null && multiple >= 1.05 && (
+              {(weekUSD ?? 0) > 0.005 && <Chip>+{formatUSD(weekUSD!)} this week</Chip>}
+              {plan && multiple !== null && multiple >= 1.05 && (
                 <Chip>About {multiple >= 10 ? Math.round(multiple) : multiple.toFixed(1)}x what you paid</Chip>
               )}
-              {plan.savedUSD > 0.005 && <Chip accent>You saved ~{formatUSD(plan.savedUSD)}</Chip>}
+              {plan && plan.savedUSD > 0.005 && <Chip accent>You saved ~{formatUSD(plan.savedUSD)}</Chip>}
             </div>
           )}
           {!plan && costNote && <p className="mt-3 text-xs text-gray-500">{costNote}</p>}

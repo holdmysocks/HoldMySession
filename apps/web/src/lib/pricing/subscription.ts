@@ -58,13 +58,15 @@ export function summarizeSubscription(
   periods: SubscriptionPeriod[],
   apiByDay: Record<string, number>,
   today: string,
+  /** Count only from this day on, for a period shorter than all history. */
+  fromDay?: string,
 ): SubscriptionSummary {
   const starts = periods.map((p) => p.startDay).sort()
   const empty: SubscriptionSummary = { firstDay: null, months: [], apiUSD: 0, paidUSD: 0, savedUSD: 0 }
   if (starts.length === 0 || starts[0] > today) return { ...empty, firstDay: starts[0] ?? null }
 
   const months = new Map<string, MonthSummary>()
-  for (let day = starts[0]; day <= today; day = addDays(day, 1)) {
+  for (let day = fromDay && fromDay > starts[0] ? fromDay : starts[0]; day <= today; day = addDays(day, 1)) {
     const plan = periodOnDay(periods, day)
     if (!plan) continue
     const api = apiByDay[day] ?? 0
