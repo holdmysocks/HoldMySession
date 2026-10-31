@@ -62,19 +62,19 @@ export function PriceHistoryPanel() {
   }
 
   const label = (id: string) => [...DEFAULT_PRICING, ...RETIRED_PRICING].find((m) => m.modelId === id)?.displayName ?? id
-  const input = 'rounded border border-gray-800 bg-gray-950 px-2 py-1 text-xs text-gray-100'
+  const input = 'min-h-10 rounded-full border border-[color:var(--hms-line)] bg-transparent px-4 text-sm text-gray-100 outline-none focus:border-brand-400'
 
   return (
     <div className="mt-6">
-      <h2 className="text-sm font-semibold text-gray-300">Price history</h2>
-      <p className="mt-1 text-[10px] text-gray-500">
+      <h2 className="font-display text-[22px] font-semibold">Price history</h2>
+      <p className="mt-1 text-[13px] text-[color:var(--hms-mute)]">
         When a price changes, add it here with the day it applies from. Past days keep the price they had, and the cost
         on Stats is worked out day by day. A later entry overwrites an earlier one on the days they share, so you can
         also backdate a correction, or set a window for a cheaper period. The table below is the base price, used on
         days with no entry.
       </p>
       <LinkedNote what="price changes" />
-      <div className="mt-3 space-y-4 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-xs text-gray-400">
+      <div className="mt-3 space-y-4 border-b border-[color:var(--hms-rule)] py-4 text-xs text-gray-400">
         <label className="flex items-center gap-2">
           <span>Model</span>
           <select value={modelId} onChange={(e) => setModelId(e.target.value)} className={input}>
@@ -188,7 +188,7 @@ export function PriceHistoryPanel() {
             <button
               type="submit"
               disabled={add.isPending}
-              className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-xs text-gray-300 hover:text-gray-100 disabled:opacity-50"
+              className="min-h-11 rounded-full border border-[color:var(--hms-line)] bg-transparent px-[18px] text-sm font-medium text-gray-100 hover:border-gray-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add price change
             </button>

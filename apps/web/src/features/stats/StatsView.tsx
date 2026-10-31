@@ -151,7 +151,7 @@ export function StatsView({
                 type="button"
                 aria-pressed={range === r}
                 onClick={() => onRange(r)}
-                className="min-h-10 min-w-11 rounded-full px-3.5 font-medium"
+                className="min-h-10 min-w-11 rounded-full px-3.5 text-[13.33px] font-medium"
                 style={range === r ? { background: 'var(--hms-ink)', color: 'var(--hms-bg)' } : { color: 'var(--hms-ink)' }}
               >
                 {r === 'all' ? 'All' : r}

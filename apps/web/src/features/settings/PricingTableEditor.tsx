@@ -71,12 +71,12 @@ export function PricingTableEditor({ overrides, onChange }: PricingTableEditorPr
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
+      <table className="w-full text-left">
         <thead>
-          <tr className="border-b border-gray-800">
-            <th className="pb-2 pr-4 text-gray-400 font-medium">Model</th>
+          <tr className="border-b border-[color:var(--hms-rule)] text-xs text-[color:var(--hms-mute)]">
+            <th className="py-2.5 pr-4 font-normal">Model</th>
             {PRICE_FIELDS.map((f) => (
-              <th key={f.key} className="pb-2 px-2 text-right text-gray-400 font-medium">
+              <th key={f.key} className="px-2 py-2.5 text-right font-normal">
                 {f.label}
               </th>
             ))}
@@ -84,28 +84,23 @@ export function PricingTableEditor({ overrides, onChange }: PricingTableEditorPr
         </thead>
         <tbody>
           {DEFAULT_PRICING.map((model) => (
-            <tr key={model.modelId} className="border-b border-gray-800/50">
-              <td className="py-2 pr-4 font-mono text-gray-300">
-                {model.displayName}
-              </td>
+            <tr key={model.modelId} className="border-b border-[color:var(--hms-rule)]">
+              <td className="py-3 pr-4 font-semibold">{model.displayName}</td>
               {PRICE_FIELDS.map((f) => {
                 const value = getEffectiveValue(model, f.key)
                 const changed = isOverridden(model.modelId, f.key)
                 return (
-                  <td key={f.key} className="px-1 py-1.5">
+                  <td key={f.key} className="px-1 py-1.5 text-right">
                     <input
                       type="number"
                       step="0.01"
                       min="0"
                       value={value}
-                      onChange={(e) =>
-                        handleCellChange(model.modelId, f.key, e.target.value)
-                      }
-                      className={`w-20 rounded border px-2 py-1 text-right font-mono text-xs ${
-                        changed
-                          ? 'border-brand-500/50 bg-brand-500/10 text-brand-400'
-                          : 'border-gray-700 bg-gray-800 text-gray-300'
-                      } focus:border-brand-500 focus:outline-none`}
+                      aria-label={`${model.displayName} ${f.label}`}
+                      onChange={(e) => handleCellChange(model.modelId, f.key, e.target.value)}
+                      className={`w-24 rounded-full border border-transparent bg-transparent px-2 py-1.5 text-right tabular-nums hover:border-[color:var(--hms-line)] focus:border-brand-400 focus:outline-none ${
+                        changed ? 'font-semibold text-brand-400' : ''
+                      }`}
                     />
                   </td>
                 )
@@ -114,9 +109,7 @@ export function PricingTableEditor({ overrides, onChange }: PricingTableEditorPr
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-[10px] text-gray-600">
-        Prices in USD per million tokens. Overridden values are highlighted.
-      </p>
+      <p className="mt-2 text-xs text-[color:var(--hms-mute)]">Overridden values are highlighted.</p>
     </div>
   )
 }

@@ -13,7 +13,7 @@ export function CostEstimationPanel({ tokensByModel }: CostEstimationPanelProps)
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
+      <div className="border-b border-[color:var(--hms-rule)] py-4">
         <div className="h-6 w-32 animate-pulse rounded bg-gray-800" />
       </div>
     )
@@ -21,18 +21,18 @@ export function CostEstimationPanel({ tokensByModel }: CostEstimationPanelProps)
 
   if (!cost || cost.totalUSD === 0) {
     return (
-      <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
-        <h3 className="text-sm font-semibold text-gray-300">Cost Estimation</h3>
+      <div className="border-b border-[color:var(--hms-rule)] py-4">
+        <h3 className="font-display text-[22px] font-semibold">Cost Estimation</h3>
         <p className="mt-2 text-xs text-gray-500">No token data available</p>
       </div>
     )
   }
 
   return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
+    <div className="border-b border-[color:var(--hms-rule)] py-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-300">Cost Estimation</h3>
+        <h3 className="font-display text-[22px] font-semibold">Cost Estimation</h3>
         <span className="font-mono text-lg font-bold text-gray-100">
           ~{formatUSD(cost.totalUSD)}
         </span>
@@ -140,7 +140,7 @@ function ModelBreakdown({ cost }: { cost: CostBreakdown }) {
               <span className="font-mono text-xs text-gray-300">
                 {formatUSD(model.totalCost)}
               </span>
-              <span className="text-[10px] text-gray-500">
+              <span className="text-[13px] text-[color:var(--hms-mute)]">
                 ({pct}%)
               </span>
               <span className="text-[10px] text-gray-600">

@@ -15,7 +15,7 @@ function describe(info: UpdateState, checkedByHand: boolean): { text: string; to
   return null
 }
 
-const TONE = { ok: 'text-emerald-400', info: 'text-brand-600', warn: 'text-red-400', muted: 'text-gray-500' }
+const TONE = { ok: 'text-[color:var(--hms-chip-ink)]', info: 'text-brand-400', warn: 'text-red-400', muted: 'text-[color:var(--hms-chip-ink)]' }
 
 export function UpdatesPanel() {
   const queryClient = useQueryClient()
@@ -32,77 +32,81 @@ export function UpdatesPanel() {
   const message = describe(info, check.isSuccess)
   const percent = info.update?.phase === 'downloading' ? info.update.percent : null
 
+  const row = 'flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-[color:var(--hms-rule)] py-[18px]'
+  const button =
+    'min-h-11 rounded-full border border-[color:var(--hms-line)] bg-transparent px-[18px] text-sm font-medium text-gray-100 hover:border-gray-500 disabled:cursor-not-allowed disabled:opacity-50'
+
   return (
-    <div className="mt-6">
-      <h2 className="text-sm font-semibold text-gray-300">About and updates</h2>
-      <div className="mt-3 space-y-4 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-xs text-gray-400">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-gray-200">
-              HoldMySession <span className="font-mono">v{info.current}</span>
+    <div>
+      <section aria-label="About" className={row}>
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold">
+            HoldMySession <span className="font-mono">v{info.current}</span>
+          </h2>
+          {message && (
+            <p role="status" className={`text-[13px] ${TONE[message.tone]}`}>
+              {message.text}
             </p>
-            {message && (
-              <p role="status" className={`mt-1 ${TONE[message.tone]}`}>
-                {message.text}
-              </p>
-            )}
-            {percent !== null && (
-              <div className="mt-2 h-1.5 w-48 overflow-hidden rounded bg-gray-800" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
-                <div className="h-full bg-brand-600 transition-all" style={{ width: `${percent}%` }} />
-              </div>
-            )}
-            {info.available && !info.canInstall && info.cannotInstallReason && <p className="mt-1 text-gray-500">{info.cannotInstallReason}</p>}
-            {(install.error || check.error) && <p role="alert" className="mt-1 text-red-400">{(install.error ?? check.error)?.message}</p>}
-          </div>
-          <div className="flex items-center gap-2">
+          )}
+          {percent !== null && (
+            <div className="mt-2 h-1.5 w-48 overflow-hidden rounded bg-[color:var(--hms-track)]" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
+              <div className="h-full bg-brand-400 transition-all" style={{ width: `${percent}%` }} />
+            </div>
+          )}
+          {info.available && !info.canInstall && info.cannotInstallReason && <p className="text-[13px] text-[color:var(--hms-mute)]">{info.cannotInstallReason}</p>}
+          {(install.error || check.error) && <p role="alert" className="text-[13px] text-red-400">{(install.error ?? check.error)?.message}</p>}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => check.mutate()} disabled={check.isPending || busy} className={button}>
+            {check.isPending ? 'Checking…' : 'Check for updates'}
+          </button>
+          {info.available && info.canInstall ? (
             <button
               type="button"
-              onClick={() => check.mutate()}
-              disabled={check.isPending || busy}
-              className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => install.mutate()}
+              disabled={busy}
+              className="min-h-11 rounded-full bg-brand-400 px-5 text-sm font-semibold text-gray-950 transition-colors hover:bg-brand-300 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {check.isPending ? 'Checking…' : 'Check for updates'}
+              {busy ? 'Updating…' : 'Update now'}
             </button>
-            {info.available && info.canInstall && (
-              <button
-                type="button"
-                onClick={() => install.mutate()}
-                disabled={busy}
-                className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {busy ? 'Updating…' : 'Update now'}
-              </button>
-            )}
-            {info.available && !info.canInstall && (
-              <a href={info.url} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-brand-600 hover:bg-gray-800">
-                Download
-              </a>
-            )}
-          </div>
+          ) : info.available && !info.canInstall ? (
+            <a href={info.url} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center ${button} text-brand-400`}>
+              Download
+            </a>
+          ) : (
+            <button type="button" disabled className="min-h-11 rounded-full border border-[color:var(--hms-rule)] bg-transparent px-[18px] text-sm font-medium text-[color:var(--hms-mute)] opacity-60">
+              Update now
+            </button>
+          )}
         </div>
+      </section>
 
-        <div className="flex items-center justify-between gap-4 border-t border-gray-800 pt-3">
-          <p>Look for new releases now and then. Only the latest version number is read from GitHub.</p>
-          <Toggle on={info.checking} onChange={(enabled) => checkSetting.mutate({ data: { enabled } })} label="Check for updates" />
+      <section aria-label="Look for new releases" className={row}>
+        <div>
+          <h2 className="text-base font-semibold">Look for new releases</h2>
+          <p className="text-[13px] text-[color:var(--hms-mute)]">Only the latest version number is read from GitHub.</p>
         </div>
-        <div className="flex items-center justify-between gap-4">
-          <p>
-            Install updates automatically: new versions are downloaded in the background and installed when HoldMySession next
-            closes. <span className="text-gray-500">Desktop app only.</span>
+        <Toggle on={info.checking} onChange={(enabled) => checkSetting.mutate({ data: { enabled } })} label="Check for updates" />
+      </section>
+      <section aria-label="Install updates automatically" className={row}>
+        <div>
+          <h2 className="text-base font-semibold">Install updates automatically</h2>
+          <p className="text-[13px] text-[color:var(--hms-mute)]">
+            New versions download in the background and install when HoldMySession next closes. Desktop app only.
           </p>
-          <Toggle
-            on={info.autoUpdate && info.checking && !!info.update}
-            onChange={(enabled) => autoSetting.mutate({ data: { enabled } })}
-            label="Install updates automatically"
-            disabled={!info.checking || !info.canInstall && !info.update}
-          />
         </div>
-        <p>
-          <a href="https://github.com/holdmysocks/HoldMySession/releases" target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline">
-            All releases
-          </a>
-        </p>
-      </div>
+        <Toggle
+          on={info.autoUpdate && info.checking && !!info.update}
+          onChange={(enabled) => autoSetting.mutate({ data: { enabled } })}
+          label="Install updates automatically"
+          disabled={!info.checking || (!info.canInstall && !info.update)}
+        />
+      </section>
+      <p className="mt-4">
+        <a href="https://github.com/holdmysocks/HoldMySession/releases" target="_blank" rel="noopener noreferrer" className="text-sm text-brand-400 hover:underline">
+          All releases
+        </a>
+      </p>
     </div>
   )
 }

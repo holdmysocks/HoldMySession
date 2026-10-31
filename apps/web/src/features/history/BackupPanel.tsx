@@ -68,30 +68,15 @@ export function BackupPanel() {
   }
 
   return (
-    <div className="mt-6">
-      <h2 className="text-sm font-semibold text-gray-300">Backup and restore</h2>
-      <p className="mt-1 text-[10px] text-gray-500">
-        Save a copy of the history database, or restore one, for example to carry your history to a new machine. The
-        newest 10 backups are kept. A restore keeps this machine's identity from the backup, so a copied database carries on
-        as the same machine.
-      </p>
-      <div className="mt-3 space-y-3 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-xs text-gray-400">
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => backUp.mutate()}
-            disabled={backUp.isPending}
-            className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-xs text-gray-300 hover:text-gray-100 disabled:opacity-50"
-          >
-            {backUp.isPending ? 'Saving…' : 'Back up now'}
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInput.current?.click()}
-            disabled={restore.isPending}
-            className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-xs text-gray-300 hover:text-gray-100 disabled:opacity-50"
-          >
+    <section aria-label="Backups" className="mt-2">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <h2 className="font-display text-[22px] font-semibold">Backups</h2>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => fileInput.current?.click()} disabled={restore.isPending} className="min-h-11 rounded-full border border-[color:var(--hms-line)] bg-transparent px-[18px] text-sm font-medium text-gray-100 hover:border-gray-500 disabled:cursor-not-allowed disabled:opacity-50">
             {restore.isPending ? 'Restoring…' : 'Restore from file…'}
+          </button>
+          <button type="button" onClick={() => backUp.mutate()} disabled={backUp.isPending} className="min-h-11 rounded-full bg-brand-400 px-5 text-sm font-semibold text-gray-950 hover:bg-brand-300 disabled:cursor-not-allowed disabled:opacity-50">
+            {backUp.isPending ? 'Saving…' : 'Back up now'}
           </button>
           <input
             ref={fileInput}
@@ -101,41 +86,39 @@ export function BackupPanel() {
             aria-label="Backup file to restore"
             onChange={(e) => choose(e.target.files?.[0])}
           />
-          {message && (
-            <span role={message.ok ? 'status' : 'alert'} className={message.ok ? 'text-emerald-500' : 'text-red-400'}>
-              {message.text}
-            </span>
-          )}
         </div>
-        {backups.length === 0 ? (
-          <p>No backups yet.</p>
-        ) : (
-          <ul className="space-y-1">
-            {backups.map((b) => (
-              <li key={b.name} className="flex flex-wrap items-center gap-x-3 border-t border-gray-800 pt-1">
-                <span className="w-44 text-gray-300">{format(new Date(b.createdAt), clockPattern('MMM d, yyyy HH:mm'))}</span>
-                <span className="font-mono text-gray-500">{size(b.sizeBytes)}</span>
-                <span className="truncate font-mono text-gray-600" title={b.name}>{b.name}</span>
-                <a
-                  href={`/api/history-backup?name=${encodeURIComponent(b.name)}`}
-                  download={b.name}
-                  className="ml-auto text-brand-600 hover:underline"
-                >
+      </div>
+      <p className="mt-1 text-[13px] text-[color:var(--hms-mute)]">
+        The newest 10 backups are kept. A restore keeps this machine's identity from the backup, so a copied database carries on as the same machine.
+      </p>
+      {message && (
+        <p role={message.ok ? 'status' : 'alert'} className={`mt-2 text-sm ${message.ok ? 'text-[color:var(--hms-chip-ink)]' : 'text-red-400'}`}>
+          {message.text}
+        </p>
+      )}
+      {backups.length === 0 ? (
+        <p className="border-b border-[color:var(--hms-rule)] py-4 text-sm text-[color:var(--hms-mute)]">No backups yet.</p>
+      ) : (
+        backups.map((b) => {
+          const when = format(new Date(b.createdAt), clockPattern('MMM d, HH:mm'))
+          return (
+            <div key={b.name} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-[color:var(--hms-rule)] py-[18px]">
+              <div className="min-w-0">
+                <div className="truncate font-semibold" title={b.name}>{b.name}</div>
+                <div className="text-[13px] text-[color:var(--hms-mute)]">{when} · {size(b.sizeBytes)}</div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <a href={`/api/history-backup?name=${encodeURIComponent(b.name)}`} download={b.name} className="inline-flex min-h-11 rounded-full border border-[color:var(--hms-line)] bg-transparent px-[18px] text-sm font-medium text-gray-100 hover:border-gray-500 items-center">
                   Download
                 </a>
-                <button
-                  type="button"
-                  onClick={() => confirmDelete(b.name, format(new Date(b.createdAt), clockPattern('MMM d, yyyy HH:mm')))}
-                  disabled={remove.isPending}
-                  className="text-red-400 hover:text-red-300 disabled:opacity-50"
-                >
+                <button type="button" onClick={() => confirmDelete(b.name, format(new Date(b.createdAt), clockPattern('MMM d, yyyy HH:mm')))} disabled={remove.isPending} className="min-h-11 rounded-full border border-[#E5645455] bg-transparent px-[18px] text-sm font-medium text-[#E56454] hover:border-[#E56454] disabled:opacity-50">
                   Delete
                 </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
+              </div>
+            </div>
+          )
+        })
+      )}
+    </section>
   )
 }

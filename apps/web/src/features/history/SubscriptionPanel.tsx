@@ -8,7 +8,7 @@ import { subscriptionQuery, useSubscriptionMutations } from './subscription.quer
 import { LinkedNote, useIsLinkedNode } from '@/features/link/LinkedNote'
 
 const tierName = (id: string) => SUBSCRIPTION_TIERS.find((t) => t.id === id)?.displayName ?? id
-const input = 'rounded border border-gray-800 bg-gray-950 px-2 py-1 text-xs text-gray-100'
+const input = 'min-h-10 rounded-full border border-[color:var(--hms-line)] bg-transparent px-4 text-sm text-gray-100 outline-none focus:border-brand-400'
 
 export function SubscriptionPanel() {
   const { data } = useQuery(subscriptionQuery)
@@ -39,113 +39,149 @@ export function SubscriptionPanel() {
   const summary = data?.summary
   const line = summary ? savingsText(summary, formatUSD) : null
 
+  const [adding, setAdding] = useState(false)
+  const sorted = [...(data?.periods ?? [])].sort((x, y) => y.startDay.localeCompare(x.startDay) || y.id - x.id)
+  const current = sorted[0]
+  const day = (iso: string) => format(parseISO(iso), 'MMM d')
+
   return (
-    <div className="mt-6">
-      <h2 className="text-sm font-semibold text-gray-300">Subscription</h2>
-      <p className="mt-1 text-[10px] text-gray-500">
-        Add each plan you have paid for with the day it started, and the price per month. A plan lasts until the next one
-        starts. The dashboard compares what the plan cost with what the same usage would have cost at API prices. A part
-        month is paid for in part. Choose API Only for pay-as-you-go, which saves nothing by definition.
-      </p>
+    <div>
       <LinkedNote what="plan and its price" />
-      <div className="mt-3 space-y-4 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-xs text-gray-400">
-        {data && data.periods.length > 0 && (
-          <ul className="space-y-1">
-            {data.periods.map((p) => (
-              <li key={p.id} className="flex flex-wrap items-center gap-x-3">
-                <span className="w-44 text-gray-300">From {p.startDay}</span>
-                <span className="text-gray-200">{tierName(p.tier)}</span>
-                <span className="font-mono">{formatUSD(p.monthlyUSD)}/mo</span>
-                {p.note && <span className="italic text-gray-500">{p.note}</span>}
-                {!readOnly && (
-                  <button
-                    type="button"
-                    onClick={() => remove.mutate({ data: { id: p.id } })}
-                    className="ml-auto text-red-400 hover:text-red-300"
-                  >
-                    Delete
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        {data && data.periods.length === 0 && <p>No plan added yet.</p>}
+      <section aria-label="Your plan" className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-[color:var(--hms-rule)] py-[18px]">
+        <div>
+          <h2 className="text-base font-semibold">Your plan</h2>
+          <p className="text-[13px] text-[color:var(--hms-mute)]">
+            Set on the master. Used for "You spent" on Stats. A plan lasts until the next one starts, and a part month is paid for in part.
+          </p>
+        </div>
+        <div role="radiogroup" aria-label="Plan" className="flex flex-wrap rounded-[24px] border border-[color:var(--hms-line)] p-1">
+          {SUBSCRIPTION_TIERS.map((t) => {
+            const on = current?.tier === t.id
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                disabled={readOnly || add.isPending}
+                onClick={() => {
+                  if (on) return
+                  setTier(t.id)
+                  setPrice(String(t.monthlyUSD))
+                  setAdding(true)
+                }}
+                className={`min-h-10 rounded-full border-[1.5px] px-[18px] text-[13.33px] font-medium ${
+                  on ? 'border-brand-400 text-brand-400' : 'border-transparent text-[color:var(--hms-mute)] hover:text-gray-100'
+                }`}
+              >
+                {t.displayName}
+              </button>
+            )
+          })}
+        </div>
+      </section>
 
-        {summary && line && (
-          <div>
-            <p className="font-medium text-gray-200">{line}</p>
-            <p className="text-[10px] text-gray-500">
-              Since {summary.firstDay}: usage priced at the API rates of each day came to ~{formatUSD(summary.apiUSD)}.
-            </p>
-            <table className="mt-2 w-full text-left">
-              <thead>
-                <tr className="text-gray-500">
-                  <th className="py-1 font-normal">Month</th>
-                  <th className="py-1 text-right font-normal">At API prices</th>
-                  <th className="py-1 text-right font-normal">Paid</th>
-                  <th className="py-1 text-right font-normal">Difference</th>
-                </tr>
-              </thead>
-              <tbody>
-                {summary.months.map((m) => {
-                  const diff = m.apiUSD - m.paidUSD
-                  return (
-                    <tr key={m.month} className="border-t border-gray-800">
-                      <td className="py-1 text-gray-300">{format(parseISO(`${m.month}-01`), 'MMM yyyy')}</td>
-                      <td className="py-1 text-right font-mono">{formatUSD(m.apiUSD)}</td>
-                      <td className="py-1 text-right font-mono">{formatUSD(m.paidUSD)}</td>
-                      <td className={`py-1 text-right font-mono ${diff >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                        {diff >= 0 ? '+' : '-'}{formatUSD(Math.abs(diff))}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+      <section aria-label="Plan history">
+        <h2 className="mt-6 font-display text-[22px] font-semibold">Plan history</h2>
+        {sorted.length === 0 && <p className="border-b border-[color:var(--hms-rule)] py-4 text-sm text-[color:var(--hms-mute)]">No plan added yet.</p>}
+        {sorted.map((p, i) => (
+          <div key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[color:var(--hms-rule)] py-4">
+            <div className="min-w-0 flex-1">
+              <b className="font-semibold">{tierName(p.tier)}</b>
+              <span className="ml-3 text-[13px] text-[color:var(--hms-mute)]">
+                {i === sorted.length - 1 && sorted.length > 1 ? `until ${day(sorted[i - 1].startDay)}` : i === 0 ? `from ${day(p.startDay)} until now` : `${day(p.startDay)} to ${day(sorted[i - 1].startDay)}`}
+              </span>
+              {p.note && <span className="ml-3 text-[13px] italic text-[color:var(--hms-mute)]">{p.note}</span>}
+            </div>
+            <span className="text-[color:var(--hms-mute)]">{p.monthlyUSD > 0 ? `${formatUSD(p.monthlyUSD)} / month` : '$0'}</span>
+            {!readOnly && (
+              <button type="button" onClick={() => remove.mutate({ data: { id: p.id } })} className="text-sm text-[#E56454] hover:underline">
+                Delete
+              </button>
+            )}
           </div>
+        ))}
+        {!readOnly && !adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="mt-4 min-h-11 rounded-full border border-[color:var(--hms-line)] bg-transparent px-[18px] text-sm font-medium text-gray-100 hover:border-gray-500"
+          >
+            Add a plan change
+          </button>
         )}
+        {!readOnly && adding && (
+          <form
+            className="mt-4 space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+              submit()
+            }}
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-[13px] text-[color:var(--hms-mute)]">
+                Plan
+                <select value={tier} onChange={(e) => chooseTier(e.target.value)} className={input}>
+                  {SUBSCRIPTION_TIERS.map((t) => <option key={t.id} value={t.id}>{t.displayName}</option>)}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-[13px] text-[color:var(--hms-mute)]">
+                Per month, USD
+                <input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} className={`${input} w-24 font-mono`} />
+              </label>
+              <label className="flex items-center gap-2 text-[13px] text-[color:var(--hms-mute)]">
+                Starts
+                <input type="date" value={startDay} onChange={(e) => setStartDay(e.target.value)} className={input} />
+              </label>
+            </div>
+            <label className="flex items-center gap-2 text-[13px] text-[color:var(--hms-mute)]">
+              Note
+              <input value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} placeholder="optional" className={`${input} flex-1`} />
+            </label>
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="submit" disabled={add.isPending} className="min-h-11 rounded-full bg-brand-400 px-5 text-sm font-semibold text-gray-950 hover:bg-brand-300 disabled:opacity-50">
+                Add plan
+              </button>
+              <button type="button" onClick={() => setAdding(false)} className="text-sm text-[color:var(--hms-mute)] hover:underline">Cancel</button>
+              {error && <span role="alert" className="text-red-400">{error}</span>}
+            </div>
+          </form>
+        )}
+      </section>
 
-        {!readOnly && <form
-          className="space-y-3 border-t border-gray-800 pt-3"
-          onSubmit={(e) => {
-            e.preventDefault()
-            submit()
-          }}
-        >
-          <p className="font-medium text-gray-300">Add a plan</p>
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-1.5">
-              Plan
-              <select value={tier} onChange={(e) => chooseTier(e.target.value)} className={input}>
-                {SUBSCRIPTION_TIERS.map((t) => <option key={t.id} value={t.id}>{t.displayName}</option>)}
-              </select>
-            </label>
-            <label className="flex items-center gap-1.5">
-              Per month, USD
-              <input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} className={`${input} w-20 font-mono`} />
-            </label>
-            <label className="flex items-center gap-1.5">
-              Starts
-              <input type="date" value={startDay} onChange={(e) => setStartDay(e.target.value)} className={input} />
-            </label>
-          </div>
-          <label className="flex items-center gap-1.5">
-            Note
-            <input value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} placeholder="optional" className={`${input} flex-1`} />
-          </label>
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={add.isPending}
-              className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-xs text-gray-300 hover:text-gray-100 disabled:opacity-50"
-            >
-              Add plan
-            </button>
-            {error && <span role="alert" className="text-red-400">{error}</span>}
-          </div>
-        </form>}
-      </div>
+      {summary && line && (
+        <section aria-label="What the plan saved" className="mt-8">
+          <h2 className="font-display text-[22px] font-semibold">{line}</h2>
+          <p className="mt-1 text-[13px] text-[color:var(--hms-mute)]">
+            Since {summary.firstDay}: usage priced at the API rates of each day came to ~{formatUSD(summary.apiUSD)}.
+          </p>
+          <table className="mt-2 w-full text-left text-sm">
+            <thead>
+              <tr className="text-xs text-[color:var(--hms-mute)]">
+                <th className="py-2 font-normal">Month</th>
+                <th className="py-2 text-right font-normal">At API prices</th>
+                <th className="py-2 text-right font-normal">Paid</th>
+                <th className="py-2 text-right font-normal">Difference</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.months.map((m) => {
+                const diff = m.apiUSD - m.paidUSD
+                return (
+                  <tr key={m.month} className="border-t border-[color:var(--hms-rule)]">
+                    <td className="py-3">{format(parseISO(`${m.month}-01`), 'MMM yyyy')}</td>
+                    <td className="py-3 text-right tabular-nums">{formatUSD(m.apiUSD)}</td>
+                    <td className="py-3 text-right tabular-nums">{formatUSD(m.paidUSD)}</td>
+                    <td className="py-3 text-right tabular-nums" style={{ color: diff >= 0 ? 'var(--hms-chip-ink)' : '#E56454' }}>
+                      {diff >= 0 ? '+' : '-'}{formatUSD(Math.abs(diff))}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </section>
+      )}
     </div>
   )
 }

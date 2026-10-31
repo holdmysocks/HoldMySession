@@ -33,139 +33,119 @@ export function HistoryPanel() {
 
   const scan = status?.lastScan
   const scanning = !!status?.scanning || rescan.isPending
+  const days =
+    status && !status.error && status.firstDay && status.lastDay
+      ? Math.max(1, Math.round((Date.parse(status.lastDay) - Date.parse(status.firstDay)) / 86_400_000) + 1)
+      : 0
+  const lastScanText = scanning
+    ? 'scanning now'
+    : scan
+      ? `last scan ${format(new Date(scan.startedAt), clockPattern('MMM d, HH:mm'))}: ${scan.status}, ${scan.sessionsSeen} sessions seen, ${scan.sessionsAdded} new`
+      : 'never scanned'
+
   return (
-    <div className="mt-6">
-      <h2 className="text-sm font-semibold text-gray-300">History database</h2>
-      <p className="mt-1 text-[10px] text-gray-500">
-        A copy of your usage kept by the dashboard, so it survives the Claude folder being cleared. Copy the file to
-        move your history to another machine.
-      </p>
-      <div className="mt-3 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-xs text-gray-400">
-        {!status ? (
-          <p>Loading…</p>
-        ) : status.error ? (
-          <p role="alert" className="text-red-400">Could not open the history database: {status.error}</p>
-        ) : (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-            <dt className="text-gray-500">File</dt>
-            <dd className="truncate font-mono text-gray-300" title={status.path}>{status.path}</dd>
-            <dt className="text-gray-500">Sessions</dt>
-            <dd className="text-gray-300">
-              {status.sessions}
+    <div className="flex flex-col">
+      <section aria-label="History database" className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-[color:var(--hms-rule)] py-[18px]">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold">History database</h2>
+          {!status ? (
+            <p className="text-[13px] text-[color:var(--hms-mute)]">Loading…</p>
+          ) : status.error ? (
+            <p role="alert" className="text-[13px] text-red-400">Could not open the history database: {status.error}</p>
+          ) : (
+            <p className="text-[13px] text-[color:var(--hms-mute)]">
+              <span className="font-mono" title={status.path}>{status.path}</span> · {status.sessions} sessions
               {status.sessionsNotOnDisk > 0 && ` (${status.sessionsNotOnDisk} no longer on disk)`}
-            </dd>
-            <dt className="text-gray-500">Days covered</dt>
-            <dd className="text-gray-300">
-              {status.firstDay && status.lastDay ? `${status.firstDay} to ${status.lastDay}` : 'None yet'}
-            </dd>
-            <dt className="text-gray-500">Last scan</dt>
-            <dd className="text-gray-300">
-              {scanning && (
-                <span className="mr-2 inline-flex items-center gap-1.5 text-brand-600">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-brand-500" aria-hidden="true" />
-                  Scanning…
-                </span>
-              )}
-              {scan
-                ? `${format(new Date(scan.startedAt), clockPattern('MMM d, HH:mm'))}: ${scan.status}, ${scan.sessionsSeen} sessions seen, ${scan.sessionsAdded} new`
-                : scanning ? '' : 'Never'}
+              {days > 0 && ` · ${days} days`} · {lastScanText}
               {scan?.message && <span className="block text-amber-400">{scan.message}</span>}
-            </dd>
-          </dl>
-        )}
-        {autoScan && (
-          <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-gray-800 pt-3">
-            <span className="text-gray-300">Scan automatically</span>
+            </p>
+          )}
+          {rescan.data && !rescan.data.ok && <p role="alert" className="text-[13px] text-red-400">Scan failed: {rescan.data.message}</p>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => rescan.mutate()} disabled={scanning} className="min-h-11 rounded-full border border-[color:var(--hms-line)] bg-transparent px-[18px] text-sm font-medium text-gray-100 hover:border-gray-500 disabled:cursor-not-allowed disabled:opacity-50">
+            {scanning ? 'Scanning…' : 'Rescan now'}
+          </button>
+          <button type="button" onClick={() => check.mutate()} disabled={check.isPending} className="min-h-11 rounded-full border border-[color:var(--hms-line)] bg-transparent px-[18px] text-sm font-medium text-gray-100 hover:border-gray-500 disabled:cursor-not-allowed disabled:opacity-50">
+            {check.isPending ? 'Checking…' : 'Check against session files'}
+          </button>
+        </div>
+      </section>
+
+      {check.data === null && <p className="mt-3 text-amber-400">Nothing to compare yet.</p>}
+      {check.data && check.data.changedWhileChecking > 0 && (
+        <p className="mt-3 text-amber-400">
+          {check.data.changedWhileChecking} session{check.data.changedWhileChecking === 1 ? ' was' : 's were'} still being written while this ran, so small differences are expected. Run it again when nothing is active for an exact match.
+        </p>
+      )}
+      {check.data && (
+        <table className="mt-3 w-full text-left text-sm">
+          <thead>
+            <tr className="text-[color:var(--hms-mute)]">
+              <th className="py-1 font-normal">Total</th>
+              <th className="py-1 text-right font-normal">Session files</th>
+              <th className="py-1 text-right font-normal">History database</th>
+              <th className="py-1 pl-3 font-normal"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {check.data.rows.map((row) => (
+              <tr key={row.label} className="border-t border-[color:var(--hms-rule)]">
+                <td className="py-2">{row.label}</td>
+                <td className="py-2 text-right font-mono">{row.live.toLocaleString()}</td>
+                <td className="py-2 text-right font-mono">{row.history.toLocaleString()}</td>
+                <td className={`py-2 pl-3 ${row.same ? 'text-[color:var(--hms-chip-ink)]' : 'text-red-400'}`}>
+                  {row.same ? 'same' : `differs by ${(row.history - row.live).toLocaleString()}`}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {autoScan && (
+        <section aria-label="Scan interval" className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-[color:var(--hms-rule)] py-[18px]">
+          <div>
+            <h2 className="text-base font-semibold">Scan automatically</h2>
+            <p className="text-[13px] text-[color:var(--hms-mute)]">
+              Keeps Stats up to date between your visits.{' '}
+              {scanning
+                ? 'Scanning now.'
+                : !autoScan.enabled
+                  ? 'Off. Use Rescan now to refresh.'
+                  : scan?.finishedAt
+                    ? `Next around ${format(new Date(new Date(scan.finishedAt).getTime() + autoScan.intervalMinutes * 60_000), clockPattern('HH:mm'))}.`
+                    : 'Runs when the server starts.'}
+            </p>
+          </div>
+          <div className="flex items-center gap-3.5">
+            <label className="relative flex items-center">
+              <span className="sr-only">Scan interval</span>
+              <select
+                value={autoScan.intervalMinutes}
+                disabled={!autoScan.enabled}
+                onChange={(e) => saveAutoScan.mutate({ data: { ...autoScan, intervalMinutes: Number(e.target.value) } })}
+                className="min-h-11 appearance-none rounded-full border border-[color:var(--hms-line)] bg-transparent pl-[18px] pr-9 text-sm font-medium text-gray-100 disabled:opacity-50"
+              >
+                {AUTO_SCAN_INTERVALS.map((m) => <option key={m} value={m}>Every {intervalLabel(m)}</option>)}
+              </select>
+              <span aria-hidden="true" className="pointer-events-none absolute right-4 text-[11px]">▾</span>
+            </label>
             <button
               type="button"
               role="switch"
               aria-checked={autoScan.enabled}
               aria-label="Scan automatically"
               onClick={() => saveAutoScan.mutate({ data: { ...autoScan, enabled: !autoScan.enabled } })}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
-                autoScan.enabled ? 'bg-brand-600' : 'bg-gray-800'
+              className={`relative inline-flex h-[30px] w-[52px] shrink-0 cursor-pointer items-center rounded-full border-[1.5px] transition-colors ${
+                autoScan.enabled ? 'border-brand-400 bg-brand-400/20' : 'border-[color:var(--hms-line)]'
               }`}
             >
-              <span
-                className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                  autoScan.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                }`}
-              />
+              <span className={`inline-block h-[21px] w-[21px] rounded-full transition-transform ${autoScan.enabled ? 'translate-x-[26px] bg-brand-400' : 'translate-x-[3px] bg-gray-400'}`} />
             </button>
-            <label className="flex items-center gap-1.5">
-              every
-              <select
-                value={autoScan.intervalMinutes}
-                disabled={!autoScan.enabled}
-                onChange={(e) => saveAutoScan.mutate({ data: { ...autoScan, intervalMinutes: Number(e.target.value) } })}
-                className="rounded border border-gray-800 bg-gray-950 px-2 py-1 text-xs text-gray-100 disabled:opacity-50"
-              >
-                {AUTO_SCAN_INTERVALS.map((m) => <option key={m} value={m}>{intervalLabel(m)}</option>)}
-              </select>
-            </label>
-            <span className="text-gray-500">
-              {scanning
-                ? 'Scanning now'
-                : !autoScan.enabled
-                ? 'Off. Use Rescan now to refresh.'
-                : scan?.finishedAt
-                  ? `Next around ${format(new Date(new Date(scan.finishedAt).getTime() + autoScan.intervalMinutes * 60_000), clockPattern('HH:mm'))}`
-                  : 'Runs when the server starts'}
-            </span>
           </div>
-        )}
-        <div className="mt-3 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => rescan.mutate()}
-            disabled={scanning}
-            className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-xs text-gray-300 hover:text-gray-100 disabled:opacity-50"
-          >
-            {scanning ? 'Scanning…' : 'Rescan now'}
-          </button>
-          <button
-            type="button"
-            onClick={() => check.mutate()}
-            disabled={check.isPending}
-            className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-1.5 text-xs text-gray-300 hover:text-gray-100 disabled:opacity-50"
-          >
-            {check.isPending ? 'Checking…' : 'Check against session files'}
-          </button>
-          {rescan.data && !rescan.data.ok && (
-            <span role="alert" className="text-red-400">Scan failed: {rescan.data.message}</span>
-          )}
-        </div>
-        {check.data === null && <p className="mt-3 text-amber-400">Nothing to compare yet.</p>}
-        {check.data && check.data.changedWhileChecking > 0 && (
-          <p className="mt-3 text-amber-400">
-            {check.data.changedWhileChecking} session{check.data.changedWhileChecking === 1 ? ' was' : 's were'} still being written while this ran, so small differences are expected. Run it again when nothing is active for an exact match.
-          </p>
-        )}
-        {check.data && (
-          <table className="mt-3 w-full text-left">
-            <thead>
-              <tr className="text-gray-500">
-                <th className="py-1 font-normal">Total</th>
-                <th className="py-1 text-right font-normal">Session files</th>
-                <th className="py-1 text-right font-normal">History database</th>
-                <th className="py-1 pl-3 font-normal"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {check.data.rows.map((row) => (
-                <tr key={row.label} className="border-t border-gray-800">
-                  <td className="py-1 text-gray-300">{row.label}</td>
-                  <td className="py-1 text-right font-mono">{row.live.toLocaleString()}</td>
-                  <td className="py-1 text-right font-mono">{row.history.toLocaleString()}</td>
-                  <td className={`py-1 pl-3 ${row.same ? 'text-emerald-500' : 'text-red-400'}`}>
-                    {row.same ? 'same' : `differs by ${(row.history - row.live).toLocaleString()}`}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+        </section>
+      )}
     </div>
   )
 }

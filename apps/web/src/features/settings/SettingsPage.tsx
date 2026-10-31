@@ -72,66 +72,27 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
       label: 'General',
       content: (
         <>
-      {/* Privacy Mode */}
-      <div className="mt-6">
-        <h2 className="text-sm font-semibold text-gray-300">Privacy Mode</h2>
-        <p className="mt-1 text-[10px] text-gray-500">
-          Hide project names, file paths, and branch names across the dashboard.
-          Useful when screen-sharing or recording demos.
-        </p>
-        <div className="mt-3 rounded-2xl border border-gray-800 bg-gray-900 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-300">Enable privacy mode</span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">
-                {privacyMode ? 'On' : 'Off'}
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={privacyMode}
-                onClick={togglePrivacyMode}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
-                  privacyMode ? 'bg-brand-600' : 'bg-gray-800'
-                }`}
-              >
-                <span
-                  className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                    privacyMode ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-          <div className="mt-3 border-t border-gray-800 pt-3">
-            <p className="text-[10px] font-medium text-gray-400">
-              What gets hidden:
-            </p>
-            <ul className="mt-1.5 space-y-1 text-[10px] text-gray-500">
-              <li>
-                <span className="text-gray-400">Project names</span>{' '}
-                <span className="font-mono text-gray-600">
-                  &rarr; project-1, project-2, ...
-                </span>
-              </li>
-              <li>
-                <span className="text-gray-400">File paths</span>{' '}
-                <span className="font-mono text-gray-600">
-                  &rarr; .../project-1
-                </span>
-              </li>
-              <li>
-                <span className="text-gray-400">Branch names</span>{' '}
-                <span className="font-mono text-gray-600">
-                  &rarr; branch-1, branch-2, ...
-                </span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
           <ClockFormatSetting />
+          <section aria-label="Privacy mode" className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-[color:var(--hms-rule)] py-[18px]">
+            <div>
+              <h2 className="text-base font-semibold">Privacy mode</h2>
+              <p className="text-[13px] text-[color:var(--hms-mute)]">
+                Hide project names, paths and branches. Useful when sharing your screen.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={privacyMode}
+              aria-label="Privacy mode"
+              onClick={togglePrivacyMode}
+              className={`relative inline-flex h-[30px] w-[52px] shrink-0 cursor-pointer items-center rounded-full border-[1.5px] transition-colors ${
+                privacyMode ? 'border-brand-400 bg-brand-400/20' : 'border-[color:var(--hms-line)]'
+              }`}
+            >
+              <span className={`inline-block h-[21px] w-[21px] rounded-full transition-transform ${privacyMode ? 'translate-x-[26px] bg-brand-400' : 'translate-x-[3px] bg-gray-400'}`} />
+            </button>
+          </section>
           <DesktopPanel />
           <ThemePicker />
         </>
@@ -158,15 +119,14 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
           <SubscriptionPanel />
       {/* Pricing Table */}
       <div className="mt-6">
-        <h2 className="text-sm font-semibold text-gray-300">
-          API Pricing (per million tokens)
+        <h2 className="font-display text-[22px] font-semibold">
+          API pricing
         </h2>
-        <p className="mt-1 text-[10px] text-gray-500">
-          Default prices from Anthropic. Override any value to match your negotiated
-          rates.
+        <p className="mt-1 text-[15px] text-[color:var(--hms-mute)]">
+          Dollars per million tokens. Change any value to match your own rates.
         </p>
         <LinkedNote what="price overrides" />
-        <div className="mt-3 rounded-2xl border border-gray-800 bg-gray-900 p-4">
+        <div className="mt-3 border-b border-[color:var(--hms-rule)] py-4">
           <PricingTableEditor
             overrides={overrides}
             onChange={handleOverridesChange}
@@ -180,7 +140,7 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
         <button
           type="button"
           onClick={handleReset}
-          className="rounded-full border border-gray-700 px-3 py-1.5 text-xs text-gray-400 transition-colors hover:border-gray-600 hover:text-gray-300"
+          className="min-h-11 rounded-full border border-[color:var(--hms-line)] px-[18px] text-sm font-medium text-gray-100 hover:border-gray-500"
         >
           Reset to Defaults
         </button>
@@ -198,9 +158,9 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
             type="button"
             onClick={handleSave}
             disabled={!isDirty || mutation.isPending}
-            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+            className={`min-h-11 rounded-full px-5 text-sm font-semibold transition-colors ${
               isDirty && !mutation.isPending
-                ? 'bg-brand-600 text-gray-100 hover:bg-brand-500'
+                ? 'bg-brand-400 text-gray-950 hover:bg-brand-300'
                 : 'cursor-not-allowed bg-gray-800 text-gray-500'
             }`}
           >
@@ -217,8 +177,8 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-extrabold text-gray-100">Settings</h1>
-      <div role="tablist" aria-label="Settings sections" className="mt-4 flex flex-wrap gap-2">
+      <h1 className="m-0 font-display text-[52px] font-bold leading-[1.05]">Settings</h1>
+      <div role="tablist" aria-label="Settings sections" className="mt-7 flex flex-wrap gap-1.5">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -228,15 +188,15 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
             aria-selected={active.id === t.id}
             aria-controls="settings-panel"
             onClick={() => onTab(t.id)}
-            className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
-              active.id === t.id ? 'border-brand-400 text-brand-400' : 'border-gray-700 text-gray-400 hover:text-gray-200'
+            className={`min-h-11 rounded-full border-[1.5px] px-[18px] text-[13.33px] font-medium transition-colors ${
+              active.id === t.id ? 'border-brand-400 text-brand-400' : 'border-[color:var(--hms-line)] text-[color:var(--hms-mute)] hover:text-gray-100'
             }`}
           >
             {t.label}
           </button>
         ))}
       </div>
-      <div role="tabpanel" id="settings-panel" aria-labelledby={`settings-tab-${active.id}`}>
+      <div className="mt-7" role="tabpanel" id="settings-panel" aria-labelledby={`settings-tab-${active.id}`}>
         {active.content}
       </div>
     </div>
