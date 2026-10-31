@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { paginatedSessionListQuery, activeSessionsQuery } from './sessions.queries'
-import { SessionCard } from './SessionCard'
+import { SessionCard, SESSION_COLUMNS } from './SessionCard'
 import { SessionFilters } from './SessionFilters'
 import { PaginationControls } from './PaginationControls'
 import { usePageSizePreference } from './usePageSizePreference'
@@ -76,7 +76,7 @@ export function SessionList() {
         {Array.from({ length: pageSize }).map((_, i) => (
           <div
             key={i}
-            className="h-28 animate-pulse rounded-2xl border border-gray-800 bg-gray-900"
+            className="h-20 animate-pulse rounded-2xl bg-gray-900"
           />
         ))}
       </div>
@@ -86,22 +86,47 @@ export function SessionList() {
   const totalCount = paginatedData?.totalCount ?? 0
   const totalPages = paginatedData?.totalPages ?? 1
   const projects = paginatedData?.projects ?? []
-  // Same rule as the page: sessions with no project are not counted as active here either.
-  const activeCount = filterVisibleSessions(activeSessions).length
   const hiddenNoProjectCount = paginatedData?.hiddenNoProjectCount ?? 0
   const hiddenArchivedCount = paginatedData?.hiddenArchivedCount ?? 0
+  // The same rule as the page: sessions with no project are not counted as running here either.
+  const running = filterVisibleSessions(activeSessions).length
 
   return (
     <div>
-      <SessionFilters projects={projects} activeCount={activeCount} />
+      <h1 className="m-0 font-display text-[52px] font-bold leading-[1.05]">Sessions</h1>
+      <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-sm text-[color:var(--hms-mute)]">
+        <p className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span>
+            <b className="font-medium text-gray-100">{(paginatedData?.totalAll ?? totalCount).toLocaleString()}</b> in total
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: '#3DDC84' }} />
+            {paginatedData?.runningCount ?? running} running
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: '#FACC15' }} />
+            {paginatedData?.needsYouCount ?? 0} needs you
+          </span>
+        </p>
+        <p className="text-xs">
+          {hiddenNoProjectCount} hidden (no project) · {hiddenArchivedCount} archived hidden
+        </p>
+      </div>
 
-      <p className="mt-3 text-xs text-gray-500">
-        {hiddenNoProjectCount} hidden (no project)
-        <span className="mx-2 text-gray-700">|</span>
-        {hiddenArchivedCount} archived hidden
-      </p>
+      <div className="mt-8">
+        <SessionFilters projects={projects} />
+      </div>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-6">
+        <div className={`hidden border-b border-[color:var(--hms-rule)] px-3.5 py-3 text-xs text-[color:var(--hms-mute)] ${SESSION_COLUMNS}`}>
+          <span>Status</span>
+          <span>Session</span>
+          <span>Model</span>
+          <span className="text-right">Messages</span>
+          <span className="text-right">Tokens</span>
+          <span className="text-right">Duration</span>
+          <span className="text-right">Last active</span>
+        </div>
         {mergedSessions.length === 0 ? (
           <div className="py-12 text-center text-sm text-gray-500">
             {totalCount === 0 && !search && status === 'all' && !project
@@ -113,6 +138,7 @@ export function SessionList() {
             <SessionCard
               key={session.sessionId}
               session={session}
+              now={now}
               status={deriveSessionStatus(
                 {
                   isActive: session.isActive,
@@ -128,7 +154,7 @@ export function SessionList() {
         )}
       </div>
 
-      <div className="mt-4">
+      <div className="mt-6">
         <PaginationControls
           page={paginatedData?.page ?? page}
           totalPages={totalPages}

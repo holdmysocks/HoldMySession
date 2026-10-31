@@ -7,6 +7,7 @@ import { filterArchivedSessions, filterHiddenSessions, filterVisibleSessions } f
 import { dropdownKey, labelScratch, visibleInLists } from '@/lib/projects/project-prefs'
 import { UNLINKED_PROJECT_KEY, UNLINKED_PROJECT_NAME } from '@/lib/projects/unlinked'
 import type { ScratchMode } from '@/features/settings/settings.types'
+import { deriveSessionStatus } from '@/lib/status/session-status'
 import { latestNotificationBySession, readRecentEvents } from '@/lib/events/event-inbox'
 
 export const getSessionList = createServerFn({ method: 'GET' }).handler(
@@ -25,7 +26,7 @@ const paginatedSessionsInputSchema = z.object({
   page: z.number().int().min(1),
   pageSize: z.number().int().min(5).max(100),
   search: z.string(),
-  status: z.enum(['all', 'active', 'completed']),
+  status: z.enum(['all', 'active', 'completed', 'needs-you', 'done']),
   project: z.string(),
   sort: z.enum(['lastActive', 'started', 'duration', 'messages']).default('lastActive'),
   sortDir: z.enum(['asc', 'desc']).default('desc'),
@@ -159,6 +160,10 @@ export interface PaginatedSessionsResponse extends PaginatedSessionsResult<Sessi
   hiddenNoProjectCount: number
   /** Sessions left out because the desktop app archived them. Shown as "archived hidden". */
   hiddenArchivedCount: number
+  /** Every session the list could show, how many are running, and how many of those wait on the user. */
+  totalAll: number
+  runningCount: number
+  needsYouCount: number
 }
 
 export const getPaginatedSessions = createServerFn({ method: 'GET' })
@@ -182,10 +187,32 @@ export const getPaginatedSessions = createServerFn({ method: 'GET' })
     )
     const hiddenNoProjectCount = filterHiddenSessions(all).length + view.live.reduce((n, l) => n + l.hiddenNoProjectCount, 0)
     const hiddenArchivedCount = filterArchivedSessions(all).length + view.live.reduce((n, l) => n + l.hiddenArchivedCount, 0)
-    const page = await paginateAndFilterSessions(allSessions, data, prefs.scratch)
+    const notifications = latestNotificationBySession(await readRecentEvents())
+
+    // "Needs you" and "Done" depend on signals, so those are worked out before the list is cut into pages.
+    // Only a running session has an open question to look for, so the scan stays small.
+    let candidates = allSessions
+    let input = data
+    if (data.status === 'needs-you' || data.status === 'done') {
+      const want = data.status === 'needs-you' ? 'needs-you' : 'completed'
+      const now = Date.now()
+      const keep = await Promise.all(
+        allSessions.map(async (s) => {
+          const x = s as typeof s & { machineId?: string; lastNotificationAt?: string | null; hasOpenQuestion?: boolean }
+          const lastNotificationAt = x.machineId ? (x.lastNotificationAt ?? null) : (notifications.get(s.sessionId) ?? null)
+          const hasOpenQuestion = x.machineId ? (x.hasOpenQuestion ?? false) : s.isActive && (await findPendingQuestions(s.filePath)).length > 0
+          return deriveSessionStatus(
+            { isActive: s.isActive, lastActiveAt: s.lastActiveAt, lastStopReason: s.lastStopReason, lastNotificationAt, hasOpenQuestion },
+            now,
+          ) === want
+        }),
+      )
+      candidates = allSessions.filter((_, i) => keep[i])
+      input = { ...data, status: 'all' }
+    }
+    const page = await paginateAndFilterSessions(candidates, input, prefs.scratch)
 
     // Signals are computed for the page only. The file scan for open questions runs for active sessions.
-    const notifications = latestNotificationBySession(await readRecentEvents())
     const sessions = await Promise.all(
       page.sessions.map(async (item): Promise<SessionListItem> => {
         // Sessions of other machines carry the machine they came from, and have no file here.
@@ -212,5 +239,26 @@ export const getPaginatedSessions = createServerFn({ method: 'GET' })
       }),
     )
 
-    return { ...page, sessions, hiddenNoProjectCount, hiddenArchivedCount }
+    const running = allSessions.filter((s) => s.isActive)
+    const waiting = await Promise.all(
+      running.map(async (s) => {
+        const x = s as typeof s & { machineId?: string; lastNotificationAt?: string | null; hasOpenQuestion?: boolean }
+        const lastNotificationAt = x.machineId ? (x.lastNotificationAt ?? null) : (notifications.get(s.sessionId) ?? null)
+        const hasOpenQuestion = x.machineId ? (x.hasOpenQuestion ?? false) : (await findPendingQuestions(s.filePath)).length > 0
+        return deriveSessionStatus(
+          { isActive: true, lastActiveAt: s.lastActiveAt, lastStopReason: s.lastStopReason, lastNotificationAt, hasOpenQuestion },
+          Date.now(),
+        ) === 'needs-you'
+      }),
+    )
+
+    return {
+      ...page,
+      sessions,
+      hiddenNoProjectCount,
+      hiddenArchivedCount,
+      totalAll: allSessions.length,
+      runningCount: running.length,
+      needsYouCount: waiting.filter(Boolean).length,
+    }
   })

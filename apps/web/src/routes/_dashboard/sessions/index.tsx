@@ -4,9 +4,9 @@ import { SessionList } from '@/features/sessions/SessionList'
 
 const sessionsSearchSchema = z.object({
   page: z.number().int().min(1).default(1).catch(1),
-  pageSize: z.number().int().min(5).max(100).default(5).catch(5),
+  pageSize: z.number().int().min(5).max(100).default(10).catch(10),
   search: z.string().default('').catch(''),
-  status: z.enum(['all', 'active', 'completed']).default('all').catch('all'),
+  status: z.enum(['all', 'active', 'completed', 'needs-you', 'done']).default('all').catch('all'),
   project: z.string().default('').catch(''),
   sort: z
     .enum(['lastActive', 'started', 'duration', 'messages'])
@@ -23,15 +23,5 @@ export const Route = createFileRoute('/_dashboard/sessions/')({
 })
 
 function SessionsPage() {
-  return (
-    <div>
-      <h1 className="font-display text-3xl font-extrabold text-gray-100">Sessions</h1>
-      <p className="mt-1 text-sm text-gray-400">
-        All Claude Code sessions from ~/.claude
-      </p>
-      <div className="mt-6">
-        <SessionList />
-      </div>
-    </div>
-  )
+  return <SessionList />
 }

@@ -9,10 +9,9 @@ type SortOption = typeof SORT_OPTIONS[number]
 
 interface SessionFiltersProps {
   projects: ProjectFilterOption[]
-  activeCount: number
 }
 
-export function SessionFilters({ projects, activeCount }: SessionFiltersProps) {
+export function SessionFilters({ projects }: SessionFiltersProps) {
   const navigate = useNavigate()
   const { search: urlSearch, status, project, sort, sortDir } = Route.useSearch()
   const { privacyMode, anonymizeProjectName } = usePrivacy()
@@ -50,7 +49,7 @@ export function SessionFilters({ projects, activeCount }: SessionFiltersProps) {
     }, 300)
   }
 
-  function handleStatusChange(newStatus: 'all' | 'active' | 'completed') {
+  function handleStatusChange(newStatus: 'all' | 'active' | 'needs-you' | 'done') {
     navigate({
       to: '/sessions',
       search: (prev) => ({ ...prev, status: newStatus, page: 1 }),
@@ -87,68 +86,86 @@ export function SessionFilters({ projects, activeCount }: SessionFiltersProps) {
     })
   }
 
+  const STATUS_PILLS = [
+    ['all', 'All'],
+    ['active', 'Running'],
+    ['needs-you', 'Needs you'],
+    ['done', 'Done'],
+  ] as const
+  const selectClass =
+    'min-h-[44px] w-full appearance-none rounded-full border border-[color:var(--hms-line)] bg-transparent pl-[18px] pr-9 text-sm font-medium text-gray-100 outline-none focus:border-brand-400'
+
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <input
-        type="text"
-        placeholder="Search sessions..."
-        value={localSearch}
-        onChange={(e) => handleSearchChange(e.target.value)}
-        className="rounded-full border border-gray-700 bg-transparent px-4 py-1.5 text-sm text-gray-200 outline-none focus:border-brand-400 placeholder-gray-500"
-      />
+      <label className="relative flex min-w-[240px] flex-[1_1_320px] items-center">
+        <span className="sr-only">Search sessions</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute left-[18px] h-[18px] w-[18px] text-[color:var(--hms-mute)]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" />
+        </svg>
+        <input
+          type="text"
+          placeholder="Search by name, project, branch or id"
+          value={localSearch}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          className="min-h-[44px] w-full rounded-full border border-[color:var(--hms-line)] bg-transparent pl-12 pr-4 text-sm text-gray-100 placeholder-[color:var(--hms-mute)] outline-none focus:border-brand-400"
+        />
+      </label>
 
-      <div className="flex rounded-full border border-gray-700 text-xs">
-        {(['all', 'active', 'completed'] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => handleStatusChange(s)}
-            className={`px-3 py-1.5 capitalize transition-colors ${
-              status === s
-                ? 'border border-brand-400 text-brand-400'
-                : 'text-gray-400 hover:text-gray-200'
-            } rounded-full`}
-          >
-            {s}
-            {s === 'active' && activeCount > 0 && (
-              <span className="ml-1 text-emerald-400">({activeCount})</span>
-            )}
-          </button>
-        ))}
+      <div role="group" aria-label="Status" className="flex rounded-[24px] border border-[color:var(--hms-line)] p-1">
+        {STATUS_PILLS.map(([value, label]) => {
+          const on = status === value || (value === 'done' && status === 'completed')
+          return (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={on}
+              onClick={() => handleStatusChange(value)}
+              className="min-h-[40px] rounded-full px-4 text-sm font-medium"
+              style={on ? { background: 'var(--hms-ink)', color: 'var(--hms-bg)' } : { color: 'var(--hms-ink)' }}
+            >
+              {label}
+            </button>
+          )
+        })}
       </div>
 
       {projects.length > 1 && (
-        <select
-          value={project}
-          onChange={(e) => handleProjectChange(e.target.value)}
-          className="rounded-full border border-gray-700 bg-transparent px-4 py-1.5 text-sm text-gray-200 outline-none focus:border-brand-400"
-        >
-          <option value="">All projects</option>
-          {projects.map((p) => (
-            <option key={p.name} value={p.name}>
-              {privacyMode ? anonymizeProjectName(p.displayName) : p.displayName}
-            </option>
-          ))}
-        </select>
+        <label className="relative flex min-w-[150px] items-center">
+          <span className="sr-only">Project</span>
+          <select value={project} onChange={(e) => handleProjectChange(e.target.value)} className={selectClass}>
+            <option value="">All projects</option>
+            {projects.map((p) => (
+              <option key={p.name} value={p.name}>
+                {privacyMode ? anonymizeProjectName(p.displayName) : p.displayName}
+              </option>
+            ))}
+          </select>
+          <span aria-hidden="true" className="pointer-events-none absolute right-4 text-[11px]">▾</span>
+        </label>
       )}
 
-      <div className="flex items-center gap-1">
-        <select
-          value={sort}
-          onChange={(e) => handleSortChange(e.target.value)}
-          className="rounded-full border border-gray-700 bg-transparent px-4 py-1.5 text-sm text-gray-200 outline-none focus:border-brand-400"
-        >
-          <option value="lastActive">Last active</option>
-          <option value="started">Started</option>
-          <option value="duration">Duration</option>
-          <option value="messages">Messages</option>
-        </select>
+      <div className="flex items-center gap-2">
+        <label className="relative flex items-center">
+          <span className="sr-only">Sort by</span>
+          <select value={sort} onChange={(e) => handleSortChange(e.target.value)} className={selectClass}>
+            <option value="lastActive">Last active</option>
+            <option value="started">Started</option>
+            <option value="duration">Duration</option>
+            <option value="messages">Messages</option>
+          </select>
+          <span aria-hidden="true" className="pointer-events-none absolute right-4 text-[11px]">▾</span>
+        </label>
         <button
           type="button"
           onClick={handleSortDirToggle}
-          className="rounded-full border border-gray-700 px-3 py-1.5 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--hms-line)] text-gray-100 transition-colors hover:border-gray-500"
           title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
+          aria-label={sortDir === 'asc' ? 'Ascending' : 'Descending'}
         >
-          {sortDir === 'asc' ? '\u2191' : '\u2193'}
+          <svg viewBox="0 0 24 24" aria-hidden="true" className={`h-[18px] w-[18px] ${sortDir === 'asc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5v14M6 13l6 6 6-6" />
+          </svg>
         </button>
       </div>
     </div>

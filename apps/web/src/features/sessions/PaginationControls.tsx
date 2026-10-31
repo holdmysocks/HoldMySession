@@ -25,13 +25,49 @@ export function PaginationControls({
   const showNavigation = totalPages > 1
   const pageNumbers = showNavigation ? buildPageNumbers(page, totalPages) : []
 
+  const circle = 'flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--hms-line)] text-gray-100 transition-colors hover:border-gray-500 disabled:cursor-not-allowed disabled:opacity-40'
+
   return (
     <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
-      <div className="flex items-center gap-3">
+      <p className="text-[13px] text-[color:var(--hms-mute)]">
+        Showing {start} to {end} of {totalCount}
+      </p>
+
+      {showNavigation && (
+        <div className="flex items-center gap-1">
+          <button onClick={() => onPageChange(page - 1)} disabled={page <= 1} aria-label="Previous page" className={circle}>
+            ←
+          </button>
+          {pageNumbers.map((item, i) =>
+            item === 'ellipsis' ? (
+              <span key={`ellipsis-${i}`} className="w-11 text-center text-sm text-[color:var(--hms-mute)]">
+                ...
+              </span>
+            ) : (
+              <button
+                key={item}
+                onClick={() => onPageChange(item)}
+                aria-current={item === page ? 'page' : undefined}
+                className={`h-11 min-w-11 rounded-full border text-sm ${
+                  item === page ? 'border-[1.5px] border-brand-400 text-brand-400' : 'border-transparent text-gray-100 hover:border-[color:var(--hms-line)]'
+                }`}
+              >
+                {item}
+              </button>
+            ),
+          )}
+          <button onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} aria-label="Next page" className={circle}>
+            →
+          </button>
+        </div>
+      )}
+
+      <label className="relative flex items-center">
+        <span className="sr-only">Sessions per page</span>
         <select
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          className="rounded-full border border-gray-700 bg-transparent px-3 py-1 text-xs text-gray-200 outline-none focus:border-brand-500"
+          className="min-h-[44px] appearance-none rounded-full border border-[color:var(--hms-line)] bg-transparent pl-[18px] pr-9 text-sm text-gray-100 outline-none focus:border-brand-400"
         >
           {VALID_SIZES.map((size) => (
             <option key={size} value={size}>
@@ -39,59 +75,8 @@ export function PaginationControls({
             </option>
           ))}
         </select>
-
-        <p className="text-xs text-gray-400">
-          Showing{' '}
-          <span className="font-mono text-gray-300">
-            {start}-{end}
-          </span>{' '}
-          of{' '}
-          <span className="font-mono text-gray-300">{totalCount}</span> sessions
-        </p>
-      </div>
-
-      {showNavigation && (
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => onPageChange(page - 1)}
-            disabled={page <= 1}
-            className="rounded-full border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-gray-800 disabled:hover:text-gray-400"
-          >
-            Previous
-          </button>
-
-          {pageNumbers.map((item, i) =>
-            item === 'ellipsis' ? (
-              <span
-                key={`ellipsis-${i}`}
-                className="px-1.5 text-xs text-gray-500"
-              >
-                ...
-              </span>
-            ) : (
-              <button
-                key={item}
-                onClick={() => onPageChange(item)}
-                className={`min-w-[2rem] rounded-full px-2 py-1.5 text-xs font-mono transition-colors ${
-                  item === page
-                    ? 'bg-brand-600 text-gray-100'
-                    : 'border border-gray-700 bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
-                }`}
-              >
-                {item}
-              </button>
-            ),
-          )}
-
-          <button
-            onClick={() => onPageChange(page + 1)}
-            disabled={page >= totalPages}
-            className="rounded-full border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-gray-800 disabled:hover:text-gray-400"
-          >
-            Next
-          </button>
-        </div>
-      )}
+        <span aria-hidden="true" className="pointer-events-none absolute right-4 text-[11px]">▾</span>
+      </label>
     </div>
   )
 }

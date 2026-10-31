@@ -17,7 +17,7 @@ interface PaginatedSessionParams {
   page: number
   pageSize: number
   search: string
-  status: 'all' | 'active' | 'completed'
+  status: 'all' | 'active' | 'completed' | 'needs-you' | 'done'
   project: string
   sort: 'lastActive' | 'started' | 'duration' | 'messages'
   sortDir: 'asc' | 'desc'

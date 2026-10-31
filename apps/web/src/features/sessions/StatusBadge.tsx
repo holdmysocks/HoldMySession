@@ -1,48 +1,22 @@
 import type { SessionStatus } from '@/lib/status/session-status'
 
-const BADGE: Record<SessionStatus, { label: string; pill: string; dot: string; ping: boolean }> = {
-  'needs-you': {
-    label: 'Needs you',
-    pill: 'bg-yellow-400/15 text-yellow-300',
-    dot: 'bg-yellow-400',
-    ping: true,
-  },
-  active: {
-    label: 'Active',
-    pill: 'bg-emerald-500/15 text-emerald-400',
-    dot: 'bg-emerald-500',
-    ping: true,
-  },
-  completed: {
-    label: 'Completed',
-    pill: 'bg-indigo-400/15 text-indigo-300',
-    dot: 'bg-indigo-400',
-    ping: false,
-  },
-  idle: {
-    label: 'Idle',
-    pill: 'bg-gray-500/15 text-gray-400',
-    dot: 'bg-gray-500',
-    ping: false,
-  },
+/** The status words and their colours, the same four the map uses. */
+const TAG: Record<SessionStatus, { label: string; style: React.CSSProperties }> = {
+  'needs-you': { label: 'NEEDS YOU', style: { background: '#FACC15', color: '#3A2C00' } },
+  active: { label: 'RUNNING', style: { background: '#3DDC84', color: '#05301A' } },
+  completed: { label: 'DONE', style: { background: '#9B8CFF', color: '#17123F' } },
+  idle: { label: 'IDLE', style: { background: 'var(--hms-track)', color: 'var(--hms-sub)' } },
 }
 
-/** Status pill. The ping on active and needs-you uses motion-safe, so it stops under reduced motion. */
 export function StatusBadge({ status }: { status: SessionStatus }) {
-  const style = BADGE[status]
+  const tag = TAG[status]
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${style.pill}`}
+      data-status-tag={status}
+      className="inline-block rounded-full px-3 py-[3px] text-[11px] font-bold tracking-[0.04em]"
+      style={tag.style}
     >
-      <span className="relative flex h-2 w-2">
-        {style.ping && (
-          <span
-            className={`motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${style.dot}`}
-          />
-        )}
-        <span className={`relative inline-flex h-2 w-2 rounded-full ${style.dot}`} />
-      </span>
-      {style.label}
+      {tag.label}
     </span>
   )
 }
