@@ -1,93 +1,16 @@
 # HoldMySession
 
-[![CI](https://github.com/holdmysocks/HoldMySession/actions/workflows/ci.yml/badge.svg)](https://github.com/holdmysocks/HoldMySession/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/holdmysocks/HoldMySession/actions/workflows/codeql.yml/badge.svg)](https://github.com/holdmysocks/HoldMySession/actions/workflows/codeql.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+See where your Claude Code usage goes: every session, every agent, every token, and what it all costs. HoldMySession reads the session files Claude Code already keeps on your computer, keeps its own long-term history of them, and shows it in a desktop app or a browser. Nothing is sent anywhere unless you link your own machines together.
 
-A read-only, local observability dashboard for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) sessions. Scans your `~/.claude` directory to visualize session history, tool usage, token consumption, cost estimates, and activity trends -- all without sending data anywhere.
+![HoldMySession stats](screenshots/stats-overview-full.png)
 
-```bash
-git clone https://github.com/holdmysocks/HoldMySession.git
-cd HoldMySession/apps/web
-npm install && npm run build && npm start
-```
+## Get it
 
-## Why?
+**Desktop app (Windows and Mac).** Download the zip for your system from the [releases page](https://github.com/holdmysocks/HoldMySession/releases), unzip it anywhere you can write to, and run HoldMySession. It opens a window, stays in the tray (menu bar on a Mac) when you close it, and is also at http://localhost:3000 in any browser on that machine. It can update itself from Settings. More in [docs/desktop-app.md](docs/desktop-app.md).
 
-Claude Code stores all session data locally in `~/.claude/projects/`, but there is no built-in way to browse, search, or analyze past sessions. As you accumulate hundreds of sessions across dozens of projects, questions start piling up:
+The programs are not code-signed, so Windows SmartScreen or macOS Gatekeeper warns the first time. On Windows choose **More info**, then **Run anyway**. On a Mac, Control-click the app, choose **Open**, then **Open** again.
 
-- How many tokens did that refactoring session actually use?
-- Which tools does Claude call most often in my codebase?
-- How much am I spending per project, per day, per model?
-- Is the context window filling up mid-session?
-- When am I most active -- mornings or late nights?
-
-This dashboard gives you answers. It reads your local session files, parses the JSONL logs, and presents everything in a fast, searchable web UI that runs entirely on your machine.
-
-## Features
-
-**Session browsing and search**
-- Full-text search across session names, projects, and branches
-- Filter by status (active / completed), project, model, and date range
-- Sortable columns with pagination
-- Active session indicator with real-time status polling
-
-**Session detail view**
-- Context window utilization breakdown (input, output, cache read, cache creation)
-- Tool usage frequency and duration statistics
-- Agent dispatch history with nested tool calls
-- Gantt-style timeline chart with zoom controls for tool calls, agent runs, and skill invocations
-- Per-session and per-agent cost estimates with per-model and per-category breakdowns
-
-![Session Detail](screenshots/session-detail-full.png)
-
-**Analytics and stats**
-- GitHub-style contribution heatmap showing token usage intensity over the past year
-- Token usage over time -- stacked area chart with daily/weekly toggle, top 5 models + "Other"
-- Model usage distribution across all sessions
-- Hourly activity distribution chart
-- Aggregate metrics: total sessions, messages, tokens, estimated cost
-
-![Stats Overview](screenshots/stats-overview-full.png)
-
-**Per-project analytics**
-- Dedicated "Projects" tab with sortable table
-- Sessions, messages, tokens, and duration aggregated per project
-- Drill-down links to filtered session lists
-
-![Per-Project Analytics](screenshots/stats-projects.png)
-
-**Cost estimation**
-- Configurable API pricing per model (Claude Sonnet 4, Opus 4, Haiku, etc.)
-- Subscription tier support (Free, Pro, Max, Ultra) with appropriate rate adjustments
-- Settings persisted to `~/.holdmysession/settings.json`
-
-![Settings Page](screenshots/settings-page.png)
-
-**Data export**
-- Export stats and session data in CSV or JSON format
-- Four export formats: session summaries, model usage, daily activity, project analytics
-- Client-side export -- no server round-trip needed
-
-**Real-time monitoring**
-- Active sessions badge in the sidebar with 3-second status polling
-- Active session banner on detail pages with adaptive refresh intervals
-- Automatic data refresh for in-progress sessions
-
-**Privacy mode**
-- Toggle to anonymize project names, file paths, branch names, and usernames
-- Analytics data anonymized consistently across all views
-- Safe for screenshot sharing and presentations
-
-## Quick Start
-
-Needs Node.js 22 or newer.
-
-### Desktop app (Windows and Mac)
-
-Download the zip for your system from the [releases page](https://github.com/holdmysocks/HoldMySession/releases), unzip it, and run HoldMySession. It opens a window, keeps running in the tray or menu bar when you close it, and is still at http://localhost:3000 in a browser. See [docs/desktop-app.md](docs/desktop-app.md).
-
-### From source
+**From source.** Needs Node.js 22.13 or newer.
 
 ```bash
 git clone https://github.com/holdmysocks/HoldMySession.git
@@ -97,102 +20,124 @@ npm run build
 npm start
 ```
 
-On Windows, `Update-SessionMap.ps1` in the repository root pulls, rebuilds and starts it for you.
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Updating
-
-Pull the latest changes and rebuild:
-
-```bash
-cd HoldMySession
-git pull
-cd apps/web && npm install && npm run build
-```
-
-## CLI Options
+Then open http://localhost:3000.
 
 ```
   -p, --port <number>   Port to listen on (default: 3000)
   --host <hostname>     Host to bind to (default: localhost)
   -o, --open            Open browser after starting
+  --print-hook-config   Print a Claude Code hooks snippet (Notification and Stop), without writing anything
   -v, --version         Show version number
   -h, --help            Show this help message
 ```
 
-> **Note:** The dashboard runs entirely on localhost and only reads files from `~/.claude`. It never modifies any Claude Code data and never sends data over the network.
+## What it shows
 
-## Tech Stack
+### Sessions
 
-- [TanStack Start](https://tanstack.com/start) -- SSR framework on Vite
-- [TanStack Router](https://tanstack.com/router) -- file-based routing with type-safe search params
-- [TanStack Query](https://tanstack.com/query) -- data fetching with caching and automatic background refetch
-- [Tailwind CSS v4](https://tailwindcss.com/) -- utility-first styling with CSS-first configuration
-- [Recharts](https://recharts.org/) -- composable charting library for timeline, heatmap, and stats visualizations
-- [Zod](https://zod.dev/) -- runtime validation for server functions and URL params
-- Node.js >= 18
+![Session detail](screenshots/session-detail-full.png)
 
-## Project Structure
+- A searchable, sortable list of every session, filtered by status, project, model and date. Active sessions are marked live.
+- **Agent delegation timeline:** a Gantt-style view of every subagent a session dispatched, in order, with how long each ran and the tokens it used. Zoom in on busy workflows.
+- **Context window:** a live breakdown of input, output and cache tokens against the window size, which is found for you: your `/autocompact` setting if you set one, otherwise the model's window.
+- **Cost:** per-session and per-agent estimates, broken down by model and token kind.
 
-```
-apps/web/src/
-  routes/                        # File-based routes (TanStack Router)
-    _dashboard/
-      sessions/
-        index.tsx                # Sessions list page
-        $sessionId.tsx           # Session detail page
-      stats.tsx                  # Stats + per-project analytics page
-      settings.tsx               # Settings page
-  features/                      # Vertical Slice Architecture
-    sessions/                    # Session list, filters, active badge
-    session-detail/              # Session detail, timeline, context window
-    stats/                       # Activity chart, heatmap, token trends, model usage
-    project-analytics/           # Per-project aggregated metrics
-    cost-estimation/             # Cost calculation and display
-    settings/                    # Subscription tier, pricing editor
-    privacy/                     # Privacy mode toggle and anonymization
-  lib/
-    scanner/                     # Filesystem scanner for ~/.claude
-    parsers/                     # JSONL session file parsers
-    cache/                       # Persistent disk cache (heatmap data)
-    utils/                       # Formatting, export utilities
-  components/                    # Shared UI components (ExportDropdown, etc.)
-```
+### Stats
 
-## How It Works
+- Totals for sessions, messages, tokens and estimated cost.
+- A year-long activity heatmap, daily activity, tokens over time (daily or weekly) by model, model share, and an hourly distribution.
+- **Projects** tab: sessions, messages, tokens and time per project, with drill-down to a full overview filtered to one project.
+- **Unlinked Sessions:** sessions with no working folder, or in a folder whose name starts with `scratch`, are grouped as one entry instead of one row each.
+- Export any of it as CSV or JSON.
 
-1. **Scanning** -- The server reads `~/.claude/projects/` to discover all session `.jsonl` files. An mtime-based cache avoids re-parsing unchanged files.
-2. **Parsing** -- Session files are parsed to extract metadata (project, branch, duration, model), tool calls, agent dispatches, token usage, and errors.
-3. **Server Functions** -- TanStack Start server functions (`createServerFn`) expose parsed data to the client via type-safe RPC. All file I/O stays on the server.
-4. **React Query** -- The UI fetches data through React Query with automatic background refetch for live updates. Active sessions use adaptive polling intervals.
-5. **Caching** -- Parsed session summaries and heatmap data are cached in memory (mtime-based invalidation) and on disk (`~/.holdmysession/cache/`) for fast startup.
+![Projects](screenshots/stats-projects.png)
+
+### History database
+
+Stats come from HoldMySession's own SQLite file, `~/.holdmysession/history.db`, not straight from Claude's files, so your history survives Claude clearing its folder.
+
+- A scan fills it automatically (every 15 minutes by default, adjustable) and on demand. Scanning twice never double-counts.
+- Prices and your plan are kept as dated history, so an old month is costed at the prices and plan of that month.
+- Back up, download, restore and delete backups from Settings. **Check against session files** compares the database with the files to prove the totals match.
+- Details in [docs/history-database.md](docs/history-database.md).
+
+### Session Map
+
+The **Map** shows one project's sessions as a tree: each session, its forks as children, and its running subagents as small cards, coloured by status (needs you, active, recent, idle). A side panel lists what is waiting on you and recent hook events. Drag to pan, scroll to zoom, and use **Edit layout** to arrange cards; the arrangement is saved and follows you to other devices. Details in [docs/session-map/README.md](docs/session-map/README.md).
+
+![Session map](screenshots/session-map.png)
+
+### Several computers
+
+Link machines to see them all in one place. One install is the **master** and the others are **nodes**.
+
+- A node sends its sessions to the master, and a master page can show one machine or all of them, with a **Machine** filter on every page. Live status, session detail and the map are fetched from the node while you look at them.
+- Linking is one paste: the master shows a pairing code, and the node pastes it and tries every address (local network, tailnet, computer name). Turning on **Listen on the network** asks Windows for the firewall permission it needs.
+- The master owns prices and the plan. Each machine has a name, editable from the master.
+
+### Projects settings
+
+Choose how scratch sessions appear (grouped as Unlinked Sessions, listed folder by folder, or hidden), name them by session name, and hide any project on any machine from lists and dropdowns. Hiding changes lists only; every total, chart and cost still counts everything.
+
+![Projects settings](screenshots/settings-page.png)
+
+### Claude Code hooks
+
+From Settings you can switch on two optional hooks, which add entries to Claude Code's `settings.json` and remove only those entries when switched off:
+
+- **Needs you notifications** feed the map's Needs you panel and recent events.
+- **Start HoldMySession with Claude Code** launches the app in the background if it is not running.
+
+A copy of the file is saved first, and a file that is not valid JSON is left alone.
+
+### Also
+
+- **Privacy mode** replaces project names, paths, branches and usernames with stand-ins everywhere, for screenshots and demos.
+- Light and dark themes, a 12- or 24-hour clock, and plan and pricing settings with your own per-model overrides. Defaults cover the current Claude models and earlier ones.
+- **Updates:** check now, update now, or update automatically (desktop app).
+
+## Your data
+
+- HoldMySession **reads** the Claude config directory (`CLAUDE_CONFIG_DIR`, default `~/.claude`) and never changes your sessions. The only thing it ever writes there is the hook entries above, and only if you switch them on.
+- Everything of its own, such as the history database, settings, backups and caches, is in `~/.holdmysession` (set `HOLDMYSESSION_DIR` to move it).
+- By default it listens on this computer only and sends nothing. Data leaves the machine only if you link machines (to your own master, with a token) or leave update checks on (which read the latest version number from GitHub).
+
+## How it works
+
+1. **Scan:** the server reads the `.jsonl` session files under `projects/`, taking each project's path from the transcript's recorded working directory, and parses messages, tool calls, agent dispatches and token usage. Unchanged files are skipped.
+2. **Store:** results go into the history database, with each request counted once across forks and sessions.
+3. **Serve:** TanStack Start server functions give the pages typed access to that data. All file access stays on the server.
+4. **Display:** React Query keeps pages fresh, polling faster for active sessions.
+
+Built with [TanStack Start](https://tanstack.com/start), [Router](https://tanstack.com/router) and [Query](https://tanstack.com/query), React 19, [Tailwind CSS v4](https://tailwindcss.com/), [Recharts](https://recharts.org/), [Zod](https://zod.dev/), Node's built-in SQLite, and [Electron](https://www.electronjs.org/) for the desktop app.
 
 ## Development
 
 ```bash
 cd apps/web
-
 npm run dev          # Dev server on localhost:3000
 npm run build        # Production build
-npm run typecheck    # TypeScript type checking
+npm run typecheck    # TypeScript
 npm run lint         # ESLint
 npm run test         # Unit tests (Vitest)
 npm run e2e          # End-to-end tests (Playwright)
 ```
 
-## Contributing
+The desktop app is in `apps/desktop`. Releases are built on your own machine, not in CI:
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and conventions. Check [good first issues](https://github.com/holdmysocks/HoldMySession/labels/good%20first%20issue) for beginner-friendly tasks.
+```bash
+cd apps/desktop
+npm install
+node scripts/package.mjs win32 x64 --build      # Windows zip
+node scripts/package.mjs darwin arm64 x64       # Mac zips
+```
 
-If you find this project useful, consider giving it a star -- it helps others discover it.
+Code is organised by feature under `apps/web/src/features`, with the scanner, parsers, history database and linking in `apps/web/src/lib`. See [CONTRIBUTING.md](CONTRIBUTING.md) and the notes in [docs](docs).
 
 ## Links
 
-- [GitHub](https://github.com/holdmysocks/HoldMySession)
-- [Issues](https://github.com/holdmysocks/HoldMySession/issues)
-- [Discussions](https://github.com/holdmysocks/HoldMySession/discussions)
+[Releases](https://github.com/holdmysocks/HoldMySession/releases) · [Issues](https://github.com/holdmysocks/HoldMySession/issues) · [Security](SECURITY.md)
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

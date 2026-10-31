@@ -1,4 +1,4 @@
-# Claude Code Session Dashboard
+# HoldMySession
 
 > Observability dashboard for Claude Code execution — visualizes active sessions and running tasks by analyzing `~/.claude`.
 >

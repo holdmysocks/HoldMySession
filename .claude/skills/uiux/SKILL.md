@@ -1,6 +1,6 @@
 ---
 name: uiux
-description: Dashboard design system — colors, typography, spacing, components, and visual patterns for the session dashboard UI.
+description: Dashboard design system — colors, typography, spacing, components, and visual patterns for the HoldMySession UI.
 user-invocable: false
 ---
 
