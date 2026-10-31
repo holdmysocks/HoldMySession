@@ -1,3 +1,4 @@
+import { PillSelect } from '@/components/ui/PillSelect'
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
@@ -77,14 +78,15 @@ export function PriceHistoryPanel() {
       <div className="mt-3 space-y-4 border-b border-[color:var(--hms-rule)] py-4 text-xs text-gray-400">
         <label className="flex items-center gap-2">
           <span>Model</span>
-          <select value={modelId} onChange={(e) => setModelId(e.target.value)} className={input}>
-            <optgroup label="Current">
-              {DEFAULT_PRICING.map((m) => <option key={m.modelId} value={m.modelId}>{m.displayName}</option>)}
-            </optgroup>
-            <optgroup label="Retired">
-              {RETIRED_PRICING.map((m) => <option key={m.modelId} value={m.modelId}>{m.displayName}</option>)}
-            </optgroup>
-          </select>
+          <PillSelect
+            label="Model"
+            value={modelId}
+            onChange={setModelId}
+            options={[
+              { group: 'Current', options: DEFAULT_PRICING.map((m) => ({ value: m.modelId, label: m.displayName })) },
+              { group: 'Retired', options: RETIRED_PRICING.map((m) => ({ value: m.modelId, label: m.displayName })) },
+            ]}
+          />
         </label>
 
         <div>

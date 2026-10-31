@@ -1,3 +1,4 @@
+import { PillSelect } from '@/components/ui/PillSelect'
 import { useMutation, useQuery, useQueryClient, queryOptions } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { settingsQuery } from '@/features/settings/settings.queries'
@@ -119,18 +120,14 @@ export function HistoryPanel() {
             </p>
           </div>
           <div className="flex items-center gap-3.5">
-            <label className="relative flex items-center">
-              <span className="sr-only">Scan interval</span>
-              <select
-                value={autoScan.intervalMinutes}
-                disabled={!autoScan.enabled}
-                onChange={(e) => saveAutoScan.mutate({ data: { ...autoScan, intervalMinutes: Number(e.target.value) } })}
-                className="min-h-11 appearance-none rounded-full border border-[color:var(--hms-line)] bg-transparent pl-[18px] pr-9 text-sm font-medium text-gray-100 disabled:opacity-50"
-              >
-                {AUTO_SCAN_INTERVALS.map((m) => <option key={m} value={m}>Every {intervalLabel(m)}</option>)}
-              </select>
-              <span aria-hidden="true" className="pointer-events-none absolute right-4 text-[11px]">▾</span>
-            </label>
+            <PillSelect
+              label="Scan interval"
+              value={String(autoScan.intervalMinutes)}
+              disabled={!autoScan.enabled}
+              align="right"
+              onChange={(v) => saveAutoScan.mutate({ data: { ...autoScan, intervalMinutes: Number(v) } })}
+              options={AUTO_SCAN_INTERVALS.map((m) => ({ value: String(m), label: `Every ${intervalLabel(m)}` }))}
+            />
             <button
               type="button"
               role="switch"

@@ -46,21 +46,16 @@ test.describe('Sessions List', () => {
   test('Given sessions exist, When I filter by project, Then only that project sessions appear', async ({
     page,
   }) => {
-    const select = page.locator('select').first()
-    // Only try project filter if the select exists (needs > 1 project)
-    if ((await select.count()) > 0) {
-      // Get the options and select one that is not "All projects"
-      const options = select.locator('option')
-      const optionCount = await options.count()
-      if (optionCount > 1) {
-        // Select the second option (first non-"All projects")
-        const optionValue = await options.nth(1).getAttribute('value')
-        if (optionValue) {
-          await select.selectOption(optionValue)
-          // Verify at least one session card is shown
-          const cards = page.locator('a[href*="/sessions/session-"]')
-          await expect(cards.first()).toBeVisible({ timeout: 2000 })
-        }
+    const picker = page.getByRole('combobox', { name: 'Project' })
+    // Only try the project filter if it exists (needs > 1 project)
+    if ((await picker.count()) > 0) {
+      await picker.click()
+      const options = page.getByRole('option')
+      if ((await options.count()) > 1) {
+        // The second option is the first project after "All projects"
+        await options.nth(1).click()
+        const cards = page.locator('a[href*="/sessions/session-"]')
+        await expect(cards.first()).toBeVisible({ timeout: 2000 })
       }
     }
   })

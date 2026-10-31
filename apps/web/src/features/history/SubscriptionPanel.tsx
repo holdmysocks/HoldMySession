@@ -1,3 +1,4 @@
+import { PillSelect } from '@/components/ui/PillSelect'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
@@ -121,9 +122,7 @@ export function SubscriptionPanel() {
             <div className="flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-2 text-[13px] text-[color:var(--hms-mute)]">
                 Plan
-                <select value={tier} onChange={(e) => chooseTier(e.target.value)} className={input}>
-                  {SUBSCRIPTION_TIERS.map((t) => <option key={t.id} value={t.id}>{t.displayName}</option>)}
-                </select>
+                <PillSelect label="Plan" value={tier} onChange={chooseTier} options={SUBSCRIPTION_TIERS.map((t) => ({ value: t.id, label: t.displayName }))} />
               </label>
               <label className="flex items-center gap-2 text-[13px] text-[color:var(--hms-mute)]">
                 Per month, USD

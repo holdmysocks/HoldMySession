@@ -7,7 +7,7 @@ export const selectors = {
   },
   sessions: {
     searchInput: 'input[placeholder*="Search"]',
-    projectFilter: 'select',
+    projectFilter: '[role="combobox"]',
     sessionCard: 'a[href*="/sessions/"]',
   },
   sessionDetail: {

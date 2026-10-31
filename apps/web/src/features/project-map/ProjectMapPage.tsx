@@ -1,3 +1,4 @@
+import { PillSelect } from '@/components/ui/PillSelect'
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { applyCustomPositions, layoutProjectMap, type NodePositions } from '@/lib/map/layout'
@@ -148,24 +149,19 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <label className="relative flex items-center">
-            <span className="sr-only">Project</span>
-            <select
-              value={selectedValue}
-              onChange={(e) => handleProjectChange(e.target.value)}
-              className={`${pill} max-w-[260px] appearance-none pr-9`}
-            >
-              {machineGroups.map((group) => {
-                const options = group.projects.map((p) => (
-                  <option key={mapProjectValue(p)} value={mapProjectValue(p)}>
-                    {privacyMode ? anonymizeProjectName(p.projectDisplayName) : p.projectDisplayName} ({p.sessionCount})
-                  </option>
-                ))
-                return group.name ? <optgroup key={group.name} label={group.name}>{options}</optgroup> : options
-              })}
-            </select>
-            <span aria-hidden="true" className="pointer-events-none absolute right-4 text-[11px]">▾</span>
-          </label>
+          <PillSelect
+            label="Project"
+            value={selectedValue}
+            onChange={handleProjectChange}
+            className="max-w-[260px]"
+            options={machineGroups.map((group) => {
+              const items = group.projects.map((p) => ({
+                value: mapProjectValue(p),
+                label: `${privacyMode ? anonymizeProjectName(p.projectDisplayName) : p.projectDisplayName} (${p.sessionCount})`,
+              }))
+              return group.name ? { group: group.name, options: items } : items
+            }).flat()}
+          />
           <button type="button" aria-pressed={editMode} onClick={() => setEditMode((on) => !on)} className={`${pill} ${editMode ? 'border-brand-400 text-brand-400' : ''}`}>
             {editMode ? 'Editing layout' : 'Edit layout'}
           </button>

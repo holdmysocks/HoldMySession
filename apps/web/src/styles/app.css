@@ -160,3 +160,10 @@ body {
     opacity: 0.45;
   }
 }
+
+/* Any native dropdown list that is left (a date picker, say) takes the theme instead of the system's white. */
+option,
+optgroup {
+  background-color: var(--color-gray-900);
+  color: var(--hms-ink);
+}

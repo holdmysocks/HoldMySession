@@ -1,3 +1,4 @@
+import { PillSelect } from '@/components/ui/PillSelect'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Route } from '@/routes/_dashboard/sessions/index'
@@ -92,8 +93,6 @@ export function SessionFilters({ projects }: SessionFiltersProps) {
     ['needs-you', 'Needs you'],
     ['done', 'Done'],
   ] as const
-  const selectClass =
-    'min-h-[44px] w-full appearance-none rounded-full border border-[color:var(--hms-line)] bg-transparent pl-[18px] pr-9 text-sm font-medium text-gray-100 outline-none focus:border-brand-400'
 
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -131,31 +130,30 @@ export function SessionFilters({ projects }: SessionFiltersProps) {
       </div>
 
       {projects.length > 1 && (
-        <label className="relative flex min-w-[150px] items-center">
-          <span className="sr-only">Project</span>
-          <select value={project} onChange={(e) => handleProjectChange(e.target.value)} className={selectClass}>
-            <option value="">All projects</option>
-            {projects.map((p) => (
-              <option key={p.name} value={p.name}>
-                {privacyMode ? anonymizeProjectName(p.displayName) : p.displayName}
-              </option>
-            ))}
-          </select>
-          <span aria-hidden="true" className="pointer-events-none absolute right-4 text-[11px]">▾</span>
-        </label>
+        <PillSelect
+          label="Project"
+          value={project}
+          onChange={handleProjectChange}
+          className="min-w-[150px]"
+          options={[
+            { value: '', label: 'All projects' },
+            ...projects.map((p) => ({ value: p.name, label: privacyMode ? anonymizeProjectName(p.displayName) : p.displayName })),
+          ]}
+        />
       )}
 
       <div className="flex items-center gap-2">
-        <label className="relative flex items-center">
-          <span className="sr-only">Sort by</span>
-          <select value={sort} onChange={(e) => handleSortChange(e.target.value)} className={selectClass}>
-            <option value="lastActive">Last active</option>
-            <option value="started">Started</option>
-            <option value="duration">Duration</option>
-            <option value="messages">Messages</option>
-          </select>
-          <span aria-hidden="true" className="pointer-events-none absolute right-4 text-[11px]">▾</span>
-        </label>
+        <PillSelect
+          label="Sort by"
+          value={sort}
+          onChange={handleSortChange}
+          options={[
+            { value: 'lastActive', label: 'Last active' },
+            { value: 'started', label: 'Started' },
+            { value: 'duration', label: 'Duration' },
+            { value: 'messages', label: 'Messages' },
+          ]}
+        />
         <button
           type="button"
           onClick={handleSortDirToggle}

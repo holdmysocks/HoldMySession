@@ -1,3 +1,4 @@
+import { PillSelect } from '@/components/ui/PillSelect'
 import { VALID_SIZES } from './usePageSizePreference'
 
 interface PaginationControlsProps {
@@ -62,21 +63,13 @@ export function PaginationControls({
         </div>
       )}
 
-      <label className="relative flex items-center">
-        <span className="sr-only">Sessions per page</span>
-        <select
-          value={pageSize}
-          onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          className="min-h-[44px] appearance-none rounded-full border border-[color:var(--hms-line)] bg-transparent pl-[18px] pr-9 text-sm text-gray-100 outline-none focus:border-brand-400"
-        >
-          {VALID_SIZES.map((size) => (
-            <option key={size} value={size}>
-              {size} / page
-            </option>
-          ))}
-        </select>
-        <span aria-hidden="true" className="pointer-events-none absolute right-4 text-[11px]">▾</span>
-      </label>
+      <PillSelect
+        label="Sessions per page"
+        value={String(pageSize)}
+        onChange={(v) => onPageSizeChange(Number(v))}
+        align="right"
+        options={VALID_SIZES.map((size) => ({ value: String(size), label: `${size} / page` }))}
+      />
     </div>
   )
 }
