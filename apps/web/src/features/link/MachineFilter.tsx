@@ -10,12 +10,12 @@ export function MachineFilter() {
   if (!data?.showMachineFilter) return null
   const value = data.machines.some((m) => m.machineId === stored) ? stored : ALL_MACHINES
   return (
-    <label className="flex items-center justify-end gap-2 text-xs text-gray-400">
+    <label className="flex items-center gap-2 text-sm text-gray-400">
       <span>Machine</span>
       <select
         value={value}
         onChange={(e) => setMachineFilter(e.target.value)}
-        className="rounded-lg border border-gray-800 bg-gray-900 px-2.5 py-1 text-xs text-gray-100 focus:border-brand-500 focus:outline-none"
+        className="min-h-[44px] rounded-full border border-gray-700 bg-transparent px-4 text-sm font-medium text-gray-100 focus:border-brand-500 focus:outline-none"
       >
         <option value={ALL_MACHINES}>All machines</option>
         {data.machines.map((m) => (

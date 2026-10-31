@@ -34,10 +34,10 @@ test.describe('Navigation', () => {
     })
   })
 
-  test('Given I am on any page, Then the sidebar shows "HoldMySession" branding', async ({
+  test('Given I am on any page, Then the header shows "HoldMySession" branding', async ({
     page,
   }) => {
     await page.goto('/sessions')
-    await expect(page.locator('aside')).toContainText('HoldMySession')
+    await expect(page.locator('header')).toContainText('HoldMySession')
   })
 })

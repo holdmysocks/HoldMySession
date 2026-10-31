@@ -1,6 +1,6 @@
 export const selectors = {
   sidebar: {
-    root: 'aside',
+    root: 'header',
     sessionsLink: 'a[href="/sessions"]',
     statsLink: 'a[href="/stats"]',
     settingsLink: 'a[href="/settings"]',

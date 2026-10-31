@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 
 @import './themes.css';
+@import '@fontsource-variable/dm-sans';
+@import '@fontsource-variable/bricolage-grotesque';
 
 /*
  * The default look is Dusk. Every theme in themes.css replaces these same variables, so a theme
@@ -8,6 +10,9 @@
  * src/features/theme/palettes.ts. The look before the redesign is kept in docs/themes.
  */
 @theme {
+  --font-sans: 'DM Sans Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', 'DM Sans Variable', system-ui, sans-serif;
+
   --color-gray-50: #faf9f5;
   --color-gray-100: #eeede9;
   --color-gray-200: #deddd9;
