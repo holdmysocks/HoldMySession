@@ -1,0 +1,158 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Default palette (dark) */
+  --color-gray-50: #f5f3ec;
+  --color-gray-100: #eae6dc;
+  --color-gray-200: #e0dbd0;
+  --color-gray-300: #cdc8b8;
+  --color-gray-400: #a39e90;
+  --color-gray-500: #7a7668;
+  --color-gray-600: #565349;
+  --color-gray-700: #3d3b36;
+  --color-gray-800: #2a2926;
+  --color-gray-900: #1c1c1a;
+  --color-gray-950: #141413;
+
+  /* Brand terracotta accent */
+  --color-brand-300: #f0b8a0;
+  --color-brand-400: #e09070;
+  --color-brand-500: #d97757;
+  --color-brand-600: #c4643f;
+  --color-brand-700: #a8512e;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  /* Invert the gray scale so dark-numbered tokens become light surfaces */
+  --color-gray-50: #141413;
+  --color-gray-100: #1c1c1a;
+  --color-gray-200: #2a2926;
+  --color-gray-300: #3d3b36;
+  --color-gray-400: #565349;
+  --color-gray-500: #7a7668;
+  --color-gray-600: #a39e90;
+  --color-gray-700: #cdc8b8;
+  --color-gray-800: #e0dbd0;
+  --color-gray-900: #eae6dc;
+  --color-gray-950: #f5f3ec;
+}
+
+body {
+  background-color: var(--color-gray-950);
+  color: var(--color-gray-100);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+/*
+ * Session status pulse. Colours come from the Tailwind border and stroke classes.
+ * These classes only add motion, and reduced-motion users keep the colour without it.
+ */
+/*
+ * Timing: needs-you pulses every 1.2 s, active every 2.4 s. Completed and idle do not pulse.
+ * Cards glow with box-shadow. The map draws a halo rect behind each node and scales it, so
+ * the halo uses transform. The needs-you border also brightens at the peak of its pulse.
+ */
+@keyframes status-glow-needs-you {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(250 204 21 / 0);
+    border-color: #facc15;
+  }
+  50% {
+    box-shadow: 0 0 0 14px rgb(250 204 21 / 0.9);
+    border-color: #fef08a;
+  }
+}
+
+@keyframes status-glow-active {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(34 197 94 / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgb(34 197 94 / 0.7);
+  }
+}
+
+@keyframes status-halo-needs-you {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.03);
+  }
+}
+
+@keyframes status-halo-active {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.03);
+  }
+}
+
+/* The map node's own border brightens with the halo. The stroke is the SVG border. */
+@keyframes status-edge-needs-you {
+  0%,
+  100% {
+    stroke: #facc15;
+  }
+  50% {
+    stroke: #fef08a;
+  }
+}
+
+.status-pulse-needs-you {
+  animation: status-glow-needs-you 1.2s ease-in-out infinite;
+}
+
+.status-pulse-active {
+  animation: status-glow-active 2.4s ease-in-out infinite;
+}
+
+.status-halo-needs-you {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: status-halo-needs-you 1.2s ease-in-out infinite;
+}
+
+.status-halo-active {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: status-halo-active 2.4s ease-in-out infinite;
+}
+
+.status-edge-needs-you {
+  animation: status-edge-needs-you 1.2s ease-in-out infinite;
+}
+
+/*
+ * Reduced motion: no pulse at all. The halo is hidden, because a static halo would look like
+ * a solid ring. The status colour stays on the border.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .status-pulse-needs-you,
+  .status-pulse-active,
+  .status-halo-needs-you,
+  .status-halo-active,
+  .status-edge-needs-you {
+    animation: none;
+  }
+
+  .status-halo-needs-you,
+  .status-halo-active {
+    opacity: 0;
+  }
+}
