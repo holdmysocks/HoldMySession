@@ -76,7 +76,7 @@ export function SessionList() {
         {Array.from({ length: pageSize }).map((_, i) => (
           <div
             key={i}
-            className="h-28 animate-pulse rounded-xl border border-gray-800 bg-gray-900/50"
+            className="h-28 animate-pulse rounded-2xl border border-gray-800 bg-gray-900"
           />
         ))}
       </div>

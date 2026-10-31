@@ -94,19 +94,19 @@ export function SessionFilters({ projects, activeCount }: SessionFiltersProps) {
         placeholder="Search sessions..."
         value={localSearch}
         onChange={(e) => handleSearchChange(e.target.value)}
-        className="rounded-lg border border-gray-700 bg-gray-800/50 px-3 py-1.5 text-sm text-gray-200 placeholder-gray-500 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+        className="rounded-full border border-gray-700 bg-transparent px-4 py-1.5 text-sm text-gray-200 outline-none focus:border-brand-400 placeholder-gray-500"
       />
 
-      <div className="flex rounded-lg border border-gray-700 text-xs">
+      <div className="flex rounded-full border border-gray-700 text-xs">
         {(['all', 'active', 'completed'] as const).map((s) => (
           <button
             key={s}
             onClick={() => handleStatusChange(s)}
             className={`px-3 py-1.5 capitalize transition-colors ${
               status === s
-                ? 'bg-gray-700 text-gray-100'
+                ? 'border border-brand-400 text-brand-400'
                 : 'text-gray-400 hover:text-gray-200'
-            } ${s === 'all' ? 'rounded-l-lg' : ''} ${s === 'completed' ? 'rounded-r-lg' : ''}`}
+            } rounded-full`}
           >
             {s}
             {s === 'active' && activeCount > 0 && (
@@ -120,7 +120,7 @@ export function SessionFilters({ projects, activeCount }: SessionFiltersProps) {
         <select
           value={project}
           onChange={(e) => handleProjectChange(e.target.value)}
-          className="rounded-lg border border-gray-700 bg-gray-800/50 px-3 py-1.5 text-sm text-gray-200 outline-none focus:border-brand-500"
+          className="rounded-full border border-gray-700 bg-transparent px-4 py-1.5 text-sm text-gray-200 outline-none focus:border-brand-400"
         >
           <option value="">All projects</option>
           {projects.map((p) => (
@@ -135,7 +135,7 @@ export function SessionFilters({ projects, activeCount }: SessionFiltersProps) {
         <select
           value={sort}
           onChange={(e) => handleSortChange(e.target.value)}
-          className="rounded-lg border border-gray-700 bg-gray-800/50 px-3 py-1.5 text-sm text-gray-200 outline-none focus:border-brand-500"
+          className="rounded-full border border-gray-700 bg-transparent px-4 py-1.5 text-sm text-gray-200 outline-none focus:border-brand-400"
         >
           <option value="lastActive">Last active</option>
           <option value="started">Started</option>
@@ -145,7 +145,7 @@ export function SessionFilters({ projects, activeCount }: SessionFiltersProps) {
         <button
           type="button"
           onClick={handleSortDirToggle}
-          className="rounded-lg border border-gray-700 px-2 py-1.5 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
+          className="rounded-full border border-gray-700 px-3 py-1.5 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
           title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
         >
           {sortDir === 'asc' ? '\u2191' : '\u2193'}

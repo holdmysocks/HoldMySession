@@ -32,7 +32,7 @@ export function SessionCard({
     : null
   const displayBranch = session.branch ? anonymizeBranch(session.branch) : null
 
-  const cardClass = `group block rounded-xl border-2 bg-gray-900/50 p-4 transition-all hover:bg-gray-900 ${STATUS_BORDER[status]} ${STATUS_PULSE[status]}`
+  const cardClass = `group block rounded-2xl border-2 bg-gray-900 p-4 transition-all hover:bg-gray-800 ${STATUS_BORDER[status]} ${STATUS_PULSE[status]}`
 
   const body = (
     <>
@@ -46,7 +46,7 @@ export function SessionCard({
             </h3>
             <StatusBadge status={status} />
             {session.machine && (
-              <span className="shrink-0 rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-300" title="Ran on this machine">
+              <span className="shrink-0 rounded-full border border-gray-700 px-2 py-0.5 text-[10px] text-gray-300" title="Ran on this machine">
                 {session.machine.name}
               </span>
             )}

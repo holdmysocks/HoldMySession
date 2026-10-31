@@ -31,7 +31,7 @@ export function PaginationControls({
         <select
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          className="rounded-lg border border-gray-700 bg-gray-800/50 px-2 py-1 text-xs text-gray-200 outline-none focus:border-brand-500"
+          className="rounded-full border border-gray-700 bg-transparent px-3 py-1 text-xs text-gray-200 outline-none focus:border-brand-500"
         >
           {VALID_SIZES.map((size) => (
             <option key={size} value={size}>
@@ -55,7 +55,7 @@ export function PaginationControls({
           <button
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1}
-            className="rounded-lg border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-gray-800 disabled:hover:text-gray-400"
+            className="rounded-full border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-gray-800 disabled:hover:text-gray-400"
           >
             Previous
           </button>
@@ -72,7 +72,7 @@ export function PaginationControls({
               <button
                 key={item}
                 onClick={() => onPageChange(item)}
-                className={`min-w-[2rem] rounded-lg px-2 py-1.5 text-xs font-mono transition-colors ${
+                className={`min-w-[2rem] rounded-full px-2 py-1.5 text-xs font-mono transition-colors ${
                   item === page
                     ? 'bg-brand-600 text-gray-100'
                     : 'border border-gray-700 bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
@@ -86,7 +86,7 @@ export function PaginationControls({
           <button
             onClick={() => onPageChange(page + 1)}
             disabled={page >= totalPages}
-            className="rounded-lg border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-gray-800 disabled:hover:text-gray-400"
+            className="rounded-full border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-gray-800 disabled:hover:text-gray-400"
           >
             Next
           </button>

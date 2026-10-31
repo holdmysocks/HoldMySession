@@ -15,8 +15,8 @@ const BADGE: Record<SessionStatus, { label: string; pill: string; dot: string; p
   },
   completed: {
     label: 'Completed',
-    pill: 'bg-brand-500/15 text-brand-300',
-    dot: 'bg-brand-500',
+    pill: 'bg-indigo-400/15 text-indigo-300',
+    dot: 'bg-indigo-400',
     ping: false,
   },
   idle: {
