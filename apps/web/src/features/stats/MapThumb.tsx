@@ -9,7 +9,7 @@ const FILL = {
 } as const
 
 const CARD_W = 76
-const CARD_H = 24
+const CARD_H = 22
 const GAP = 22
 const MAX_PER_ROW = 4
 
@@ -45,7 +45,7 @@ function Sketch({ running, done, idle }: { running: number; done: number; idle: 
   const hidden = running - showRun + (done - showDone) + (idle - showIdle)
   const rowW = (n: number) => n * CARD_W + Math.max(0, n - 1) * GAP
   const W = 394
-  const runY = 0
+  const runY = 3
   const childY = runY + CARD_H + 6
   const secondY = showRun > 0 ? 50 : 28
   const x0 = (n: number) => Math.round((W - rowW(n)) / 2)
@@ -69,7 +69,7 @@ function Sketch({ running, done, idle }: { running: number; done: number; idle: 
         <Card key={`other-${i}`} x={x0(second.length) + i * (CARD_W + GAP)} y={secondY} look={look} />
       ))}
       {hidden > 0 && (
-        <text x={W - 8} y={90} textAnchor="end" fill="#A8A69C" className="text-[12px]">
+        <text x={W - 8} y={89} textAnchor="end" fill="#A8A69C" className="text-[11px]">
           +{hidden} more
         </text>
       )}
