@@ -1,45 +1,34 @@
 @import 'tailwindcss';
 
-@theme {
-  /* Default palette (dark) */
-  --color-gray-50: #f5f3ec;
-  --color-gray-100: #eae6dc;
-  --color-gray-200: #e0dbd0;
-  --color-gray-300: #cdc8b8;
-  --color-gray-400: #a39e90;
-  --color-gray-500: #7a7668;
-  --color-gray-600: #565349;
-  --color-gray-700: #3d3b36;
-  --color-gray-800: #2a2926;
-  --color-gray-900: #1c1c1a;
-  --color-gray-950: #141413;
+@import './themes.css';
 
-  /* Brand terracotta accent */
-  --color-brand-300: #f0b8a0;
-  --color-brand-400: #e09070;
+/*
+ * The default look is Dusk. Every theme in themes.css replaces these same variables, so a theme
+ * changes the page, the cards, the text, the borders and the accent together. The palettes are in
+ * src/features/theme/palettes.ts. The look before the redesign is kept in docs/themes.
+ */
+@theme {
+  --color-gray-50: #faf9f5;
+  --color-gray-100: #eeede9;
+  --color-gray-200: #deddd9;
+  --color-gray-300: #c4c3c0;
+  --color-gray-400: #a5a4a1;
+  --color-gray-500: #858481;
+  --color-gray-600: #5f5e5c;
+  --color-gray-700: #403f3e;
+  --color-gray-800: #2e2d2b;
+  --color-gray-900: #1f1e1d;
+  --color-gray-950: #0f0e0d;
+
+  --color-brand-300: #ffb38f;
+  --color-brand-400: #f0906f;
   --color-brand-500: #d97757;
-  --color-brand-600: #c4643f;
-  --color-brand-700: #a8512e;
+  --color-brand-600: #bb664b;
+  --color-brand-700: #98533d;
 }
 
 :root {
   color-scheme: dark;
-}
-
-:root[data-theme='light'] {
-  color-scheme: light;
-  /* Invert the gray scale so dark-numbered tokens become light surfaces */
-  --color-gray-50: #141413;
-  --color-gray-100: #1c1c1a;
-  --color-gray-200: #2a2926;
-  --color-gray-300: #3d3b36;
-  --color-gray-400: #565349;
-  --color-gray-500: #7a7668;
-  --color-gray-600: #a39e90;
-  --color-gray-700: #cdc8b8;
-  --color-gray-800: #e0dbd0;
-  --color-gray-900: #eae6dc;
-  --color-gray-950: #f5f3ec;
 }
 
 body {

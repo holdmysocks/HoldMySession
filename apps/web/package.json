@@ -43,7 +43,8 @@
     "e2e:headed": "playwright test --headed",
     "lint": "eslint src/",
     "prepack": "cp ../../README.md ./README.md",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "themes": "node --experimental-strip-types scripts/generate-themes-css.mts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.75.0",

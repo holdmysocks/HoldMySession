@@ -9,6 +9,7 @@ import {
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PrivacyProvider } from '@/features/privacy/PrivacyContext'
 import { ThemeProvider } from '@/features/theme/ThemeProvider'
+import { THEMES } from '@/features/theme/palettes'
 import { ClockFormatProvider } from '@/features/time/ClockFormatProvider'
 import appCss from '@/styles/app.css?url'
 
@@ -60,14 +61,15 @@ function RootComponent() {
 const themeInitScript = `
 (() => {
   try {
+    const ids = ${JSON.stringify(THEMES.map((t) => t.id))};
+    const bg = ${JSON.stringify(Object.fromEntries(THEMES.map((t) => [t.id, t.bg])))};
     const stored = localStorage.getItem('csd-theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = stored === 'light' || stored === 'dark' ? stored : (prefersDark ? 'dark' : 'light');
+    const theme = ids.includes(stored) ? stored : (stored === 'light' ? 'clay' : 'dusk');
     document.documentElement.setAttribute('data-theme', theme);
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', theme === 'dark' ? '#141413' : '#f5f3ec');
+    if (meta) meta.setAttribute('content', bg[theme]);
   } catch (e) {
-    document.documentElement.setAttribute('data-theme', 'dark');
+    document.documentElement.setAttribute('data-theme', 'dusk');
   }
 })();
 `
