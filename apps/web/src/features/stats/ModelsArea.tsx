@@ -50,7 +50,7 @@ export function ModelsArea({ data, controls }: { data: DailyModelTokens[]; contr
       <svg
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
-        className="block h-[220px] w-full"
+        className="block h-[140px] w-full sm:h-[220px]"
         role="img"
         aria-label="Stacked area chart of daily tokens by model"
       >

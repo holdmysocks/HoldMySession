@@ -5,6 +5,7 @@ import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { mapProjectValue, type MapProject } from './project-map.api'
 import { mapProjectsQuery, projectMapQuery, hookEventsQuery } from './project-map.queries'
 import { MapCanvas, type NodeMove } from './MapCanvas'
+import { MapTree } from './MapTree'
 import { NeedsYouPanel, waitingFor, waitingNodes } from './NeedsYouPanel'
 import { NodeDetailPanel } from './NodeDetailPanel'
 import { HookEventsPanel } from './HookEventsPanel'
@@ -139,7 +140,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="m-0 truncate font-display text-[44px] font-bold leading-[1.05]">{projectTitle}</h1>
+          <h1 className="m-0 truncate font-display text-[32px] font-bold leading-[1.05] sm:text-[44px]">{projectTitle}</h1>
           <div className="mt-1.5 flex flex-wrap gap-x-3.5 gap-y-1 text-[13px] text-[color:var(--hms-mute)]">
             <span><span style={{ color: '#3DDC84' }}>●</span> {activeCount} running</span>
             <span><span style={{ color: '#FFC83D' }}>●</span> {needsYouCount} need you</span>
@@ -195,9 +196,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
 
       <section
         aria-label="Project map"
-        className={`relative min-w-0 overflow-hidden rounded-[32px] border border-[color:var(--hms-rule)] ${
-          panelsHidden ? 'h-[calc(100vh-18rem)] min-h-[28rem]' : 'h-[calc(100vh-24rem)] min-h-[24rem]'
-        }`}
+        className="relative flex min-w-0 flex-col overflow-hidden rounded-[32px] border border-[color:var(--hms-rule)]"
         style={{ background: 'radial-gradient(500px 260px at 40% 20%, var(--hms-glow), transparent), var(--color-gray-900)' }}
       >
         {mapQuery.isLoading || layoutLoading ? (
@@ -205,15 +204,22 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
         ) : mapQuery.error ? (
           <p className="py-12 text-center text-sm text-red-400">Failed to load map: {mapQuery.error.message}</p>
         ) : layout && layout.nodes.length > 0 ? (
-          <MapCanvas
-            key={selectedValue}
-            layout={layout}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            editMode={editMode}
-            onNodesMove={handleNodesMove}
-            snapToGrid={snapToGrid}
-          />
+          <>
+            <div className="md:hidden">
+              <MapTree nodes={layout.nodes} selectedId={selectedId} onSelect={setSelectedId} />
+            </div>
+            <div className={`hidden md:block ${panelsHidden ? 'h-[calc(100vh-18rem)] min-h-[28rem]' : 'h-[calc(100vh-24rem)] min-h-[24rem]'}`}>
+              <MapCanvas
+                key={selectedValue}
+                layout={layout}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                editMode={editMode}
+                onNodesMove={handleNodesMove}
+                snapToGrid={snapToGrid}
+              />
+            </div>
+          </>
         ) : (
           <p className="py-12 text-center text-sm text-gray-500">This project has no sessions yet.</p>
         )}
@@ -222,7 +228,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
           <button
             type="button"
             onClick={() => setSelectedId(first.id)}
-            className="status-pulse-needs-you absolute bottom-4 left-4 flex max-w-[calc(100%-330px)] flex-wrap items-center gap-x-3.5 gap-y-2 rounded-[22px] border-2 border-[#FFE9A8] px-[18px] py-2.5 text-left text-[#241600] max-md:max-w-[calc(100%-2rem)] max-md:bottom-20"
+            className="status-pulse-needs-you flex max-w-full max-md:order-first flex-wrap items-center gap-x-3.5 gap-y-2 rounded-[22px] border-2 border-[#FFE9A8] px-[18px] py-2.5 text-left text-[#241600] max-md:m-3 md:absolute md:bottom-4 md:left-4 md:max-w-[calc(100%-330px)]"
             style={{ background: 'linear-gradient(160deg, #FFD25A, #F5A623)' }}
           >
             <span className="whitespace-nowrap rounded-full bg-[#241600] px-2.5 py-[3px] text-[11px] font-bold tracking-[0.06em] text-[#FFD25A]">

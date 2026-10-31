@@ -177,8 +177,8 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
 
   return (
     <div>
-      <h1 className="m-0 font-display text-[52px] font-bold leading-[1.05]">Settings</h1>
-      <div role="tablist" aria-label="Settings sections" className="mt-7 flex flex-wrap gap-1.5">
+      <h1 className="m-0 font-display text-[40px] font-bold leading-[1.05] sm:text-[52px]">Settings</h1>
+      <div role="tablist" aria-label="Settings sections" className="-mx-4 mt-7 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -188,7 +188,7 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
             aria-selected={active.id === t.id}
             aria-controls="settings-panel"
             onClick={() => onTab(t.id)}
-            className={`min-h-11 rounded-full border-[1.5px] px-[18px] text-[13.33px] font-medium transition-colors ${
+            className={`min-h-11 shrink-0 rounded-full border-[1.5px] px-[18px] text-[13.33px] font-medium transition-colors ${
               active.id === t.id ? 'border-brand-400 text-brand-400' : 'border-[color:var(--hms-line)] text-[color:var(--hms-mute)] hover:text-gray-100'
             }`}
           >

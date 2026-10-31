@@ -38,7 +38,7 @@ export function RhythmGrid({
 
   return (
     <div
-      className="grid min-h-[170px] flex-1 gap-1"
+      className="grid min-h-[110px] flex-1 gap-0.5 sm:min-h-[170px] sm:gap-1"
       style={{ gridTemplateColumns: `repeat(${WEEKS}, minmax(0, 1fr))`, gridTemplateRows: 'repeat(7, minmax(0, 1fr))', gridAutoFlow: 'column' }}
     >
       {cells.map((c) => (

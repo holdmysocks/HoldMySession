@@ -93,7 +93,7 @@ export function SessionList() {
 
   return (
     <div>
-      <h1 className="m-0 font-display text-[52px] font-bold leading-[1.05]">Sessions</h1>
+      <h1 className="m-0 font-display text-[40px] font-bold leading-[1.05] sm:text-[52px]">Sessions</h1>
       <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-sm text-[color:var(--hms-mute)]">
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span>

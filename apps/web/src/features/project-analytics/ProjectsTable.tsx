@@ -35,7 +35,7 @@ export function ProjectsTable({
         <span className="text-[13px] text-[color:var(--hms-mute)]">Select a project to see this whole page for just that one</span>
       </div>
       <div className="hidden flex-wrap gap-x-5 gap-y-1 border-b border-[color:var(--hms-rule)] py-2.5 text-xs text-[color:var(--hms-mute)] sm:flex">
-        <span className="min-w-[180px] flex-1">Project</span>
+        <span className="min-w-full flex-1 sm:min-w-[180px]">Project</span>
         <span className="min-w-[240px] flex-[2]">Tokens</span>
         <span className="w-20 text-right">Sessions</span>
         <span className="w-[100px] text-right">API price</span>
@@ -53,7 +53,7 @@ export function ProjectsTable({
               p.isUnlinked ? 'text-[color:var(--hms-sub)]' : ''
             }`}
           >
-            <span className="min-w-[180px] flex-1">
+            <span className="min-w-full flex-1 sm:min-w-[180px]">
               <b className="font-display text-[17px] font-semibold">{p.isUnlinked ? p.displayName : anonymizeProjectName(p.displayName)}</b>
               {p.isUnlinked && (
                 <span className="ml-2.5 rounded-full border border-[color:var(--hms-line)] px-[9px] py-0.5 align-[2px] text-[11px] text-[color:var(--hms-mute)]">
@@ -61,7 +61,7 @@ export function ProjectsTable({
                 </span>
               )}
             </span>
-            <span className="flex min-w-[240px] flex-[2] items-center gap-3">
+            <span className="flex min-w-full flex-[2] items-center gap-3 sm:min-w-[240px]">
               <span className="h-2 flex-1 rounded bg-[color:var(--hms-track)]">
                 <span
                   className="block h-2 rounded"
@@ -76,9 +76,9 @@ export function ProjectsTable({
               </span>
               <span className="w-16 text-right tabular-nums">{formatTokenCount(tokens)}</span>
             </span>
-            <span className="w-20 text-right tabular-nums">{p.totalSessions}</span>
-            <span className="w-[100px] text-right tabular-nums">{cost !== undefined ? formatMoney(cost) : '-'}</span>
-            <span className="w-[100px] text-right text-[color:var(--hms-mute)]">{formatAgo(p.lastSessionAt)}</span>
+            <span className="w-auto text-xs text-[color:var(--hms-mute)] tabular-nums sm:w-20 sm:text-right sm:text-base sm:text-inherit">{p.totalSessions} sessions</span>
+            <span className="w-auto text-xs text-[color:var(--hms-mute)] tabular-nums sm:w-[100px] sm:text-right sm:text-base sm:text-inherit">{cost !== undefined ? formatMoney(cost) : '-'}</span>
+            <span className="w-auto text-xs text-[color:var(--hms-mute)] sm:w-[100px] sm:text-right sm:text-base">{formatAgo(p.lastSessionAt)}</span>
           </Link>
         )
       })}

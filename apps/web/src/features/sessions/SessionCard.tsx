@@ -39,8 +39,9 @@ export function SessionCard({
       data-status={status}
       data-machine={session.machine?.id}
     >
-      <span className="mb-2 block md:mb-0">
+      <span className="mb-2 flex items-center justify-between md:mb-0 md:block">
         <StatusBadge status={status} />
+        <span className="text-xs text-[color:var(--hms-mute)] md:hidden">{formatAgo(session.lastActiveAt, now)}</span>
       </span>
 
       <span className="min-w-0">
@@ -78,7 +79,7 @@ export function SessionCard({
         <span className="md:text-right md:text-[15px] md:text-[color:var(--hms-ink)]" title="Duration">
           {session.isActive ? <RunningTimer startedAt={session.startedAt} /> : formatDuration(session.durationMs)}
         </span>
-        <span className="md:text-right md:text-[15px]" title="Last active">{formatAgo(session.lastActiveAt, now)}</span>
+        <span className="hidden md:block md:text-right md:text-[15px]" title="Last active">{formatAgo(session.lastActiveAt, now)}</span>
       </span>
     </Link>
   )

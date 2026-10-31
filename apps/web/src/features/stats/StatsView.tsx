@@ -144,14 +144,14 @@ export function StatsView({
         <ModelsArea
           data={stats.dailyModelTokens}
           controls={
-          <div role="group" aria-label="Range" className="flex flex-wrap rounded-[20px] border border-[color:var(--hms-line)] p-1">
+          <div role="group" aria-label="Range" className="flex w-full rounded-[20px] border border-[color:var(--hms-line)] p-1 sm:w-auto">
             {RANGES.map((r) => (
               <button
                 key={r}
                 type="button"
                 aria-pressed={range === r}
                 onClick={() => onRange(r)}
-                className="min-h-10 min-w-11 rounded-full px-3.5 text-[13.33px] font-medium"
+                className="min-h-10 flex-1 rounded-full px-1 text-[13.33px] font-medium sm:min-w-11 sm:flex-none sm:px-3.5"
                 style={range === r ? { background: 'var(--hms-ink)', color: 'var(--hms-bg)' } : { color: 'var(--hms-ink)' }}
               >
                 {r === 'all' ? 'All' : r}
