@@ -5,11 +5,12 @@ import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { mapProjectValue, type MapProject } from './project-map.api'
 import { mapProjectsQuery, projectMapQuery, hookEventsQuery } from './project-map.queries'
 import { MapCanvas, type NodeMove } from './MapCanvas'
-import { NeedsYouPanel } from './NeedsYouPanel'
+import { NeedsYouPanel, waitingFor, waitingNodes } from './NeedsYouPanel'
 import { NodeDetailPanel } from './NodeDetailPanel'
 import { HookEventsPanel } from './HookEventsPanel'
 import { expiredSubagentsLabel } from './format-node'
 import { useMapLayout } from './use-map-layout'
+import { useNow } from '@/features/sessions/useNow'
 import { useMachineScope } from '@/features/link/useMachineScope'
 
 interface ProjectMapPageProps {
@@ -19,7 +20,7 @@ interface ProjectMapPageProps {
 }
 
 export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps) {
-  const { privacyMode, anonymizeProjectName, anonymizePath } = usePrivacy()
+  const { privacyMode, anonymizeProjectName, anonymizePath, anonymizeSessionName } = usePrivacy()
   const scope = useMachineScope()
   // With a node chosen the list is that node's. With all machines it holds every connected machine's projects.
   const projectsQuery = useQuery(mapProjectsQuery(scope.isRemote ? scope.machineId : undefined))
@@ -34,6 +35,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   const mapQuery = useQuery(projectMapQuery(selectedKey, machineId))
   const eventsQuery = useQuery(hookEventsQuery(machineId))
 
+  const now = useNow()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [panelsHidden, setPanelsHidden] = useState(false)
@@ -57,7 +59,6 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   const sessionNodes = nodes.filter((n) => n.kind === 'session')
   const activeCount = sessionNodes.filter((n) => n.status === 'active').length
   const needsYouCount = sessionNodes.filter((n) => n.status === 'needs-you').length
-  const firstNeedsYou = sessionNodes.find((n) => n.status === 'needs-you')
   // Expired subagents are not drawn, so their count comes from the session nodes' chips.
   const expiredSubagentTotal = sessionNodes.reduce((sum, n) => sum + n.expiredSubagentCount, 0)
   // Sessions with no project, and archived sessions, are left out of the map and counted by the server.
@@ -102,7 +103,6 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   if (projects.length === 0) {
     return (
       <div>
-        <Header />
         <div className="mt-10 rounded-xl border border-dashed border-gray-800 p-8 text-center">
           <p className="text-sm text-gray-300">No projects found</p>
           <p className="mt-1 text-xs text-gray-500">The map reads sessions from the projects folder in your Claude config directory.</p>
@@ -120,162 +120,144 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
       : selectedProject.projectPath
     : ''
 
+  const waiting = waitingNodes(nodes)
+  const projectTitle = selectedProject
+    ? privacyMode
+      ? anonymizeProjectName(selectedProject.projectDisplayName)
+      : selectedProject.projectDisplayName
+    : 'Session Map'
+  const first = waiting[0]
+  const nextWaiting = () => {
+    if (waiting.length === 0) return
+    const at = waiting.findIndex((n) => n.id === selectedId)
+    setSelectedId(waiting[(at + 1) % waiting.length].id)
+  }
+  const pill =
+    'inline-flex min-h-11 items-center rounded-full border border-[color:var(--hms-line)] bg-transparent px-[18px] font-medium text-gray-100 hover:border-gray-500'
+
   return (
-    <div>
-      <Header />
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-sm text-gray-400">
-          <span>Project</span>
-          <select
-            value={selectedValue}
-            onChange={(e) => handleProjectChange(e.target.value)}
-            className="max-w-xs rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-100 focus:border-brand-500 focus:outline-none"
-          >
-            {machineGroups.map((group) => {
-              const options = group.projects.map((p) => (
-                <option key={mapProjectValue(p)} value={mapProjectValue(p)}>
-                  {privacyMode ? anonymizeProjectName(p.projectDisplayName) : p.projectDisplayName} ({p.sessionCount})
-                </option>
-              ))
-              return group.name ? <optgroup key={group.name} label={group.name}>{options}</optgroup> : options
-            })}
-          </select>
-        </label>
-        {selectedProject && (
-          <p className="min-w-0 truncate text-xs text-gray-500">
-            <span className="font-mono">{displayPath}</span>
-            <span className="mx-2 text-gray-700">|</span>
-            {activeCount} active
-            <span className="mx-2 text-gray-700">|</span>
-            {needsYouCount} need you
-            <span className="mx-2 text-gray-700">|</span>
-            {hiddenNoProjectCount} hidden (no project)
-            <span className="mx-2 text-gray-700">|</span>
-            {hiddenArchivedCount} archived hidden
-            <span className="mx-2 text-gray-700">|</span>
-            {expiredSubagentsLabel(expiredSubagentTotal)}
-          </p>
-        )}
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          aria-pressed={editMode}
-          onClick={() => setEditMode((on) => !on)}
-          className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-            editMode
-              ? 'border-brand-500 bg-brand-500/15 text-brand-600'
-              : 'border-gray-800 bg-gray-900 text-gray-300 hover:text-gray-100'
-          }`}
-        >
-          {editMode ? 'Editing layout' : 'Edit layout'}
-        </button>
-        {editMode && (
-          <label className="flex items-center gap-1.5 rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-300">
-            <input
-              type="checkbox"
-              checked={snapToGrid}
-              onChange={(e) => setSnapToGrid(e.target.checked)}
-              className="accent-brand-500"
-            />
-            Snap to grid
-          </label>
-        )}
-        {editMode && (
-          <button
-            type="button"
-            onClick={handleResetLayout}
-            disabled={!hasCustomLayout}
-            className="rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-300 hover:text-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Reset layout
-          </button>
-        )}
-        <button
-          type="button"
-          aria-pressed={panelsHidden}
-          onClick={() => setPanelsHidden((hidden) => !hidden)}
-          className="rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5 text-sm text-gray-300 hover:text-gray-100"
-        >
-          {panelsHidden ? 'Show panels' : 'Hide panels'}
-        </button>
-        <p className="text-xs text-gray-500">
-          {editMode
-            ? 'Drag a card to move it. It snaps to the grid, and holding Alt places it freely. Ctrl-click cards, or hold Ctrl and drag over empty space, to select several and move them together. Drag empty space to pan, scroll to zoom, arrow keys nudge. Your layout is saved on the server and follows you to other devices.'
-            : 'Drag to pan, scroll to zoom.'}
-        </p>
-        {saveFailed && (
-          <p role="alert" className="text-xs text-red-400">
-            Could not save the layout. Trying again.
-          </p>
-        )}
-      </div>
-
-      <div className="mt-3">
-        <section
-          aria-label="Project map"
-          className={`relative min-w-0 overflow-hidden rounded-2xl border border-gray-800 bg-gray-950 ${
-            panelsHidden ? 'h-[calc(100vh-18rem)] min-h-[28rem]' : 'h-[calc(100vh-24rem)] min-h-[22rem]'
-          }`}
-        >
-          {needsYouCount > 0 && firstNeedsYou && (
-            <button
-              type="button"
-              onClick={() => setSelectedId(firstNeedsYou.id)}
-              className="absolute left-3 top-3 z-10 flex items-center gap-2 rounded-full border border-yellow-400 bg-gray-900/90 px-3 py-1.5 text-xs font-medium text-yellow-300 shadow-lg"
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="m-0 truncate font-display text-[44px] font-bold leading-[1.05]">{projectTitle}</h1>
+          <div className="mt-1.5 flex flex-wrap gap-x-3.5 gap-y-1 text-[13px] text-[color:var(--hms-mute)]">
+            <span><span style={{ color: '#3DDC84' }}>●</span> {activeCount} running</span>
+            <span><span style={{ color: '#FFC83D' }}>●</span> {needsYouCount} need you</span>
+            {selectedProject && <span className="font-mono">{displayPath}</span>}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <label className="relative flex items-center">
+            <span className="sr-only">Project</span>
+            <select
+              value={selectedValue}
+              onChange={(e) => handleProjectChange(e.target.value)}
+              className={`${pill} max-w-[260px] appearance-none pr-9`}
             >
-              <span className="h-2 w-2 rounded-full bg-yellow-400" />
-              {needsYouCount === 1 ? '1 session needs you' : `${needsYouCount} sessions need you`}
+              {machineGroups.map((group) => {
+                const options = group.projects.map((p) => (
+                  <option key={mapProjectValue(p)} value={mapProjectValue(p)}>
+                    {privacyMode ? anonymizeProjectName(p.projectDisplayName) : p.projectDisplayName} ({p.sessionCount})
+                  </option>
+                ))
+                return group.name ? <optgroup key={group.name} label={group.name}>{options}</optgroup> : options
+              })}
+            </select>
+            <span aria-hidden="true" className="pointer-events-none absolute right-4 text-[11px]">▾</span>
+          </label>
+          <button type="button" aria-pressed={editMode} onClick={() => setEditMode((on) => !on)} className={`${pill} ${editMode ? 'border-brand-400 text-brand-400' : ''}`}>
+            {editMode ? 'Editing layout' : 'Edit layout'}
+          </button>
+          {editMode && (
+            <label className={`${pill} gap-1.5 text-sm`}>
+              <input type="checkbox" checked={snapToGrid} onChange={(e) => setSnapToGrid(e.target.checked)} className="accent-brand-400" />
+              Snap to grid
+            </label>
+          )}
+          {editMode && (
+            <button type="button" onClick={handleResetLayout} disabled={!hasCustomLayout} className={`${pill} disabled:cursor-not-allowed disabled:opacity-40`}>
+              Reset layout
             </button>
           )}
-          {mapQuery.isLoading || layoutLoading ? (
-            <div className="h-64 animate-pulse rounded-2xl bg-gray-900" />
-          ) : mapQuery.error ? (
-            <p className="py-12 text-center text-sm text-red-400">
-              Failed to load map: {mapQuery.error.message}
-            </p>
-          ) : layout && layout.nodes.length > 0 ? (
-            <MapCanvas
-              key={selectedValue}
-              layout={layout}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              editMode={editMode}
-              onNodesMove={handleNodesMove}
-              snapToGrid={snapToGrid}
-            />
-          ) : (
-            <p className="py-12 text-center text-sm text-gray-500">
-              This project has no sessions yet.
-            </p>
-          )}
-        </section>
-
-        {!panelsHidden && (
-          <div className="mt-4 space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <NeedsYouPanel nodes={nodes} onSelect={setSelectedId} selectedId={selectedId} />
-              <NodeDetailPanel node={selectedNode} projectKey={selectedKey} machineId={machineId} />
-            </div>
-            <HookEventsPanel events={eventsQuery.data} />
-          </div>
-        )}
+          <button type="button" aria-pressed={panelsHidden} onClick={() => setPanelsHidden((hidden) => !hidden)} className={pill}>
+            {panelsHidden ? 'Show panels' : 'Hide panels'}
+          </button>
+        </div>
       </div>
-    </div>
-  )
-}
+      {(editMode || saveFailed) && (
+        <p className="-mt-2 text-xs text-[color:var(--hms-mute)]">
+          {editMode
+            ? 'Drag a card to move it. It snaps to the grid, and holding Alt places it freely. Ctrl-click cards, or hold Ctrl and drag over empty space, to select several and move them together. Drag empty space to pan, scroll to zoom, arrow keys nudge. Your layout is saved on the server and follows you to other devices.'
+            : ''}
+          {saveFailed && <span role="alert" className="ml-2 text-red-400">Could not save the layout. Trying again.</span>}
+        </p>
+      )}
 
-function Header() {
-  return (
-    <div>
-      <h1 className="font-display text-3xl font-extrabold text-gray-100">Session Map</h1>
-      <p className="mt-1 text-sm text-gray-400">
-        Sessions in a project, with the subagents they dispatched. Read-only: the editor only moves cards, and the arrangement is saved by the dashboard, not in your Claude config.
-      </p>
-      <p className="mt-2 text-xs text-gray-500">
-        Messaging and linking sessions: Phase 2, see docs/session-map/README.md
+      <section
+        aria-label="Project map"
+        className={`relative min-w-0 overflow-hidden rounded-[32px] border border-[color:var(--hms-rule)] ${
+          panelsHidden ? 'h-[calc(100vh-18rem)] min-h-[28rem]' : 'h-[calc(100vh-24rem)] min-h-[24rem]'
+        }`}
+        style={{ background: 'radial-gradient(500px 260px at 40% 20%, var(--hms-glow), transparent), var(--color-gray-900)' }}
+      >
+        {mapQuery.isLoading || layoutLoading ? (
+          <div className="h-64 animate-pulse rounded-2xl bg-gray-900" />
+        ) : mapQuery.error ? (
+          <p className="py-12 text-center text-sm text-red-400">Failed to load map: {mapQuery.error.message}</p>
+        ) : layout && layout.nodes.length > 0 ? (
+          <MapCanvas
+            key={selectedValue}
+            layout={layout}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            editMode={editMode}
+            onNodesMove={handleNodesMove}
+            snapToGrid={snapToGrid}
+          />
+        ) : (
+          <p className="py-12 text-center text-sm text-gray-500">This project has no sessions yet.</p>
+        )}
+
+        {first && (
+          <button
+            type="button"
+            onClick={() => setSelectedId(first.id)}
+            className="status-pulse-needs-you absolute bottom-4 left-4 flex max-w-[calc(100%-330px)] flex-wrap items-center gap-x-3.5 gap-y-2 rounded-[22px] border-2 border-[#FFE9A8] px-[18px] py-2.5 text-left text-[#241600] max-md:max-w-[calc(100%-2rem)] max-md:bottom-20"
+            style={{ background: 'linear-gradient(160deg, #FFD25A, #F5A623)' }}
+          >
+            <span className="whitespace-nowrap rounded-full bg-[#241600] px-2.5 py-[3px] text-[11px] font-bold tracking-[0.06em] text-[#FFD25A]">
+              {waiting.length} NEED YOU
+            </span>
+            <span className="min-w-0 font-semibold">
+              {privacyMode ? anonymizeSessionName(first.title) : first.title}
+              {first.pendingQuestions.length > 0 ? ' asked you a question' : ' is waiting on you'}{' '}
+              <span className="font-normal text-[#4A3200]">
+                · {waitingFor(first, now)}
+                {waiting.length > 1 ? `, and ${waiting.length - 1} more` : ''}
+              </span>
+            </span>
+            <span className="inline-flex min-h-11 items-center rounded-full bg-[#241600] px-[18px] font-semibold text-[#FFD25A]">Review first</span>
+          </button>
+        )}
+      </section>
+
+      {!panelsHidden && (
+        <>
+          <div className="flex flex-wrap items-stretch gap-6">
+            <NeedsYouPanel nodes={nodes} onSelect={setSelectedId} selectedId={selectedId} />
+            <NodeDetailPanel
+              node={selectedNode}
+              projectKey={selectedKey}
+              machineId={machineId}
+              onNext={waiting.length > 1 ? nextWaiting : undefined}
+            />
+          </div>
+          <HookEventsPanel events={eventsQuery.data} />
+        </>
+      )}
+
+      <p className="text-xs text-[color:var(--hms-mute)]">
+        {hiddenNoProjectCount} hidden (no project) · {hiddenArchivedCount} archived hidden · {expiredSubagentsLabel(expiredSubagentTotal)}
       </p>
     </div>
   )

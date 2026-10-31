@@ -46,6 +46,27 @@ const STATUS_CLASSES: Record<
   idle: { stroke: 'stroke-gray-600', dot: 'fill-gray-500' },
 }
 
+/** What each status looks like on a card: its fill, border, dot, text colours, tag word and glow. */
+interface Look {
+  fill: string
+  edge: string
+  dot: string
+  ink: string
+  sub: string
+  word: string
+  badge: string
+  badgeInk: string
+  glow: string
+}
+const GREEN: Look = { fill: 'url(#hms-card-active)', edge: '#3DDC84', dot: '#3DDC84', ink: '#EAFFF2', sub: '#8BE8B4', word: 'RUNNING', badge: '#3DDC84', badgeInk: '#04210F', glow: '#3DDC8455' }
+const LOOKS: Record<MapNodeStatus, Look> = {
+  active: GREEN,
+  running: GREEN,
+  'needs-you': { fill: 'url(#hms-card-warn)', edge: '#FFE9A8', dot: '#2A1B00', ink: '#241600', sub: '#4A3200', word: 'NEEDS YOU', badge: '#241600', badgeInk: '#FFD25A', glow: '#FFC83D77' },
+  completed: { fill: 'url(#hms-card-done)', edge: '#9B8CFF', dot: '#9B8CFF', ink: '#F1EFFF', sub: '#B9B0FF', word: 'DONE', badge: '#9B8CFF', badgeInk: '#17123F', glow: '#9B8CFF44' },
+  idle: { fill: '#1D1C1A', edge: '#ffffff2a', dot: '#8F8D85', ink: '#FAF9F5', sub: '#A8A69C', word: 'IDLE', badge: '#ffffff1c', badgeInk: '#C9C7BE', glow: 'transparent' },
+}
+
 /** Session node border width. Subagent cards use a thinner one. Selection adds 1. */
 const SESSION_STROKE = 2
 const SUBAGENT_STROKE = 1.5
@@ -306,6 +327,11 @@ export function MapCanvas({
           event.preventDefault()
         }}
       >
+        <defs>
+          <linearGradient id="hms-card-active" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#0F4A2C" /><stop offset="1" stopColor="#0A2D1B" /></linearGradient>
+          <linearGradient id="hms-card-warn" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FFD25A" /><stop offset="1" stopColor="#F5A623" /></linearGradient>
+          <linearGradient id="hms-card-done" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#2B2466" /><stop offset="1" stopColor="#1A1640" /></linearGradient>
+        </defs>
         {editMode && snapToGrid && size.width > 0 && view.k >= MIN_GRID_ZOOM && (
           <defs>
             <pattern
@@ -366,7 +392,7 @@ export function MapCanvas({
       <div
         role="toolbar"
         aria-label="Map view"
-        className="absolute bottom-3 right-3 flex items-center gap-1 rounded-lg border border-gray-800 bg-gray-900/90 p-1 text-xs text-gray-300 shadow-lg"
+        className="absolute bottom-3.5 right-3.5 flex items-center gap-0.5 rounded-full border border-[color:var(--hms-line)] bg-gray-900 p-[3px] text-xs text-[color:var(--hms-mute)]"
       >
         <ViewButton label="Zoom out" onClick={() => zoomFromCentre(1 / ZOOM_BUTTON_FACTOR)}>
           −
@@ -389,7 +415,9 @@ function ViewButton({ label, onClick, children }: { label: string; onClick: () =
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="min-w-7 rounded-md px-2 py-1 font-medium text-gray-200 hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400"
+      className={`min-h-11 rounded-full font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 ${
+        children === 'Fit' ? 'bg-brand-400 px-[18px] font-semibold text-gray-950 hover:bg-brand-300' : 'min-w-11 text-lg text-gray-100 hover:bg-gray-800'
+      }`}
     >
       {children}
     </button>
@@ -403,9 +431,11 @@ function MapEdgeLine({ edge }: { edge: PositionedEdge }) {
     <path
       d={edge.d}
       fill="none"
-      strokeWidth={1.5}
-      strokeDasharray={isFork ? '6 4' : undefined}
-      className={isFork ? 'stroke-gray-500' : 'stroke-gray-700'}
+      strokeWidth={isFork ? 3 : 2.5}
+      strokeLinecap="round"
+      strokeDasharray={isFork ? '0.1 7' : undefined}
+      stroke={isFork ? '#3DDC8499' : '#3DDC8477'}
+      style={{ filter: 'drop-shadow(0 0 6px #3DDC8455)' }}
     />
   )
 }
@@ -434,6 +464,8 @@ function NodeView({ node, selected, multiSelected, editMode, canMove, onClick, o
   const { privacyMode, anonymizeSessionName, anonymizeProjectName, anonymizeBranch } = usePrivacy()
   const isSession = node.kind === 'session'
   const classes = STATUS_CLASSES[node.status]
+  const look = LOOKS[node.status]
+  const radius = isSession ? 22 : 16
 
   const sessionTitle = isSession && privacyMode ? anonymizeSessionName(node.title) : node.title
   const projectLabel =
@@ -498,33 +530,53 @@ function NodeView({ node, selected, multiSelected, editMode, canMove, onClick, o
       )}
       {classes.halo && (
         <rect
+          data-card-halo
           x={-HALO_INSET}
           y={-HALO_INSET}
           width={node.width + HALO_INSET * 2}
           height={node.height + HALO_INSET * 2}
-          rx={16}
+          rx={radius + 4}
           strokeWidth={0}
           className={classes.halo}
+          style={{ fill: look.glow, filter: `drop-shadow(0 0 14px ${look.glow})` }}
+        />
+      )}
+      {selected && (
+        <rect
+          data-selected-ring
+          x={-5}
+          y={-5}
+          width={node.width + 10}
+          height={node.height + 10}
+          rx={radius + 5}
+          fill="none"
+          stroke="var(--hms-ink)"
+          strokeWidth={3}
         />
       )}
       <rect
+        data-card-body
         width={node.width}
         height={node.height}
-        rx={12}
-        strokeWidth={(isSession ? SESSION_STROKE : SUBAGENT_STROKE) + (selected ? 1 : 0)}
-        className={`${selected ? 'fill-gray-800' : 'fill-gray-900'} ${classes.stroke} ${classes.edge ?? ''} group-focus-visible:stroke-brand-300`}
+        rx={radius}
+        strokeWidth={(isSession ? SESSION_STROKE : SUBAGENT_STROKE) + (selected ? 1 : 0) + (node.status === 'needs-you' ? 1 : 0)}
+        className={`${classes.stroke} ${classes.edge ?? ''} group-focus-visible:stroke-brand-300`}
+        style={{ fill: look.fill, stroke: node.status === 'needs-you' ? look.edge : undefined, filter: look.glow === 'transparent' ? undefined : `drop-shadow(0 0 12px ${look.glow})` }}
       />
       {isSession ? (
         <SessionLines
           sessionTitle={sessionTitle}
-          dotClass={classes.dot}
+          look={look}
           branch={branch}
-          subtitle={node.subtitle}
+          sessionId={node.sessionId}
+          messages={node.subtitle.split('·')[1]?.trim() ?? ''}
           model={model}
           relation={relationTag(node.parentRelation)}
+          kind={node.needsYou ? (node.pendingQuestions.length > 0 ? 'Question' : 'Permission') : null}
+          pulse={node.status === 'active' || node.status === 'running'}
         />
       ) : (
-        <SubagentLines title={node.title} description={node.subtitle} dotClass={classes.dot} />
+        <SubagentLines title={node.title} description={node.subtitle} look={look} pulse={node.status === 'active' || node.status === 'running'} />
       )}
       {isSession && node.backgroundTaskCount > 0 && (
         <TaskChip count={node.backgroundTaskCount} x={node.width - 120} y={node.height - 22} />
@@ -542,8 +594,8 @@ function TaskChip({ count, x, y }: { count: number; x: number; y: number }) {
   const label = `${count} ${count === 1 ? 'task' : 'tasks'}`
   return (
     <g aria-hidden="true">
-      <rect x={x} y={y} width={68} height={16} rx={8} strokeWidth={1} className="fill-gray-800 stroke-green-600" />
-      <text x={x + 34} y={y + 11.5} textAnchor="middle" className="fill-green-300 text-[10px] font-semibold">
+      <rect x={x} y={y} width={68} height={18} rx={9} fill="#00000055" />
+      <text x={x + 34} y={y + 12.5} textAnchor="middle" fill="#CFEFDC" className="text-[11px]">
         {label}
       </text>
     </g>
@@ -551,79 +603,95 @@ function TaskChip({ count, x, y }: { count: number; x: number; y: number }) {
 }
 
 /**
- * "+N" chip at the bottom right of a session node: N subagents were dispatched here but their
- * cache has expired, so they are not drawn. Sits below the subtitle and clear of the model line.
+ * Chip at the bottom right of a session node: N subagents were dispatched here but their
+ * cache has expired, so they are not drawn.
  */
 function ExpiredChip({ count, x, y }: { count: number; x: number; y: number }) {
+  const text = `+${count} quiet ${count === 1 ? 'agent' : 'agents'}`
+  const width = text.length * 6 + 18
   return (
     <g aria-hidden="true">
-      <rect x={x} y={y} width={40} height={16} rx={8} strokeWidth={1} className="fill-gray-800 stroke-gray-600" />
-      <text x={x + 20} y={y + 11.5} textAnchor="middle" className="fill-gray-300 text-[10px] font-semibold">
-        {`+${count}`}
+      <rect x={x - width + 40} y={y} width={width} height={18} rx={9} fill="#00000055" />
+      <text x={x - width / 2 + 40} y={y + 12.5} textAnchor="middle" fill="#CFEFDC" className="text-[11px]">
+        {text}
       </text>
     </g>
   )
 }
 
+/** A status dot with a soft glow. Running ones breathe. */
+function Dot({ cx, cy, r, color, pulse }: { cx: number; cy: number; r: number; color: string; pulse: boolean }) {
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={r}
+      fill={color}
+      style={{ filter: `drop-shadow(0 0 5px ${color})`, animation: pulse ? 'runPulse 1.6s ease-in-out infinite' : undefined }}
+    />
+  )
+}
+
 /**
- * Text on a session card. The project is left off: the map is already for one project. The
- * session name sits next to the status dot, and the lines below it are larger than before.
+ * Text on a session card: the name next to the status dot, then the status word with the messages and
+ * model, then the branch and short id. The project is left off: the map is already for one project.
  */
 function SessionLines({
   sessionTitle,
-  dotClass,
+  look,
   branch,
-  subtitle,
+  sessionId,
+  messages,
   model,
   relation,
+  kind,
+  pulse,
 }: {
   sessionTitle: string
-  dotClass: string
+  look: Look
   branch: string | null
-  subtitle: string
+  sessionId: string
+  messages: string
   model: string | null
   relation: string | null
+  /** What a needs-you session is waiting for, shown in place of the message count. */
+  kind: string | null
+  pulse: boolean
 }) {
+  const wordWidth = look.word.length * 6.6 + 16
+  const meta = [kind ?? relation, kind ? null : messages, model].filter(Boolean).join(' · ')
+  const detail = [branch, sessionId.slice(0, 8)].filter(Boolean).join(' · ')
   return (
     <>
-      <circle cx={16} cy={24} r={5} className={dotClass} />
-      <text x={30} y={29} className="fill-gray-100 text-[15px] font-semibold">
-        {truncateLabel(sessionTitle, 28)}
+      <Dot cx={21} cy={28} r={5} color={look.dot} pulse={pulse} />
+      <text x={36} y={33} fill={look.ink} className="font-display text-[16px] font-semibold">
+        {truncateLabel(sessionTitle, 24)}
       </text>
-      <text x={16} y={51} className="fill-gray-400 text-[12px]">
-        {truncateLabel(subtitle, 36)}
+      <rect x={16} y={46} width={wordWidth} height={16} rx={8} fill={look.badge} />
+      <text x={16 + wordWidth / 2} y={57.5} textAnchor="middle" fill={look.badgeInk} className="text-[10px] font-bold" letterSpacing="0.06em">
+        {look.word}
       </text>
-      {branch && (
-        <text x={16} y={69} className="fill-gray-500 text-[11px]">
-          {truncateLabel(branch, 40)}
-        </text>
-      )}
-      {(model || relation) && (
-        <text x={16} y={87} className="fill-gray-500 font-mono text-[11px]">
-          {[relation, model].filter(Boolean).join(' · ')}
+      <text x={16 + wordWidth + 8} y={58} fill={look.sub} className="text-[12px]">
+        {truncateLabel(meta, 28)}
+      </text>
+      {detail && (
+        <text x={16} y={82} fill={look.sub} opacity={0.85} className="font-mono text-[11px]">
+          {truncateLabel(detail, 34)}
         </text>
       )}
     </>
   )
 }
 
-function SubagentLines({
-  title,
-  description,
-  dotClass,
-}: {
-  title: string
-  description: string
-  dotClass: string
-}) {
+function SubagentLines({ title, description, look, pulse }: { title: string; description: string; look: Look; pulse: boolean }) {
   return (
     <>
-      <circle cx={12} cy={19} r={3.5} className={dotClass} />
-      <text x={22} y={24} className="fill-gray-100 text-[13px] font-semibold">
-        {truncateLabel(title, 24)}
+      <Dot cx={15} cy={21} r={4.5} color={look.dot} pulse={pulse} />
+      <text x={29} y={26} fill={look.ink} className="font-display text-[14px] font-semibold">
+        {truncateLabel(title, 22)}
       </text>
-      <text x={22} y={44} className="fill-gray-500 text-[11px]">
-        {truncateLabel(description, 30)}
+      <text x={14} y={46} fill={look.sub} className="text-[12px]">
+        {truncateLabel(description, 28)}
       </text>
     </>
   )

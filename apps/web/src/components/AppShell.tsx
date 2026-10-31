@@ -76,15 +76,13 @@ function NavPill({ currentPath, className }: { currentPath: string; className?: 
 export function AppShell({ children }: { children: ReactNode }) {
   const matches = useMatches()
   const currentPath = matches[matches.length - 1]?.pathname ?? ''
-  const wide = currentPath.startsWith('/map')
   const { data: appInfo } = useQuery(appInfoQuery)
   const { data: update } = useQuery(updateInfoQuery)
   useHistoryRefresh()
   const onSettings = currentPath.startsWith('/settings')
   const updateReady = !!update?.available && !!update.latest
 
-  // The map fills the width it is given. Every other page keeps a readable column.
-  const column = wide ? 'px-4 sm:px-6' : 'mx-auto w-full max-w-[1228px] px-4 sm:px-6'
+  const column = 'mx-auto w-full max-w-[1228px] px-4 sm:px-6'
 
   return (
     <div

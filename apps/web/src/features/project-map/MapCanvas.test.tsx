@@ -124,12 +124,12 @@ describe('MapCanvas', () => {
     expect(screen.getByRole('button', { name: 'Subagent, Explore, Running' }).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('shows the session name next to the dot, then the short id and message count, branch and model', () => {
+  it('shows the session name next to the dot, then the status word, messages and model, and the branch and short id', () => {
     renderCanvas(layout)
     expect(screen.getAllByText('Fix the map labels').length).toBeGreaterThan(0)
-    expect(screen.getByText('aaaaaaaa · 4 msgs')).toBeTruthy()
-    expect(screen.getAllByText('feature/map').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('example-1').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/^(IDLE|DONE|RUNNING|NEEDS YOU)$/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/4 msgs · example-1/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('feature/map · aaaaaaaa').length).toBeGreaterThan(0)
   })
 
   it('leaves the project name off the card, but keeps it in the accessible label', () => {
@@ -193,7 +193,7 @@ describe('MapCanvas borders and expired subagents', () => {
 
   it('draws session borders 2px wide and subagent borders 1.5px wide', () => {
     const container = renderInputs([input('aaaaaaaa-1111', [agent], [['agent-1', Date.now()]])])
-    const bodies = Array.from(container.querySelectorAll('rect[rx="12"]'))
+    const bodies = Array.from(container.querySelectorAll('rect[data-card-body]'))
     expect(bodies.map((b) => b.getAttribute('stroke-width'))).toEqual(['2', '1.5'])
   })
 
@@ -204,30 +204,30 @@ describe('MapCanvas borders and expired subagents', () => {
         <MapCanvas layout={layout} selectedId={layout.nodes[0].id} onSelect={vi.fn()} />
       </PrivacyProvider>,
     )
-    expect(container.querySelector('rect[rx="12"]')!.getAttribute('stroke-width')).toBe('3')
+    expect(container.querySelector('rect[data-card-body]')!.getAttribute('stroke-width')).toBe('3')
   })
 
   it('shows a +N chip for the expired subagents of a session, and says so in its label', () => {
     const container = renderInputs([
       input('aaaaaaaa-1111', [agent, { ...agent, agentId: 'agent-2' }]),
     ])
-    expect(screen.getByText('+2')).toBeTruthy()
+    expect(screen.getByText('+2 quiet agents')).toBeTruthy()
     expect(
       screen.getByRole('button', { name: 'Session, My App, Fix the map labels, Idle, 2 expired subagents hidden' }),
     ).toBeTruthy()
     // The chip is decoration. The label above carries the same information.
-    expect(container.querySelector('[aria-hidden="true"]')!.textContent).toBe('+2')
+    expect(container.querySelector('[aria-hidden="true"]')!.textContent).toBe('+2 quiet agents')
   })
 
   it('shows no chip when every subagent is running', () => {
     renderInputs([input('aaaaaaaa-1111', [agent], [['agent-1', Date.now()]])])
-    expect(screen.queryByText(/^\+\d+$/)).toBeNull()
+    expect(screen.queryByText(/^\+\d+ quiet/)).toBeNull()
   })
 
   it('draws a session whose subagents have all expired as one node, with no child cards', () => {
     const container = renderInputs([input('aaaaaaaa-1111', [agent])])
-    expect(container.querySelectorAll('rect[rx="12"]')).toHaveLength(1)
-    expect(screen.getByText('+1')).toBeTruthy()
+    expect(container.querySelectorAll('rect[data-card-body]')).toHaveLength(1)
+    expect(screen.getByText('+1 quiet agent')).toBeTruthy()
   })
 
   it('brightens the border of a needs-you session', () => {
@@ -235,8 +235,8 @@ describe('MapCanvas borders and expired subagents', () => {
     const pendingInput = input('bbbbbbbb-2222', [], [], { isActive: true })
     pendingInput.pendingQuestions = [{ toolUseId: 'q', timestamp: '2026-01-01T10:00:00Z', questions: [] }]
     const needsYou = renderInputs([pendingInput])
-    expect(container.querySelector('rect[rx="12"]')!.getAttribute('class')).not.toContain('status-edge-needs-you')
-    expect(needsYou.querySelector('rect[rx="12"]')!.getAttribute('class')).toContain('status-edge-needs-you')
+    expect(container.querySelector('rect[data-card-body]')!.getAttribute('class')).not.toContain('status-edge-needs-you')
+    expect(needsYou.querySelector('rect[data-card-body]')!.getAttribute('class')).toContain('status-edge-needs-you')
   })
 })
 
@@ -264,8 +264,8 @@ describe('MapCanvas status styling', () => {
         <MapCanvas layout={single} selectedId={null} onSelect={vi.fn()} />
       </PrivacyProvider>,
     )
-    const body = container.querySelector('rect[rx="12"]')!
-    const halo = container.querySelector('rect[rx="16"]')
+    const body = container.querySelector('rect[data-card-body]')!
+    const halo = container.querySelector('rect[data-card-halo]')
     return { body: body.getAttribute('class') ?? '', halo: halo?.getAttribute('class') ?? null }
   }
 
