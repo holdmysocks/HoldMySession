@@ -1,7 +1,7 @@
 import type { StatsCache } from '@/lib/parsers/types'
 import { projectGroupKey } from '@/lib/projects/unlinked'
 import type { Db } from './sqlite'
-import { localDay } from './day-allocation'
+import { localDay, splitByWeight } from './day-allocation'
 
 export interface HistoryStatsOptions {
   /** A project's path, or UNLINKED_PROJECT_KEY, to count only that project's sessions. */
@@ -47,13 +47,36 @@ export function selectSessions(db: Db, options: HistoryStatsOptions = {}): Sessi
   )
 }
 
+/** A session's open time split over the local days between its first and last message. */
+export function splitDuration(startIso: string, endIso: string, durationMs: number): Map<string, number> {
+  const start = new Date(startIso).getTime()
+  const end = new Date(endIso).getTime()
+  const startDay = localDay(startIso)
+  const endDay = localDay(endIso)
+  if (!startDay || !endDay || !(durationMs > 0) || !(end > start) || startDay === endDay) {
+    return new Map(endDay && durationMs > 0 ? [[endDay, Math.round(durationMs)]] : [])
+  }
+  const weights = new Map<string, number>()
+  let cursor = start
+  // Day by day to midnight, never more than a few years, so a bad timestamp cannot loop forever.
+  for (let i = 0; i < 1500 && cursor < end; i++) {
+    const d = new Date(cursor)
+    const nextMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime()
+    const stop = Math.min(nextMidnight, end)
+    const day = localDay(new Date(cursor).toISOString())
+    if (day) weights.set(day, (weights.get(day) ?? 0) + (stop - cursor))
+    cursor = stop
+  }
+  return splitByWeight(Math.round(durationMs), weights)
+}
+
 export function statsFromHistory(db: Db, options: HistoryStatsOptions = {}): StatsCache | null {
   const chosen = selectSessions(db, options)
   if (!chosen || chosen.length === 0) return null
 
   const keys = new Set(chosen.map((row) => `${row.machine_id}\u0000${row.session_key}`))
 
-  const activity = new Map<string, { messageCount: number; sessionCount: number; toolCallCount: number }>()
+  const activity = new Map<string, { messageCount: number; sessionCount: number; toolCallCount: number; durationMs: number }>()
   const hourCounts: Record<string, number> = {}
   let totalMessages = 0
   let firstSessionDate: string | null = null
@@ -62,11 +85,17 @@ export function statsFromHistory(db: Db, options: HistoryStatsOptions = {}): Sta
   for (const row of chosen) {
     const lastActive = String(row.last_active_at || row.started_at)
     const day = localDay(lastActive) ?? lastActive.split('T')[0]
-    const cur = activity.get(day) ?? { messageCount: 0, sessionCount: 0, toolCallCount: 0 }
+    const cur = activity.get(day) ?? { messageCount: 0, sessionCount: 0, toolCallCount: 0, durationMs: 0 }
     cur.sessionCount += 1
     cur.messageCount += Number(row.message_count)
     cur.toolCallCount += Number(row.tool_call_count)
     activity.set(day, cur)
+    // The time a session was open is spread over the days it spanned, by how much of each day it covers.
+    for (const [d, ms] of splitDuration(String(row.started_at), lastActive, Number(row.duration_ms))) {
+      const a = activity.get(d) ?? { messageCount: 0, sessionCount: 0, toolCallCount: 0, durationMs: 0 }
+      a.durationMs += ms
+      activity.set(d, a)
+    }
     totalMessages += Number(row.message_count)
 
     const started = new Date(String(row.started_at))

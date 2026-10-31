@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { openHistoryDb } from './history-db'
-import { statsFromHistory } from './history-stats'
+import { splitDuration, statsFromHistory } from './history-stats'
 import { UNLINKED_PROJECT_KEY } from '@/lib/projects/unlinked'
 
 function claudeFolder(): string {
@@ -84,5 +84,24 @@ describe('statsFromHistory', () => {
     const { db } = await scanned()
     db.exec('UPDATE sessions SET cwd = NULL')
     expect(statsFromHistory(db)).toBeNull()
+  })
+})
+
+describe('splitDuration', () => {
+  it('puts a session that stayed within one day on that day', () => {
+    const out = splitDuration('2026-10-30T09:00:00', '2026-10-30T11:00:00', 7_200_000)
+    expect([...out]).toEqual([['2026-10-30', 7_200_000]])
+  })
+
+  it('spreads a session over the days it spanned, and the parts add up to its duration', () => {
+    // Noon to noon the next day: half on each local day.
+    const out = splitDuration('2026-10-30T12:00:00', '2026-10-31T12:00:00', 10_000_000)
+    expect([...out.keys()]).toEqual(['2026-10-30', '2026-10-31'])
+    expect([...out.values()].reduce((a, b) => a + b, 0)).toBe(10_000_000)
+    expect(out.get('2026-10-30')).toBe(5_000_000)
+  })
+
+  it('gives nothing for a session with no duration', () => {
+    expect(splitDuration('2026-10-30T09:00:00', '2026-10-30T09:00:00', 0).size).toBe(0)
   })
 })

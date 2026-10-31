@@ -42,6 +42,11 @@ function exportOptions(stats: StatsCache, prefix: string) {
   ]
 }
 
+/** Time sessions were open, counted per day, or null when the stats carry no per-day time. */
+function openTimeOf(stats: StatsCache): number | null {
+  return stats.dailyActivity.some((d) => d.durationMs !== undefined) ? stats.dailyActivity.reduce((s, d) => s + (d.durationMs ?? 0), 0) : null
+}
+
 /** What the last seven days added: tokens, sessions, messages and tool calls. */
 function weekOf(stats: StatsCache | null | undefined, weekStart: string) {
   const w = stats ? filterStatsRange(stats, weekStart) : null
@@ -50,6 +55,7 @@ function weekOf(stats: StatsCache | null | undefined, weekStart: string) {
     sessions: w?.totalSessions ?? 0,
     messages: w?.totalMessages ?? 0,
     toolCalls: w?.dailyActivity.reduce((s, d) => s + d.toolCallCount, 0) ?? 0,
+    durationMs: w ? openTimeOf(w) : null,
   }
 }
 
@@ -96,7 +102,8 @@ function StatsPage() {
   }, [selected, stats, allStats, startDay, datedCost, apiUSD])
 
   const week = useMemo(() => weekOf(baseStats, weekStart), [baseStats, weekStart])
-  const durationMs = selected ? selected.totalDurationMs : projects.reduce((sum, p) => sum + p.totalDurationMs, 0)
+  // Counted per day when the history has it, so it follows the range. Otherwise all the sessions' time.
+  const durationMs = (stats ? openTimeOf(stats) : null) ?? (selected ? selected.totalDurationMs : projects.reduce((sum, p) => sum + p.totalDurationMs, 0))
 
   const setRange = (r: (typeof RANGES)[number]) => navigate({ search: (prev) => ({ ...prev, range: r }) })
 
@@ -140,6 +147,7 @@ function StatsPage() {
           plan={plan}
           share={share}
           durationMs={durationMs}
+          weekDurationMs={week.durationMs}
           range={range}
           onRange={setRange}
           rhythmTitle={selected ? 'Your rhythm here' : 'Your rhythm'}

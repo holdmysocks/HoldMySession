@@ -194,6 +194,8 @@ export const DailyActivitySchema = z.object({
   messageCount: z.number(),
   sessionCount: z.number(),
   toolCallCount: z.number(),
+  /** Time sessions were open on this day, when the history database has it. */
+  durationMs: z.number().optional(),
 })
 
 export const DailyModelTokensSchema = z.object({
