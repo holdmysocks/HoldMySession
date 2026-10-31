@@ -5,6 +5,7 @@ import { ActiveSessionsBadge } from '@/features/sessions/ActiveSessionsBadge'
 import { appInfoQuery } from '@/features/settings/app-info.queries'
 import { useHistoryRefresh } from '@/features/history/useHistoryRefresh'
 import { MachineFilter } from '@/features/link/MachineFilter'
+import { ProjectFilter } from '@/features/project-analytics/ProjectFilter'
 import { updateInfoQuery } from '@/features/updates/updates.queries'
 
 /** The three pages in the menu. Settings is the gear. */
@@ -83,10 +84,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const updateReady = !!update?.available && !!update.latest
 
   // The map fills the width it is given. Every other page keeps a readable column.
-  const column = wide ? 'px-4 sm:px-6' : 'mx-auto w-full max-w-[1180px] px-4 sm:px-6'
+  const column = wide ? 'px-4 sm:px-6' : 'mx-auto w-full max-w-[1228px] px-4 sm:px-6'
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div
+      className="flex min-h-screen flex-col"
+      style={{ backgroundImage: 'radial-gradient(900px 420px at 18% -8%, var(--hms-glow), transparent)', backgroundRepeat: 'no-repeat' }}
+    >
       <header className={`${column} pt-5`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link to="/stats" className="flex items-center gap-2.5 text-gray-100" title="Go to Stats">
@@ -98,6 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <div className="flex items-center gap-2">
             {/* Drawn only on a master with linked nodes. It chooses whose data every page shows. */}
+            {currentPath.startsWith('/stats') && <ProjectFilter />}
             <MachineFilter />
             <Link
               to="/settings"

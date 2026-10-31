@@ -2,6 +2,7 @@ import type { ModelPricing } from '@/features/settings/settings.types'
 import { normalizeModelId } from '@/features/settings/settings.types'
 import { costOfUsage, priceOnDay, type PriceEntry } from '@/lib/pricing/price-timeline'
 import type { Db } from './sqlite'
+import { projectGroupKey } from '@/lib/projects/unlinked'
 import { selectSessions, type HistoryStatsOptions } from './history-stats'
 import { listPriceEntries } from './price-store'
 
@@ -15,6 +16,8 @@ export interface HistoryCost {
   byMonth: Record<string, number>
   /** yyyy-MM-dd to USD */
   byDay: Record<string, number>
+  /** A project's key (its path, or the unlinked group's key) to its cost and every token it used. */
+  byProject: Record<string, { usd: number; tokens: number }>
 }
 
 /**
@@ -30,11 +33,22 @@ export function historyCost(
   const sessions = selectSessions(db, options)
   if (!sessions || sessions.length === 0) return null
   const keys = new Set(sessions.map((s) => `${s.machine_id}\u0000${s.session_key}`))
+  const projectOf = new Map(
+    sessions.map((s) => [
+      `${s.machine_id}\u0000${s.session_key}`,
+      projectGroupKey({
+        cwd: String(s.cwd),
+        projectName: String(s.project_name ?? ''),
+        projectDisplayName: String(s.project_display_name),
+        projectPath: String(s.project_path),
+      }),
+    ]),
+  )
 
   const byModelId = new Map<string, PriceEntry[]>()
   for (const entry of entries) byModelId.set(entry.modelId, [...(byModelId.get(entry.modelId) ?? []), entry])
 
-  const result: HistoryCost = { totalUSD: 0, byModel: {}, byMonth: {}, byDay: {} }
+  const result: HistoryCost = { totalUSD: 0, byModel: {}, byMonth: {}, byDay: {}, byProject: {} }
   const rows = db
     .prepare(
       `SELECT machine_id, session_key, day, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens
@@ -42,7 +56,8 @@ export function historyCost(
     )
     .all()
   for (const row of rows) {
-    if (!keys.has(`${row.machine_id}\u0000${row.session_key}`)) continue
+    const sessionId = `${row.machine_id}\u0000${row.session_key}`
+    if (!keys.has(sessionId)) continue
     const normalized = normalizeModelId(String(row.model))
     const modelId = baseTable[normalized] ? normalized : FALLBACK_MODEL_ID
     const base = baseTable[modelId]
@@ -62,6 +77,12 @@ export function historyCost(
     const month = day.slice(0, 7)
     result.byMonth[month] = (result.byMonth[month] ?? 0) + cost
     result.byDay[day] = (result.byDay[day] ?? 0) + cost
+    const project = projectOf.get(sessionId)
+    if (project) {
+      const entry = (result.byProject[project] ??= { usd: 0, tokens: 0 })
+      entry.usd += cost
+      entry.tokens += Number(row.input_tokens) + Number(row.output_tokens) + Number(row.cache_read_tokens) + Number(row.cache_write_tokens)
+    }
   }
   return result
 }

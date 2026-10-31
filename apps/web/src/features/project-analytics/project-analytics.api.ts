@@ -12,6 +12,8 @@ import type { ScratchMode } from '@/features/settings/settings.types'
 export interface ProjectAnalytics {
   /** The project's path, or UNLINKED_PROJECT_KEY for the group of unlinked sessions. */
   projectPath: string
+  /** The project's directory name under the Claude config, which the map is keyed by. */
+  projectKey: string
   /** The project's folder name. The Sessions list filters on it. */
   projectName: string
   /** What to show: package.json name, git repo name, or the folder name. "Unlinked Sessions" for the group. */
@@ -60,6 +62,7 @@ export function aggregateProjectAnalytics(
     projects.push({
       projectPath,
       isUnlinked,
+      projectKey: isUnlinked ? '' : (firstSession.projectKey ?? ''),
       projectName: isUnlinked
         ? UNLINKED_PROJECT_NAME
         : (firstSession.projectName ?? projectPath.split('/').pop() ?? 'Unknown'),

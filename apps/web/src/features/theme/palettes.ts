@@ -37,6 +37,34 @@ export const THEMES = [
   { id: 'solar', label: 'Solar', note: 'Light, cream and blue', dark: false, bg: '#FDF6E3', tile: '#EEE8D5', ink: '#073642', mute: '#586E75', acc: '#268BD2', accLight: '#5AA9E0', hero: '#CB4B16' },
 ] as const satisfies readonly ThemePalette[]
 
+/** The rest of each theme's colours: hairlines, chips, heatmap cells, and the chart lines. */
+interface ThemeExtras {
+  sub: string
+  glow: string
+  glowStrong: string
+  line: string
+  rule: string
+  track: string
+  chipBg: string
+  chipInk: string
+  cell: string
+  l1: string
+  l2: string
+  l3: string
+  l4: string
+}
+
+const EXTRAS: Record<string, ThemeExtras> = {
+  dusk: { sub: '#C9C7BE', glow: '#D9775722', glowStrong: '#D9775799', line: '#ffffff1c', rule: '#ffffff14', track: '#ffffff12', chipBg: '#2D3B2A', chipInk: '#8FD39B', cell: '#2B2927', l1: '#FFA683', l2: '#A3CBF2', l3: '#B4D18F', l4: '#E4E2D8' },
+  ink: { sub: '#C9C7BE', glow: '#D9775718', glowStrong: '#D9775799', line: '#ffffff1c', rule: '#ffffff14', track: '#ffffff12', chipBg: '#1F3320', chipInk: '#8FD39B', cell: '#1F1E1D', l1: '#FFA683', l2: '#A3CBF2', l3: '#B4D18F', l4: '#E4E2D8' },
+  dracula: { sub: '#D7DAEA', glow: '#BD93F926', glowStrong: '#BD93F999', line: '#ffffff1f', rule: '#ffffff14', track: '#ffffff14', chipBg: '#1E3A2B', chipInk: '#50FA7B', cell: '#343746', l1: '#FF9AD5', l2: '#8BE9FD', l3: '#50FA7B', l4: '#F8F8F2' },
+  nord: { sub: '#D8DEE9', glow: '#88C0D01f', glowStrong: '#88C0D099', line: '#ffffff1f', rule: '#ffffff14', track: '#ffffff14', chipBg: '#3B4B3F', chipInk: '#A3BE8C', cell: '#3B4252', l1: '#D08770', l2: '#88C0D0', l3: '#A3BE8C', l4: '#E5E9F0' },
+  clay: { sub: '#3D3D3A', glow: '#D9775733', glowStrong: '#D9775766', line: '#14141330', rule: '#14141418', track: '#14141412', chipBg: '#DDEBD2', chipInk: '#25602F', cell: '#E2DFD2', l1: '#B4492A', l2: '#2F6FB0', l3: '#4F6B35', l4: '#6B6A63' },
+  sage: { sub: '#2F3A2A', glow: '#788C5D33', glowStrong: '#788C5D77', line: '#1B211830', rule: '#1B211818', track: '#1B211812', chipBg: '#D3E3C4', chipInk: '#25602F', cell: '#D3DACB', l1: '#9A4A2E', l2: '#2F6FB0', l3: '#4F6B35', l4: '#5E6558' },
+  alucard: { sub: '#3A3840', glow: '#644AC922', glowStrong: '#644AC966', line: '#1F1F1F30', rule: '#1F1F1F18', track: '#1F1F1F12', chipBg: '#DCEFD8', chipInk: '#14710A', cell: '#F0EAD2', l1: '#A3144D', l2: '#036A96', l3: '#14710A', l4: '#5C5963' },
+  solar: { sub: '#2F4A52', glow: '#268BD22a', glowStrong: '#268BD266', line: '#07364230', rule: '#07364218', track: '#07364212', chipBg: '#E6EAC5', chipInk: '#5C6B00', cell: '#EEE8D5', l1: '#CB4B16', l2: '#268BD2', l3: '#6B7E00', l4: '#586E75' },
+}
+
 export type ThemeId = (typeof THEMES)[number]['id']
 
 export const DEFAULT_THEME: ThemeId = 'dusk'
@@ -95,8 +123,23 @@ export function themeVariables(t: ThemePalette): Record<string, string> {
   vars['--color-brand-600'] = mix(t.hero, '#000000', 0.14)
   vars['--color-brand-700'] = mix(t.hero, '#000000', 0.3)
   vars['--hms-accent'] = t.acc
-  vars['--hms-glow'] = t.hero + (t.dark ? '22' : '33')
-  vars['--hms-line'] = t.ink + (t.dark ? '1c' : '30')
+  vars['--hms-mute'] = t.mute
+  vars['--hms-ink'] = t.ink
+  vars['--hms-bg'] = t.bg
+  const x = EXTRAS[t.id] ?? EXTRAS.dusk
+  vars['--hms-glow'] = x.glow
+  vars['--hms-glow-strong'] = x.glowStrong
+  vars['--hms-line'] = x.line
+  vars['--hms-rule'] = x.rule
+  vars['--hms-track'] = x.track
+  vars['--hms-sub'] = x.sub
+  vars['--hms-chip-bg'] = x.chipBg
+  vars['--hms-chip-ink'] = x.chipInk
+  vars['--hms-cell'] = x.cell
+  vars['--hms-l1'] = x.l1
+  vars['--hms-l2'] = x.l2
+  vars['--hms-l3'] = x.l3
+  vars['--hms-l4'] = x.l4
   return vars
 }
 

@@ -19,8 +19,22 @@
   --color-brand-600: #bb664b;
   --color-brand-700: #98533d;
   --hms-accent: #F0906F;
+  --hms-mute: #A8A69C;
+  --hms-ink: #FAF9F5;
+  --hms-bg: #0F0E0D;
   --hms-glow: #D9775722;
-  --hms-line: #FAF9F51c;
+  --hms-glow-strong: #D9775799;
+  --hms-line: #ffffff1c;
+  --hms-rule: #ffffff14;
+  --hms-track: #ffffff12;
+  --hms-sub: #C9C7BE;
+  --hms-chip-bg: #2D3B2A;
+  --hms-chip-ink: #8FD39B;
+  --hms-cell: #2B2927;
+  --hms-l1: #FFA683;
+  --hms-l2: #A3CBF2;
+  --hms-l3: #B4D18F;
+  --hms-l4: #E4E2D8;
 }
 
 :root[data-theme='ink'] {
@@ -42,8 +56,22 @@
   --color-brand-600: #bb664b;
   --color-brand-700: #98533d;
   --hms-accent: #F0906F;
-  --hms-glow: #D9775722;
-  --hms-line: #FAF9F51c;
+  --hms-mute: #A8A69C;
+  --hms-ink: #FAF9F5;
+  --hms-bg: #000000;
+  --hms-glow: #D9775718;
+  --hms-glow-strong: #D9775799;
+  --hms-line: #ffffff1c;
+  --hms-rule: #ffffff14;
+  --hms-track: #ffffff12;
+  --hms-sub: #C9C7BE;
+  --hms-chip-bg: #1F3320;
+  --hms-chip-ink: #8FD39B;
+  --hms-cell: #1F1E1D;
+  --hms-l1: #FFA683;
+  --hms-l2: #A3CBF2;
+  --hms-l3: #B4D18F;
+  --hms-l4: #E4E2D8;
 }
 
 :root[data-theme='dracula'] {
@@ -65,8 +93,22 @@
   --color-brand-600: #a37ed6;
   --color-brand-700: #8467ae;
   --hms-accent: #FF79C6;
-  --hms-glow: #BD93F922;
-  --hms-line: #F8F8F21c;
+  --hms-mute: #B4B8D0;
+  --hms-ink: #F8F8F2;
+  --hms-bg: #282A36;
+  --hms-glow: #BD93F926;
+  --hms-glow-strong: #BD93F999;
+  --hms-line: #ffffff1f;
+  --hms-rule: #ffffff14;
+  --hms-track: #ffffff14;
+  --hms-sub: #D7DAEA;
+  --hms-chip-bg: #1E3A2B;
+  --hms-chip-ink: #50FA7B;
+  --hms-cell: #343746;
+  --hms-l1: #FF9AD5;
+  --hms-l2: #8BE9FD;
+  --hms-l3: #50FA7B;
+  --hms-l4: #F8F8F2;
 }
 
 :root[data-theme='nord'] {
@@ -88,8 +130,22 @@
   --color-brand-600: #516f94;
   --color-brand-700: #425a78;
   --hms-accent: #88C0D0;
-  --hms-glow: #5E81AC22;
-  --hms-line: #ECEFF41c;
+  --hms-mute: #AEB8CA;
+  --hms-ink: #ECEFF4;
+  --hms-bg: #2E3440;
+  --hms-glow: #88C0D01f;
+  --hms-glow-strong: #88C0D099;
+  --hms-line: #ffffff1f;
+  --hms-rule: #ffffff14;
+  --hms-track: #ffffff14;
+  --hms-sub: #D8DEE9;
+  --hms-chip-bg: #3B4B3F;
+  --hms-chip-ink: #A3BE8C;
+  --hms-cell: #3B4252;
+  --hms-l1: #D08770;
+  --hms-l2: #88C0D0;
+  --hms-l3: #A3BE8C;
+  --hms-l4: #E5E9F0;
 }
 
 :root[data-theme='clay'] {
@@ -111,8 +167,22 @@
   --color-brand-600: #bb664b;
   --color-brand-700: #98533d;
   --hms-accent: #B4492A;
+  --hms-mute: #5E5D59;
+  --hms-ink: #141413;
+  --hms-bg: #EFEDE4;
   --hms-glow: #D9775733;
+  --hms-glow-strong: #D9775766;
   --hms-line: #14141330;
+  --hms-rule: #14141418;
+  --hms-track: #14141412;
+  --hms-sub: #3D3D3A;
+  --hms-chip-bg: #DDEBD2;
+  --hms-chip-ink: #25602F;
+  --hms-cell: #E2DFD2;
+  --hms-l1: #B4492A;
+  --hms-l2: #2F6FB0;
+  --hms-l3: #4F6B35;
+  --hms-l4: #6B6A63;
 }
 
 :root[data-theme='sage'] {
@@ -134,8 +204,22 @@
   --color-brand-600: #677850;
   --color-brand-700: #546241;
   --hms-accent: #4F6B35;
+  --hms-mute: #515A4C;
+  --hms-ink: #1B2118;
+  --hms-bg: #E3E8DD;
   --hms-glow: #788C5D33;
+  --hms-glow-strong: #788C5D77;
   --hms-line: #1B211830;
+  --hms-rule: #1B211818;
+  --hms-track: #1B211812;
+  --hms-sub: #2F3A2A;
+  --hms-chip-bg: #D3E3C4;
+  --hms-chip-ink: #25602F;
+  --hms-cell: #D3DACB;
+  --hms-l1: #9A4A2E;
+  --hms-l2: #2F6FB0;
+  --hms-l3: #4F6B35;
+  --hms-l4: #5E6558;
 }
 
 :root[data-theme='alucard'] {
@@ -157,8 +241,22 @@
   --color-brand-600: #5640ad;
   --color-brand-700: #46348d;
   --hms-accent: #644AC9;
-  --hms-glow: #644AC933;
+  --hms-mute: #5C5963;
+  --hms-ink: #1F1F1F;
+  --hms-bg: #FFFBEB;
+  --hms-glow: #644AC922;
+  --hms-glow-strong: #644AC966;
   --hms-line: #1F1F1F30;
+  --hms-rule: #1F1F1F18;
+  --hms-track: #1F1F1F12;
+  --hms-sub: #3A3840;
+  --hms-chip-bg: #DCEFD8;
+  --hms-chip-ink: #14710A;
+  --hms-cell: #F0EAD2;
+  --hms-l1: #A3144D;
+  --hms-l2: #036A96;
+  --hms-l3: #14710A;
+  --hms-l4: #5C5963;
 }
 
 :root[data-theme='solar'] {
@@ -180,6 +278,20 @@
   --color-brand-600: #af4113;
   --color-brand-700: #8e350f;
   --hms-accent: #268BD2;
-  --hms-glow: #CB4B1633;
+  --hms-mute: #586E75;
+  --hms-ink: #073642;
+  --hms-bg: #FDF6E3;
+  --hms-glow: #268BD22a;
+  --hms-glow-strong: #268BD266;
   --hms-line: #07364230;
+  --hms-rule: #07364218;
+  --hms-track: #07364212;
+  --hms-sub: #2F4A52;
+  --hms-chip-bg: #E6EAC5;
+  --hms-chip-ink: #5C6B00;
+  --hms-cell: #EEE8D5;
+  --hms-l1: #CB4B16;
+  --hms-l2: #268BD2;
+  --hms-l3: #6B7E00;
+  --hms-l4: #586E75;
 }

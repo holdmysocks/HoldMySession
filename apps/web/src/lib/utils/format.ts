@@ -58,3 +58,16 @@ export function formatUSD(amount: number): string {
   if (amount >= 100) return `$${Math.round(amount)}`
   return `$${amount.toFixed(2)}`
 }
+
+/** "now", "2 min ago", "1 h ago", "yesterday", "3 days ago": the short form the lists use. */
+export function formatAgo(dateStr: string, nowMs: number = Date.now()): string {
+  const minutes = Math.max(0, Math.floor((nowMs - new Date(dateStr).getTime()) / 60_000))
+  if (minutes < 1) return 'now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} h ago`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'yesterday'
+  if (days < 30) return `${days} days ago`
+  return format(new Date(dateStr), 'MMM d, yyyy')
+}

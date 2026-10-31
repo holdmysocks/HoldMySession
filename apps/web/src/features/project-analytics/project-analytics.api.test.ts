@@ -255,6 +255,7 @@ describe('project-analytics', () => {
       expect(result.projects[0]).toEqual({
         projectPath: '/project-a',
         isUnlinked: false,
+        projectKey: 'app',
         projectName: 'project-a',
         displayName: 'Test Project',
         totalSessions: 1,
@@ -306,6 +307,7 @@ describe('project-analytics', () => {
       expect(result.projects[0]).toEqual({
         projectPath: '/project-b',
         isUnlinked: false,
+        projectKey: 'app',
         projectName: 'project-b',
         displayName: 'Test Project',
         totalSessions: 1,
@@ -321,6 +323,7 @@ describe('project-analytics', () => {
       expect(result.projects[1]).toEqual({
         projectPath: '/project-a',
         isUnlinked: false,
+        projectKey: 'app',
         projectName: 'project-a',
         displayName: 'Test Project',
         totalSessions: 2,
