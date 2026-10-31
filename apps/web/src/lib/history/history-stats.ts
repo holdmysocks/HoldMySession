@@ -1,7 +1,7 @@
 import type { StatsCache } from '@/lib/parsers/types'
 import { projectGroupKey } from '@/lib/projects/unlinked'
 import type { Db } from './sqlite'
-import { localDay, splitByWeight } from './day-allocation'
+import { localDay, splitDuration, splitCount } from './day-allocation'
 
 export interface HistoryStatsOptions {
   /** A project's path, or UNLINKED_PROJECT_KEY, to count only that project's sessions. */
@@ -47,29 +47,6 @@ export function selectSessions(db: Db, options: HistoryStatsOptions = {}): Sessi
   )
 }
 
-/** A session's open time split over the local days between its first and last message. */
-export function splitDuration(startIso: string, endIso: string, durationMs: number): Map<string, number> {
-  const start = new Date(startIso).getTime()
-  const end = new Date(endIso).getTime()
-  const startDay = localDay(startIso)
-  const endDay = localDay(endIso)
-  if (!startDay || !endDay || !(durationMs > 0) || !(end > start) || startDay === endDay) {
-    return new Map(endDay && durationMs > 0 ? [[endDay, Math.round(durationMs)]] : [])
-  }
-  const weights = new Map<string, number>()
-  let cursor = start
-  // Day by day to midnight, never more than a few years, so a bad timestamp cannot loop forever.
-  for (let i = 0; i < 1500 && cursor < end; i++) {
-    const d = new Date(cursor)
-    const nextMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime()
-    const stop = Math.min(nextMidnight, end)
-    const day = localDay(new Date(cursor).toISOString())
-    if (day) weights.set(day, (weights.get(day) ?? 0) + (stop - cursor))
-    cursor = stop
-  }
-  return splitByWeight(Math.round(durationMs), weights)
-}
-
 export function statsFromHistory(db: Db, options: HistoryStatsOptions = {}): StatsCache | null {
   const chosen = selectSessions(db, options)
   if (!chosen || chosen.length === 0) return null
@@ -82,20 +59,40 @@ export function statsFromHistory(db: Db, options: HistoryStatsOptions = {}): Sta
   let firstSessionDate: string | null = null
   let longest = { sessionId: '', duration: 0, messageCount: 0, timestamp: '' }
 
+  // Messages and tool calls per day, exact for sessions the scanner has read since activity_daily was added.
+  const exact = new Map<string, Array<{ day: string; messages: number; tool_calls: number }>>()
+  for (const r of db.prepare('SELECT machine_id, session_key, day, messages, tool_calls FROM activity_daily').all()) {
+    const k = `${r.machine_id}\u0000${r.session_key}`
+    if (!keys.has(k)) continue
+    const list = exact.get(k) ?? []
+    list.push({ day: String(r.day), messages: Number(r.messages), tool_calls: Number(r.tool_calls) })
+    exact.set(k, list)
+  }
+  const bucket = (d: string) => {
+    const a = activity.get(d) ?? { messageCount: 0, sessionCount: 0, toolCallCount: 0, durationMs: 0 }
+    activity.set(d, a)
+    return a
+  }
+
   for (const row of chosen) {
     const lastActive = String(row.last_active_at || row.started_at)
-    const day = localDay(lastActive) ?? lastActive.split('T')[0]
-    const cur = activity.get(day) ?? { messageCount: 0, sessionCount: 0, toolCallCount: 0, durationMs: 0 }
-    cur.sessionCount += 1
-    cur.messageCount += Number(row.message_count)
-    cur.toolCallCount += Number(row.tool_call_count)
-    activity.set(day, cur)
-    // The time a session was open is spread over the days it spanned, by how much of each day it covers.
-    for (const [d, ms] of splitDuration(String(row.started_at), lastActive, Number(row.duration_ms))) {
-      const a = activity.get(d) ?? { messageCount: 0, sessionCount: 0, toolCallCount: 0, durationMs: 0 }
-      a.durationMs += ms
-      activity.set(d, a)
+    const startedIso = String(row.started_at)
+    // A session counts on the day it started. Its messages and tool calls count on the days they happened.
+    bucket(localDay(startedIso) ?? localDay(lastActive) ?? startedIso.split('T')[0]).sessionCount += 1
+    const rows = exact.get(`${row.machine_id}\u0000${row.session_key}`)
+    if (rows) {
+      for (const r of rows) {
+        const a = bucket(r.day)
+        a.messageCount += r.messages
+        a.toolCallCount += r.tool_calls
+      }
+    } else {
+      // The transcript is gone, so only the totals are known. They are spread over the days the session ran.
+      for (const [d, n] of splitCount(startedIso, lastActive, Number(row.message_count))) bucket(d).messageCount += n
+      for (const [d, n] of splitCount(startedIso, lastActive, Number(row.tool_call_count))) bucket(d).toolCallCount += n
     }
+    // The time a session was open is spread over the days it spanned, by how much of each day it covers.
+    for (const [d, ms] of splitDuration(startedIso, lastActive, Number(row.duration_ms))) bucket(d).durationMs += ms
     totalMessages += Number(row.message_count)
 
     const started = new Date(String(row.started_at))

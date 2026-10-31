@@ -1,4 +1,5 @@
 import { computeStatsFromSummaries } from '@/lib/parsers/stats-parser'
+import { addOpenTime } from '@/lib/stats/open-time'
 import { projectGroupKey } from './unlinked'
 import type { StatsCache } from '@/lib/parsers/types'
 import type { SessionSummaryWithPath } from '@/lib/scanner/session-scanner'
@@ -17,5 +18,6 @@ export async function computeProjectStats(
 ): Promise<StatsCache | null> {
   const inProject = sessions.filter((session) => projectGroupKey(session) === projectPath || session.projectPath === projectPath)
   if (inProject.length === 0) return null
-  return computeStatsFromSummaries(inProject)
+  const stats = await computeStatsFromSummaries(inProject)
+  return stats ? addOpenTime(stats, inProject) : null
 }

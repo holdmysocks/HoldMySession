@@ -12,6 +12,12 @@ export const UsageRowSchema = z.object({
   cache_write_tokens: z.number().int().min(0),
 })
 
+export const ActivityRowSchema = z.object({
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  messages: z.number().int().min(0),
+  tool_calls: z.number().int().min(0),
+})
+
 export const SessionRowSchema = z.object({
   session_key: z.string().min(1).max(500),
   session_id: z.string().max(200),
@@ -29,6 +35,7 @@ export const SessionRowSchema = z.object({
   cwd: z.string().max(2000).nullable(),
   project_name: z.string().max(500).nullable(),
   usage: z.array(UsageRowSchema).max(100_000),
+  activity: z.array(ActivityRowSchema).max(100_000),
 })
 
 export const MachineInfoSchema = z.object({

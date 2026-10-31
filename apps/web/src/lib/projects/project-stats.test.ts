@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import type { SessionSummaryWithPath } from '@/lib/scanner/session-scanner'
 
 const { computeStatsFromSummaries } = vi.hoisted(() => ({
-  computeStatsFromSummaries: vi.fn(async (sessions: unknown[]) => ({ sessions: sessions.length })),
+  computeStatsFromSummaries: vi.fn(async (sessions: unknown[]) => ({ sessions: sessions.length, dailyActivity: [] })),
 }))
 vi.mock('@/lib/parsers/stats-parser', () => ({ computeStatsFromSummaries }))
 
@@ -32,12 +32,12 @@ describe('computeProjectStats', () => {
 
   it('computes stats from only the sessions of the project', async () => {
     const result = await computeProjectStats(sessions, '/work/app')
-    expect(result).toEqual({ sessions: 2 })
+    expect(result).toEqual({ sessions: 2, dailyActivity: [] })
     expect(computeStatsFromSummaries).toHaveBeenLastCalledWith([sessions[0], sessions[1]])
   })
 
   it('selects every unlinked session for the unlinked key', async () => {
-    expect(await computeProjectStats(sessions, UNLINKED_PROJECT_KEY)).toEqual({ sessions: 2 })
+    expect(await computeProjectStats(sessions, UNLINKED_PROJECT_KEY)).toEqual({ sessions: 2, dailyActivity: [] })
     expect(computeStatsFromSummaries).toHaveBeenLastCalledWith([sessions[3], sessions[4]])
   })
 

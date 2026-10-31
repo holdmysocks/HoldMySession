@@ -10,5 +10,12 @@ export const getStats = createServerFn({ method: 'GET' })
   .inputValidator((input: unknown) => inputSchema.parse(input ?? {}))
   .handler(async ({ data }) => {
     const { loadHistoryStats } = await import('@/lib/history/history-read')
-    return (await loadHistoryStats({ machineId: data.machineId })) ?? (data.machineId ? null : parseStats())
+    const fromHistory = await loadHistoryStats({ machineId: data.machineId })
+    if (fromHistory || data.machineId) return fromHistory
+    // Without the history database the stats carry no open time per day, so it is worked out from the session files.
+    const stats = await parseStats()
+    if (!stats) return null
+    const { scanAllSessions } = await import('@/lib/scanner/session-scanner')
+    const { addOpenTime } = await import('@/lib/stats/open-time')
+    return addOpenTime(stats, await scanAllSessions())
   })

@@ -21,8 +21,12 @@ export function sessionFingerprint(db: Db, machineId: string, sessionKey: string
     )
     .all(machineId, sessionKey)
     .map((u) => [u.day, u.model, u.input_tokens, u.output_tokens, u.thinking_tokens, u.cache_read_tokens, u.cache_write_tokens])
+  const activity = db
+    .prepare('SELECT day, messages, tool_calls FROM activity_daily WHERE machine_id = ? AND session_key = ? ORDER BY day')
+    .all(machineId, sessionKey)
+    .map((a) => [a.day, a.messages, a.tool_calls])
   const fields = SESSION_FIELDS.map((f) => row[f] ?? null)
-  return createHash('sha256').update(JSON.stringify([fields, usage])).digest('hex')
+  return createHash('sha256').update(JSON.stringify([fields, usage, activity])).digest('hex')
 }
 
 /** Refreshes `sync_hash` for sessions of this machine. Pass keys to do some, or none to do all. */

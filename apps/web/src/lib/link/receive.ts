@@ -52,6 +52,8 @@ export function acceptPush(db: Db, input: unknown, now: Date = new Date()): { ac
       INSERT INTO usage_daily (machine_id, session_key, day, model, input_tokens, output_tokens, thinking_tokens, cache_read_tokens, cache_write_tokens)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
+    const clearActivity = db.prepare('DELETE FROM activity_daily WHERE machine_id = ? AND session_key = ?')
+    const addActivity = db.prepare('INSERT INTO activity_daily (machine_id, session_key, day, messages, tool_calls) VALUES (?, ?, ?, ?, ?)')
     for (const s of payload.sessions) {
       upsert.run(
         machine.machineId, s.session_key, s.session_id, s.project_key, s.project_path, s.project_display_name, s.session_name,
@@ -59,6 +61,8 @@ export function acceptPush(db: Db, input: unknown, now: Date = new Date()): { ac
         s.cwd ?? '', s.project_name ?? '',
       )
       clear.run(machine.machineId, s.session_key)
+      clearActivity.run(machine.machineId, s.session_key)
+      for (const a of s.activity) addActivity.run(machine.machineId, s.session_key, a.day, a.messages, a.tool_calls)
       for (const u of s.usage) {
         addUsage.run(machine.machineId, s.session_key, u.day, u.model, u.input_tokens, u.output_tokens, u.thinking_tokens, u.cache_read_tokens, u.cache_write_tokens)
       }

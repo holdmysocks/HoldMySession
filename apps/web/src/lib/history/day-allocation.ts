@@ -33,3 +33,38 @@ export function splitByWeight(total: number, weights: Map<string, number>): Map<
   for (const p of parts) out.set(p.day, p.whole)
   return out
 }
+
+/** How many milliseconds of each local day lie between two instants. Empty when the span is empty or bad. */
+export function overlapWeights(startIso: string, endIso: string): Map<string, number> {
+  const start = new Date(startIso).getTime()
+  const end = new Date(endIso).getTime()
+  const weights = new Map<string, number>()
+  if (Number.isNaN(start) || Number.isNaN(end) || !(end > start)) return weights
+  let cursor = start
+  // Day by day to midnight, never more than a few years, so a bad timestamp cannot loop forever.
+  for (let i = 0; i < 1500 && cursor < end; i++) {
+    const d = new Date(cursor)
+    const nextMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime()
+    const stop = Math.min(nextMidnight, end)
+    const day = localDay(new Date(cursor).toISOString())
+    if (day) weights.set(day, (weights.get(day) ?? 0) + (stop - cursor))
+    cursor = stop
+  }
+  return weights
+}
+
+/** A whole number (time, messages, tool calls) split over the local days between two instants, in proportion to how much of each day they cover. */
+export function splitCount(startIso: string, endIso: string, total: number): Map<string, number> {
+  const whole = Math.round(total)
+  const endDay = localDay(endIso)
+  if (!(whole > 0)) return new Map()
+  const weights = overlapWeights(startIso, endIso)
+  // One day, or a span that cannot be split: everything lands on the day the session was last active.
+  if (weights.size <= 1) return endDay ? new Map([[endDay, whole]]) : new Map()
+  return splitByWeight(whole, weights)
+}
+
+/** A session's open time split over the days it spanned. */
+export function splitDuration(startIso: string, endIso: string, durationMs: number): Map<string, number> {
+  return splitCount(startIso, endIso, durationMs)
+}

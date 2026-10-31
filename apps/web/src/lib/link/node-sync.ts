@@ -65,6 +65,9 @@ function pendingBatch(db: Db, machineId: string): Pending[] {
     `SELECT day, model, input_tokens, output_tokens, thinking_tokens, cache_read_tokens, cache_write_tokens
      FROM usage_daily WHERE machine_id = ? AND session_key = ? ORDER BY day, model`,
   )
+  const activityStmt = db.prepare(
+    'SELECT day, messages, tool_calls FROM activity_daily WHERE machine_id = ? AND session_key = ? ORDER BY day',
+  )
   return rows.map((r) => ({
     key: String(r.session_key),
     hash: String(r.sync_hash),
@@ -79,6 +82,9 @@ function pendingBatch(db: Db, machineId: string): Pending[] {
       usage: usageStmt.all(machineId, String(r.session_key)).map((u) => ({
         day: String(u.day), model: String(u.model), input_tokens: Number(u.input_tokens), output_tokens: Number(u.output_tokens),
         thinking_tokens: Number(u.thinking_tokens), cache_read_tokens: Number(u.cache_read_tokens), cache_write_tokens: Number(u.cache_write_tokens),
+      })),
+      activity: activityStmt.all(machineId, String(r.session_key)).map((a) => ({
+        day: String(a.day), messages: Number(a.messages), tool_calls: Number(a.tool_calls),
       })),
     },
   }))

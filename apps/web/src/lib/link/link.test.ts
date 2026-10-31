@@ -62,6 +62,20 @@ describe('a node sending to a master', () => {
     expect(listMachines(master).map((m) => m.isSelf)).toEqual([true, false])
   })
 
+  it('sends each day\'s messages and tool calls, so the master counts days exactly', async () => {
+    const master = openHistoryDb(':memory:')
+    const node = openHistoryDb(':memory:')
+    ingestSessions(node, [{ summary: summary('a'), detail: detail(10) }])
+    const nodeId = selfMachineId(node)
+    const sentFrom = node.prepare('SELECT COUNT(*) AS n FROM activity_daily WHERE machine_id = ?').get(nodeId)!.n
+    expect(Number(sentFrom)).toBeGreaterThan(0)
+
+    await pushToMaster(node, linked(), '1.0', toMaster(master, masterSettings))
+    const got = master.prepare('SELECT SUM(messages) AS m FROM activity_daily WHERE machine_id = ?').get(nodeId)!.m
+    const sent = node.prepare('SELECT SUM(messages) AS m FROM activity_daily WHERE machine_id = ?').get(nodeId)!.m
+    expect(Number(got)).toBe(Number(sent))
+  })
+
   it('sends only what changed, and still checks in when there is nothing new', async () => {
     const master = openHistoryDb(':memory:')
     const node = openHistoryDb(':memory:')
@@ -158,7 +172,7 @@ describe('what the master refuses', () => {
     ingestSessions(master, [{ summary: summary('own'), detail: detail(5) }])
     const row = { session_key: 'proj:own', session_id: 'own', project_key: 'proj', project_path: '/p', project_display_name: 'P', session_name: null,
       started_at: at(1), last_active_at: at(1), duration_ms: 0, message_count: 0, tool_call_count: 0, on_disk: 1, first_seen_at: at(1), cwd: '/p', project_name: 'p',
-      usage: [{ day: '2026-03-01', model: 'm', input_tokens: 777, output_tokens: 0, thinking_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 }] }
+      usage: [{ day: '2026-03-01', model: 'm', input_tokens: 777, output_tokens: 0, thinking_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 }], activity: [] }
     acceptPush(master, payload({ sessions: [row] }))
     // Same session key, different machine: two rows, and the master's own tokens are untouched.
     expect(Number(master.prepare('SELECT COUNT(*) AS n FROM sessions').get()!.n)).toBe(2)

@@ -92,6 +92,7 @@ export function removeMachine(db: Db, machineId: string, deleteData: boolean): v
   if (Number(row.is_self) === 1) throw new Error('This machine cannot be removed.')
   inTransaction(db, () => {
     if (deleteData) {
+      db.prepare('DELETE FROM activity_daily WHERE machine_id = ?').run(machineId)
       db.prepare('DELETE FROM usage_daily WHERE machine_id = ?').run(machineId)
       db.prepare('DELETE FROM sessions WHERE machine_id = ?').run(machineId)
     }

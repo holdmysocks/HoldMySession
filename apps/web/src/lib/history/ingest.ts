@@ -70,6 +70,41 @@ export function usageByDay(summary: SessionSummary, detail: SessionDetail): Map<
 }
 
 /**
+ * A session's messages and tool calls by local day, from the time of each message. The counts are the
+ * session's own totals, so they add up exactly. When no message carries a usable time, everything goes
+ * on the day the session was last active.
+ */
+export function activityByDay(
+  summary: SessionSummary,
+  detail: SessionDetail,
+  totals: { messages: number; toolCalls: number },
+): Map<string, { messages: number; tool_calls: number }> {
+  const fallbackDay = localDay(summary.lastActiveAt || summary.startedAt)
+  const messageWeights = new Map<string, number>()
+  const toolWeights = new Map<string, number>()
+  for (const turn of detail.turns) {
+    const day = localDay(turn.timestamp)
+    if (!day) continue
+    messageWeights.set(day, (messageWeights.get(day) ?? 0) + 1)
+    if (turn.toolCalls.length > 0) toolWeights.set(day, (toolWeights.get(day) ?? 0) + turn.toolCalls.length)
+  }
+  const out = new Map<string, { messages: number; tool_calls: number }>()
+  const put = (day: string, key: 'messages' | 'tool_calls', n: number) => {
+    const row = out.get(day) ?? { messages: 0, tool_calls: 0 }
+    row[key] += n
+    out.set(day, row)
+  }
+  const spread = (total: number, weights: Map<string, number>, key: 'messages' | 'tool_calls') => {
+    if (total <= 0) return
+    const use = weights.size > 0 ? weights : fallbackDay ? new Map([[fallbackDay, 1]]) : new Map<string, number>()
+    for (const [day, n] of splitByWeight(total, use)) put(day, key, n)
+  }
+  spread(totals.messages, messageWeights, 'messages')
+  spread(totals.toolCalls, toolWeights.size > 0 ? toolWeights : messageWeights, 'tool_calls')
+  return out
+}
+
+/**
  * Writes sessions and their usage to the database, and marks stored sessions that are not in this
  * scan as no longer on disk. A session's usage rows are replaced as a whole, so scanning twice is
  * the same as scanning once. A session whose parse failed keeps the usage it already had.
@@ -97,6 +132,9 @@ export function ingestSessions(db: Db, entries: IngestEntry[], now: Date = new D
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
+  const clearActivity = db.prepare('DELETE FROM activity_daily WHERE machine_id = ? AND session_key = ?')
+  const addActivity = db.prepare('INSERT INTO activity_daily (machine_id, session_key, day, messages, tool_calls) VALUES (?, ?, ?, ?, ?)')
+
   inTransaction(db, () => {
     const seen = new Set<string>()
     for (const { summary, detail } of entries) {
@@ -107,6 +145,8 @@ export function ingestSessions(db: Db, entries: IngestEntry[], now: Date = new D
       if (exists.get(machineId, key)) result.updated += 1
       else result.added += 1
 
+      const messages = detail ? detail.turns.length : summary.messageCount
+      const toolCalls = detail ? Object.values(detail.toolFrequency).reduce((a, b) => a + b, 0) : summary.toolCallCount
       upsert.run(
         machineId,
         key,
@@ -118,8 +158,8 @@ export function ingestSessions(db: Db, entries: IngestEntry[], now: Date = new D
         summary.startedAt,
         summary.lastActiveAt || summary.startedAt,
         Math.round(summary.durationMs),
-        detail ? detail.turns.length : summary.messageCount,
-        detail ? Object.values(detail.toolFrequency).reduce((a, b) => a + b, 0) : summary.toolCallCount,
+        messages,
+        toolCalls,
         stamp,
         stamp,
         summary.cwd ?? '',
@@ -127,6 +167,10 @@ export function ingestSessions(db: Db, entries: IngestEntry[], now: Date = new D
       )
 
       if (!detail) continue
+      clearActivity.run(machineId, key)
+      for (const [day, row] of activityByDay(summary, detail, { messages, toolCalls })) {
+        addActivity.run(machineId, key, day, row.messages, row.tool_calls)
+      }
       clearUsage.run(machineId, key)
       for (const [day, models] of usageByDay(summary, detail)) {
         for (const [model, row] of models) {

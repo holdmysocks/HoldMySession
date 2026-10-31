@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import type { SessionDetail, SessionSummary, TokenUsage } from '@/lib/parsers/types'
 import { openHistoryDb } from './history-db'
-import { ingestSessions, usageByDay, type IngestEntry } from './ingest'
+import { activityByDay, ingestSessions, usageByDay, type IngestEntry } from './ingest'
+import { statsFromHistory } from './history-stats'
 
 const usage = (o: Partial<TokenUsage>): TokenUsage => ({
   inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, ...o,
@@ -110,3 +111,60 @@ describe('ingestSessions', () => {
     expect(db.prepare("SELECT on_disk FROM sessions WHERE machine_id = 'other-machine'").get()).toMatchObject({ on_disk: 1 })
   })
 })
+
+describe('activityByDay', () => {
+  const turns = (days: number[], tools: number[] = []) =>
+    ({
+      turns: days.map((day, i) => ({ uuid: `t${i}`, type: 'user', timestamp: at(day), toolCalls: new Array(tools[i] ?? 0).fill({ toolName: 'Bash', toolUseId: 'x' }) })),
+      tokensByModel: {}, toolFrequency: {},
+    }) as unknown as SessionDetail
+
+  it('counts messages and tool calls on the days they happened, and keeps the totals exact', () => {
+    const rows = activityByDay(summary('s'), turns([1, 1, 3], [1, 0, 2]), { messages: 3, toolCalls: 3 })
+    expect([...rows.keys()].sort()).toEqual(['2026-03-01', '2026-03-03'])
+    expect(rows.get('2026-03-01')).toEqual({ messages: 2, tool_calls: 1 })
+    expect(rows.get('2026-03-03')).toEqual({ messages: 1, tool_calls: 2 })
+  })
+
+  it('scales to the session totals when they differ from what the turns show', () => {
+    const rows = activityByDay(summary('s'), turns([1, 3]), { messages: 10, toolCalls: 0 })
+    expect([...rows.values()].reduce((a, r) => a + r.messages, 0)).toBe(10)
+  })
+
+  it('puts everything on the last active day when no turn has a time', () => {
+    const rows = activityByDay(summary('s'), { turns: [], tokensByModel: {}, toolFrequency: {} } as unknown as SessionDetail, { messages: 4, toolCalls: 0 })
+    expect([...rows]).toEqual([['2026-03-03', { messages: 4, tool_calls: 0 }]])
+  })
+})
+
+describe('stats from the per-day rows', () => {
+  it('counts a session on the day it started and its messages on the days they happened', () => {
+    const db = openHistoryDb(':memory:')
+    ingestSessions(db, [
+      { summary: summary('s', { messageCount: 3, startedAt: at(1), lastActiveAt: at(3), durationMs: 2 * 86_400_000 }), detail: turns3() },
+    ])
+    const stats = statsFromHistory(db)!
+    const day = (d: string) => stats.dailyActivity.find((a) => a.date === d)!
+    expect(day('2026-03-01').sessionCount).toBe(1)
+    expect(day('2026-03-03').sessionCount).toBe(0)
+    expect(day('2026-03-01').messageCount).toBe(2)
+    expect(day('2026-03-03').messageCount).toBe(1)
+    expect(stats.dailyActivity.reduce((s, a) => s + (a.durationMs ?? 0), 0)).toBe(2 * 86_400_000)
+  })
+
+  it('spreads the totals of a session whose transcript is gone, with nothing lost', () => {
+    const db = openHistoryDb(':memory:')
+    ingestSessions(db, [{ summary: summary('old', { messageCount: 10, toolCallCount: 4, startedAt: at(1), lastActiveAt: at(3) }), detail: null }])
+    const stats = statsFromHistory(db)!
+    expect(stats.dailyActivity.reduce((s, a) => s + a.messageCount, 0)).toBe(10)
+    expect(stats.dailyActivity.reduce((s, a) => s + a.toolCallCount, 0)).toBe(4)
+    expect(stats.dailyActivity.find((a) => a.date === '2026-03-01')!.sessionCount).toBe(1)
+  })
+})
+
+function turns3(): SessionDetail {
+  return {
+    turns: [1, 1, 3].map((day, i) => ({ uuid: `t${i}`, type: 'user', timestamp: at(day), toolCalls: [] })),
+    tokensByModel: {}, toolFrequency: {},
+  } as unknown as SessionDetail
+}

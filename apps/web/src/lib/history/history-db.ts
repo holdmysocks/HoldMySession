@@ -169,6 +169,20 @@ const MIGRATIONS: string[] = [
   ALTER TABLE sessions ADD COLUMN sync_hash TEXT;
   ALTER TABLE sessions ADD COLUMN synced_hash TEXT;
   `,
+  // 7: messages and tool calls per session and local day, so Stats can count a day exactly. Filled by the next scan.
+  // A session whose transcript is gone has no rows here, and Stats spreads its totals over the days it ran.
+  `
+  CREATE TABLE activity_daily (
+    machine_id TEXT NOT NULL,
+    session_key TEXT NOT NULL,
+    day TEXT NOT NULL,
+    messages INTEGER NOT NULL DEFAULT 0,
+    tool_calls INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (machine_id, session_key, day),
+    FOREIGN KEY (machine_id, session_key) REFERENCES sessions (machine_id, session_key)
+  );
+  CREATE INDEX activity_daily_day ON activity_daily (day);
+  `,
 ]
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length

@@ -3,7 +3,8 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { openHistoryDb } from './history-db'
-import { splitDuration, statsFromHistory } from './history-stats'
+import { statsFromHistory } from './history-stats'
+import { splitDuration } from './day-allocation'
 import { UNLINKED_PROJECT_KEY } from '@/lib/projects/unlinked'
 
 function claudeFolder(): string {
