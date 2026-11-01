@@ -29,25 +29,31 @@ function helperScript(platform) {
     return `param([int]$ParentPid,[string]$Source,[string]$Target,[string]$Exe,[int]$Relaunch,[string]$Log)
 try {
   for ($i = 0; $i -lt 120; $i++) { if (-not (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue)) { break }; Start-Sleep -Milliseconds 500 }
-  # The app's own files are swapped as a whole, so files an older version had do not pile up. The old copy is kept until the new one is in place.
-  $app = Join-Path $Target 'resources\\app'
-  $old = Join-Path $Target 'resources\\app.old'
-  Remove-Item -Recurse -Force $old -ErrorAction SilentlyContinue
-  $moved = $false
-  for ($i = 0; $i -lt 40 -and -not $moved; $i++) {
-    try { if (Test-Path $app) { Rename-Item -Path $app -NewName 'app.old' -ErrorAction Stop }; $moved = $true } catch { $last = $_.Exception.Message; Start-Sleep -Milliseconds 500 }
+  # The app's own files are swapped as a whole, so files an older version had do not pile up. A version keeps them
+  # as the folder resources\\app (older ones) or the single file resources\\app.asar. The old copy is kept until the new one is in place.
+  $items = @(@('resources\\app', 'app.old'), @('resources\\app.asar', 'app.asar.old'))
+  foreach ($item in $items) { Remove-Item -Recurse -Force (Join-Path $Target ('resources\\' + $item[1])) -ErrorAction SilentlyContinue }
+  foreach ($item in $items) {
+    $path = Join-Path $Target $item[0]
+    $moved = $false
+    for ($i = 0; $i -lt 40 -and -not $moved; $i++) {
+      try { if (Test-Path $path) { Rename-Item -Path $path -NewName $item[1] -ErrorAction Stop }; $moved = $true } catch { $last = $_.Exception.Message; Start-Sleep -Milliseconds 500 }
+    }
+    if (-not $moved) { throw "Could not replace the program files: $last" }
   }
-  if (-not $moved) { throw "Could not replace the program files: $last" }
   $done = $false
   for ($i = 0; $i -lt 40 -and -not $done; $i++) {
     try { Copy-Item -Path (Join-Path $Source '*') -Destination $Target -Recurse -Force -ErrorAction Stop; $done = $true } catch { $last = $_.Exception.Message; Start-Sleep -Milliseconds 500 }
   }
   if (-not $done) {
-    Remove-Item -Recurse -Force $app -ErrorAction SilentlyContinue
-    if (Test-Path $old) { Rename-Item -Path $old -NewName 'app' -ErrorAction SilentlyContinue }
+    foreach ($item in $items) {
+      $path = Join-Path $Target $item[0]
+      $aside = Join-Path $Target ('resources\\' + $item[1])
+      if (Test-Path $aside) { Remove-Item -Recurse -Force $path -ErrorAction SilentlyContinue; Rename-Item -Path $aside -NewName (Split-Path $path -Leaf) -ErrorAction SilentlyContinue }
+    }
     throw "Could not replace the program files: $last"
   }
-  Remove-Item -Recurse -Force $old -ErrorAction SilentlyContinue
+  foreach ($item in $items) { Remove-Item -Recurse -Force (Join-Path $Target ('resources\\' + $item[1])) -ErrorAction SilentlyContinue }
   Remove-Item -Recurse -Force (Split-Path $Source -Parent) -ErrorAction SilentlyContinue
 } catch { Set-Content -Path $Log -Value $_.Exception.Message }
 if ($Relaunch -eq 1) { Start-Process -FilePath $Exe }

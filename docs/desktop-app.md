@@ -45,7 +45,7 @@ node scripts/package.mjs win32 x64 --build      # Windows zip
 node scripts/package.mjs darwin arm64 x64       # Mac zips, Apple Silicon and Intel
 ```
 
-`--build` runs `npm run build` in `apps/web` first. The script stages the built web app with its production dependencies, packages it with Electron for each platform and architecture, puts the icon on the Windows program (done with `resedit`, so no Windows tooling is needed), and writes `release/HoldMySession-<version>-<win|mac>-<arch>.zip` and `release/SHA256SUMS.txt`. Mac builds can be made from Windows or Linux, but they are not signed or notarised.
+`--build` runs `npm run build` in `apps/web` first. The program's own files are packed into one `resources/app.asar`, so a build is a few dozen files, not tens of thousands. The script stages the built web app with its production dependencies, packages it with Electron for each platform and architecture, puts the icon on the Windows program (done with `resedit`, so no Windows tooling is needed), and writes `release/HoldMySession-<version>-<win|mac>-<arch>.zip` and `release/SHA256SUMS.txt`. Mac builds can be made from Windows or Linux, but they are not signed or notarised.
 
 The version is the one in `apps/web/package.json`. The sidebar shows it, links it to the releases page, and says when a newer release is published (Settings, About and updates, can turn that check off).
 
