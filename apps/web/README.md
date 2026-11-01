@@ -42,9 +42,11 @@ Then open http://localhost:3000.
 
 ### Stats
 
-- Totals for sessions, messages, tokens and estimated cost.
-- A year-long activity heatmap, daily activity, tokens over time (daily or weekly) by model, model share, and an hourly distribution.
-- **Projects** tab: sessions, messages, tokens and time per project, with drill-down to a full overview filtered to one project.
+- **The headline:** total tokens, what they would cost at API prices, what you spent on your plan, and how many times over it paid for itself. Chips show this week and the change against the period of the same length before.
+- A **range switch** (7 days to all history), a stacked chart of the top models over time, a 26-week rhythm grid, model shares, and when you start sessions.
+- **Totals** for sessions, messages, time with Claude and tool calls, counted on the day each happened, with what this week added.
+- **This month:** what the month has cost so far at API prices, where it is heading, and what your plan costs.
+- **Projects:** tokens, sessions, API price and last activity for each project. Open one to see the whole page for just that project, with its map and latest sessions.
 - **Unlinked Sessions:** sessions with no working folder, or in a folder whose name starts with `scratch`, are grouped as one entry instead of one row each.
 - Export any of it as CSV or JSON.
 
@@ -61,7 +63,7 @@ Stats come from HoldMySession's own SQLite file, `~/.holdmysession/history.db`, 
 
 ![Session map](screenshots/session-map.png)
 
-The **Map** shows one project's sessions as a tree: each session, its forks as children, and its running subagents as small cards, coloured by status (needs you, active, recent, idle). A side panel lists what is waiting on you and recent hook events. Drag to pan, scroll to zoom, and use **Edit layout** to arrange cards; the arrangement is saved and follows you to other devices. Details in [docs/session-map/README.md](docs/session-map/README.md).
+The **Map** shows one project's sessions as a tree: each session, its forks as children, and its running subagents as small cards, coloured by status (needs you, running, done, idle). A session waiting on you says what it wants ("Wants to run Bash", or the question it asked), and a list below the map shows what is waiting, longest first, with recent hook events. Drag to pan, scroll to zoom, and use **Edit layout** to arrange cards; the arrangement is saved and follows you to other devices. Details in [docs/session-map/README.md](docs/session-map/README.md).
 
 ### Several computers
 
@@ -75,11 +77,15 @@ Link machines to see them all in one place. One install is the **master** and th
 
 Choose how scratch sessions appear (grouped as Unlinked Sessions, listed folder by folder, or hidden), name them by session name, and hide any project on any machine from lists and dropdowns. Hiding changes lists only; every total, chart and cost still counts everything.
 
+### Needs-you alerts (desktop app)
+
+With the Needs you hook on, the desktop app shows a notification the moment a session starts waiting on you, says what it wants, and puts a count on the tray (menu bar) icon. Clicking the notification opens the Map on that session. There is no alert while the window is in front of you, and Settings, General can turn it off.
+
 ### Claude Code hooks
 
 From Settings you can switch on two optional hooks, which add entries to Claude Code's `settings.json` and remove only those entries when switched off:
 
-- **Needs you notifications** feed the map's Needs you panel and recent events.
+- **Needs you notifications** feed the map's Needs you list, the alerts below and recent events.
 - **Start HoldMySession with Claude Code** launches the app in the background if it is not running.
 
 A copy of the file is saved first, and a file that is not valid JSON is left alone.
@@ -87,7 +93,7 @@ A copy of the file is saved first, and a file that is not valid JSON is left alo
 ### Also
 
 - **Privacy mode** replaces project names, paths, branches and usernames with stand-ins everywhere, for screenshots and demos.
-- Light and dark themes, a 12- or 24-hour clock, and plan and pricing settings with your own per-model overrides. Defaults cover the current Claude models and earlier ones.
+- Eight themes (dark by default), a 12- or 24-hour clock, and plan and pricing settings with your own per-model overrides. Defaults cover the current Claude models and earlier ones.
 - **Updates:** check now, update now, or update automatically (desktop app).
 
 ## Your data

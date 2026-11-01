@@ -58,3 +58,7 @@ The version is the one in `apps/web/package.json`. The sidebar shows it, links i
 1. Change the version in `apps/web/package.json` (and the top of its lock file) and in `apps/desktop/package.json`, and commit.
 2. Build the zips as above.
 3. Tag `v<version>`, push the tag, and create a release for it on GitHub with the zips and `SHA256SUMS.txt` attached.
+
+## Needs-you alerts
+
+Every few seconds the app asks its own server (`/api/needs-you`) which sessions of this computer are waiting on the user. A session that starts waiting is announced once, with a notification that says what it wants, and the tray icon gets an amber dot and a tooltip with the count (a Mac shows the count beside the menu bar icon). Clicking the notification opens `/map?project=...&session=...`. Nothing is announced while the window is visible and focused, and a wait that was already there when alerts were off or the window was in front is not announced later. The switch is in Settings, General (`needsYouAlerts` in `settings.json`). The decision logic is `alerts.cjs`, with tests in `alerts.test.cjs`; the tray dot icons are drawn by `scripts/make-alert-icons.mjs`. It relies on the Needs you hook (Settings, Claude Code) for permission prompts; open questions are found in the transcript without it.
