@@ -14,6 +14,7 @@ const { spawn } = require('node:child_process');
 const os = require('node:os');
 const { pathToFileURL } = require('node:url');
 const { createUpdater } = require('./updater.cjs');
+const { shouldShowWindowFor, portInUse } = require('./launch.cjs');
 
 const args = process.argv.slice(1);
 const flag = (name) => args.includes(name);
@@ -35,19 +36,6 @@ const setLogin = (enabled) => app.setLoginItemSettings({ openAtLogin: enabled, p
 
 app.setAppUserModelId('com.holdmysocks.holdmysession');
 
-function portInUse(port) {
-  return new Promise((resolve) => {
-    const socket = net.connect({ host: '127.0.0.1', port });
-    const done = (value) => {
-      socket.destroy();
-      resolve(value);
-    };
-    socket.setTimeout(800, () => done(false));
-    socket.on('connect', () => done(true));
-    socket.on('error', () => done(false));
-  });
-}
-
 // --- Hook modes: no window, no server, quick ---
 
 async function runNotifyHook() {
@@ -61,7 +49,9 @@ async function runNotifyHook() {
 
 async function runStartHook() {
   try {
-    if (!(await portInUse(PORT))) {
+    // Both loopback addresses are tried, and a busy server gets a moment to answer, so a running app is never
+    // mistaken for a stopped one. That would start a second copy, which would show the first one's window.
+    if (!(await portInUse(PORT, 1500))) {
       // The installed program starts as the app. Run from a checkout, it has to be told which app to run.
       const launch = app.isPackaged ? ['--background'] : [app.getAppPath(), '--background', ...(flag('--no-sandbox') ? ['--no-sandbox'] : [])];
       const child = spawn(process.execPath, launch, { detached: true, stdio: 'ignore', windowsHide: true });
@@ -83,7 +73,7 @@ if (NOTIFY || START) {
 
 function runApp() {
   if (!app.requestSingleInstanceLock()) {
-    // Another copy is running: it opens its window, and this one leaves.
+    // Another copy is running: it opens its window (unless this start was a background one), and this one leaves.
     app.quit();
     return;
   }
@@ -216,10 +206,14 @@ function runApp() {
       updates: updater,
     };
     // Load the app once, so the server starts its background work now, not when the first page is opened.
-    fetch(`http://127.0.0.1:${PORT}/`, { redirect: 'manual' }).catch(() => undefined);
+    fetch(`http://localhost:${PORT}/`, { redirect: 'manual' }).catch(() => undefined);
   }
 
-  app.on('second-instance', () => showWindow());
+  // Another copy started by hand asks for the window. One started in the background (the Claude Code start hook)
+  // must not show it, restore it from the taskbar or take focus.
+  app.on('second-instance', (_event, argv) => {
+    if (shouldShowWindowFor(argv)) showWindow();
+  });
   // Closing every window must not quit: the app stays in the tray.
   app.on('window-all-closed', () => undefined);
   app.on('activate', () => showWindow());

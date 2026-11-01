@@ -33,7 +33,7 @@ Settings, under **Claude Code hooks**, has two switches that add or remove entri
 
 Only these entries are added or removed. The rest of the file is kept, a copy is saved first in `~/.holdmysession/claude-settings-backups`, a file that is not valid JSON is left alone, and a hook that points to an old location is shown as out of date. It is the only thing HoldMySession writes under `~/.claude`.
 
-The hooks are commands run by Claude Code. For the installed app they are the app's own program with a flag (`--holdmysession-notify`, `--holdmysession-start`), so no Node is needed. From a source checkout they are `node bin/holdmysession-hook.mjs` and `node bin/ensure-running.mjs`. Both are written with forward slashes so any shell reads the path. Claude Code reads hooks when a session starts, so sessions already open need restarting.
+The hooks are commands run by Claude Code. For the installed app they are the app's own program with a flag (`--holdmysession-notify`, `--holdmysession-start`), so no Node is needed. From a source checkout they are `node bin/holdmysession-hook.mjs` and `node bin/ensure-running.mjs`. Both are written with forward slashes so any shell reads the path. Claude Code reads hooks when a session starts, so sessions already open need restarting. The start hook only ever starts the app in the tray: it never opens or raises the window, and when the app is already running, even minimised or hidden, it does nothing. (It checks both `127.0.0.1` and `::1`, since the app listens on `localhost`, and a start with `--background` never makes a running copy show its window.)
 
 ## Building it
 

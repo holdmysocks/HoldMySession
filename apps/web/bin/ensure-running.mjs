@@ -12,17 +12,22 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.HOLDMYSESSION_PORT) || 3000;
 
-function listening() {
+function connectsTo(host) {
   return new Promise((done) => {
-    const socket = connect({ host: '127.0.0.1', port });
+    const socket = connect({ host, port });
     const finish = (value) => {
       socket.destroy();
       done(value);
     };
-    socket.setTimeout(800, () => finish(false));
+    socket.setTimeout(1500, () => finish(false));
     socket.on('connect', () => finish(true));
     socket.on('error', () => finish(false));
   });
+}
+
+// "localhost" can mean the IPv6 address as well as the IPv4 one, so both are tried.
+async function listening() {
+  return (await connectsTo('127.0.0.1')) || (await connectsTo('::1'));
 }
 
 try {
