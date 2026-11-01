@@ -16,6 +16,7 @@ import { HooksPanel } from '@/features/hooks/HooksPanel'
 import { DesktopPanel } from '@/features/desktop/DesktopPanel'
 import { ProjectsPanel } from '@/features/projects/ProjectsPanel'
 import { UpdatesPanel } from '@/features/updates/UpdatesPanel'
+import { updateInfoQuery } from '@/features/updates/updates.queries'
 import { LinkedNote } from '@/features/link/LinkedNote'
 import { ClockFormatSetting } from '@/features/time/ClockFormatSetting'
 import { PriceHistoryPanel } from '@/features/history/PriceHistoryPanel'
@@ -42,6 +43,9 @@ export function SettingsPage({ tab, onTab }: { tab: SettingsTab; onTab: (tab: Se
 function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: SettingsTab; onTab: (tab: SettingsTab) => void }) {
   const mutation = useSettingsMutation()
   const { privacyMode, togglePrivacyMode } = usePrivacy()
+  // The same dot as on the gear, so the tab to open is easy to find once Settings is up.
+  const { data: update } = useQuery(updateInfoQuery)
+  const updateReady = !!update?.available && !!update.latest
 
   const [overrides, setOverrides] = useState<Record<string, ModelPricingOverride>>(settings.pricingOverrides)
   const [isDirty, setIsDirty] = useState(false)
@@ -188,11 +192,19 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
             aria-selected={active.id === t.id}
             aria-controls="settings-panel"
             onClick={() => onTab(t.id)}
-            className={`min-h-11 shrink-0 rounded-full border-[1.5px] px-[18px] text-[13.33px] font-medium transition-colors ${
+            className={`relative min-h-11 shrink-0 rounded-full border-[1.5px] px-[18px] text-[13.33px] font-medium transition-colors ${
               active.id === t.id ? 'border-brand-400 text-brand-400' : 'border-[color:var(--hms-line)] text-[color:var(--hms-mute)] hover:text-gray-100'
             }`}
           >
             {t.label}
+            {t.id === 'updates' && updateReady && (
+              <span
+                role="img"
+                aria-label={`Version ${update?.latest} is available`}
+                title={`Version ${update?.latest} is available`}
+                className="absolute right-2 top-1.5 h-2.5 w-2.5 rounded-full bg-brand-400 ring-2 ring-gray-950"
+              />
+            )}
           </button>
         ))}
       </div>

@@ -53,7 +53,12 @@ try {
     }
     throw "Could not replace the program files: $last"
   }
-  foreach ($item in $items) { Remove-Item -Recurse -Force (Join-Path $Target ('resources\\' + $item[1])) -ErrorAction SilentlyContinue }
+  # The new version starts first. Clearing the old copy can take a while when it is thousands of files.
+  if ($Relaunch -eq 1) { Start-Process -FilePath $Exe; $Relaunch = 0 }
+  foreach ($item in $items) {
+    $aside = Join-Path $Target ('resources\\' + $item[1])
+    if (Test-Path $aside) { if ((Get-Item $aside).PSIsContainer) { cmd.exe /c rd /s /q ('"' + $aside + '"') } else { Remove-Item -Force $aside -ErrorAction SilentlyContinue } }
+  }
   Remove-Item -Recurse -Force (Split-Path $Source -Parent) -ErrorAction SilentlyContinue
 } catch { Set-Content -Path $Log -Value $_.Exception.Message }
 if ($Relaunch -eq 1) { Start-Process -FilePath $Exe }
