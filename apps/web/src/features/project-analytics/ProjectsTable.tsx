@@ -76,7 +76,7 @@ export function ProjectsTable({
               </span>
               <span className="w-16 text-right tabular-nums">{formatTokenCount(tokens)}</span>
             </span>
-            <span className="w-auto text-xs text-[color:var(--hms-mute)] tabular-nums sm:w-20 sm:text-right sm:text-base sm:text-inherit">{p.totalSessions} sessions</span>
+            <span className="w-auto text-xs text-[color:var(--hms-mute)] tabular-nums sm:w-20 sm:text-right sm:text-base sm:text-inherit">{p.totalSessions}<span className="sm:hidden"> sessions</span></span>
             <span className="w-auto text-xs text-[color:var(--hms-mute)] tabular-nums sm:w-[100px] sm:text-right sm:text-base sm:text-inherit">{cost !== undefined ? formatMoney(cost) : '-'}</span>
             <span className="w-auto text-xs text-[color:var(--hms-mute)] sm:w-[100px] sm:text-right sm:text-base">{formatAgo(p.lastSessionAt)}</span>
           </Link>
