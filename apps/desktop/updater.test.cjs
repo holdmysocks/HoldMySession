@@ -109,3 +109,27 @@ test('the swap scripts wait for the app, copy over it, and relaunch only when as
   assert.match(mac, /ditto/);
   assert.match(mac, /RELAUNCH" = "1"/);
 });
+
+test('when the update step cannot be started, the app stays open and says why, instead of quitting silently', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hms-upd-'));
+  fs.mkdirSync(path.join(dir, 'app'));
+  const zip = makeZip(dir);
+  const sums = `${crypto.createHash('sha256').update(zip).digest('hex')}  ${NAME}\n`;
+  // On this system there is no Windows PowerShell at the path the updater uses, so starting it fails.
+  const { updater, quits } = updaterFor(dir, { [release.url]: zip, [release.sumsUrl]: sums });
+  updater.download(release, true);
+  await settled(updater);
+  for (let i = 0; i < 200 && updater.status().phase !== 'error'; i++) await new Promise((r) => setTimeout(r, 10));
+  const status = updater.status();
+  assert.strictEqual(status.phase, 'error');
+  assert.match(status.error, /could not be started/);
+  assert.strictEqual(quits.length, 0, 'it must not quit when the update step did not start');
+  // The note is there for the next start as well.
+  assert.match(fs.readFileSync(path.join(dir, 'data', 'updates', 'last-error.txt'), 'utf8'), /could not be started/);
+});
+
+test('the Windows PowerShell program is started by its full path', () => {
+  const src = fs.readFileSync(path.join(__dirname, 'updater.cjs'), 'utf8');
+  assert.match(src, /WindowsPowerShell/);
+  assert.doesNotMatch(src, /spawn\(\s*'powershell\.exe'/);
+});

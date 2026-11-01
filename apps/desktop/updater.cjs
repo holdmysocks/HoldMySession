@@ -203,8 +203,24 @@ function createUpdater(o) {
     void run(release, installWhenReady);
   }
 
-  /** Starts the swap script and, unless the app is already quitting, quits. */
-  function spawnSwap(restart) {
+  /** The Windows PowerShell program, by its full path. A bare name is looked up on PATH, and a program started by a Claude Code hook can have a PATH without it. */
+  function powershellPath() {
+    return path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+  }
+
+  /** Writes what went wrong where the next start shows it, since the app may not be here to say so. */
+  function failed(message) {
+    state = { phase: 'error', version: staged ? staged.version : null, percent: null, error: message };
+    try {
+      fs.mkdirSync(updatesDir, { recursive: true });
+      fs.writeFileSync(errorFile, message);
+    } catch {
+      // Nothing more can be done.
+    }
+  }
+
+  /** Starts the swap script and returns the process. Tells the caller through `onStarted` once it is running. */
+  function spawnSwap(restart, onStarted) {
     fs.mkdirSync(updatesDir, { recursive: true });
     const script = path.join(updatesDir, platform === 'win32' ? 'apply-update.ps1' : 'apply-update.sh');
     fs.writeFileSync(script, helperScript(platform), { mode: 0o755 });
@@ -213,20 +229,30 @@ function createUpdater(o) {
     const child =
       platform === 'win32'
         ? spawn(
-            'powershell.exe',
+            powershellPath(),
             ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', script,
               '-ParentPid', common[0], '-Source', common[1], '-Target', common[2], '-Exe', o.exePath, '-Relaunch', restart ? '1' : '0', '-Log', errorFile],
             { detached: true, stdio: 'ignore', windowsHide: true },
           )
         : spawn('/bin/sh', [script, ...common, restart ? '1' : '0', errorFile], { detached: true, stdio: 'ignore' });
-    child.unref();
+    // Without a handler a failure to start would be thrown in the main process, and the app would quit with nothing said.
+    child.once('error', (error) => failed(`The update step could not be started: ${(error && error.message) || error}`));
+    child.once('spawn', () => {
+      child.unref();
+      if (onStarted) onStarted();
+    });
+    return child;
   }
 
   function install(restart) {
     if (!staged || state.phase === 'installing') return;
     state = { ...state, phase: 'installing' };
-    spawnSwap(restart);
-    o.quit();
+    // The app only quits once the update step is running. If it cannot start, the app stays open and says why.
+    try {
+      spawnSwap(restart, () => o.quit());
+    } catch (error) {
+      failed(`The update step could not be started: ${(error && error.message) || error}`);
+    }
   }
 
   return {
@@ -241,7 +267,11 @@ function createUpdater(o) {
     applyOnQuit: () => {
       if (installOnQuit && staged && state.phase === 'ready') {
         state = { ...state, phase: 'installing' };
-        spawnSwap(false);
+        try {
+          spawnSwap(false);
+        } catch (error) {
+          failed(`The update step could not be started: ${(error && error.message) || error}`);
+        }
       }
     },
   };
