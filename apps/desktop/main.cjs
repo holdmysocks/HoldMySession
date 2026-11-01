@@ -7,7 +7,7 @@
 //   --holdmysession-start    start the app in the background if it is not running, then exit
 //   --background             start in the tray without opening the window
 
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell, dialog } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, dialog, Notification } = require('electron');
 const path = require('node:path');
 const net = require('node:net');
 const { spawn } = require('node:child_process');
@@ -15,6 +15,7 @@ const os = require('node:os');
 const { pathToFileURL } = require('node:url');
 const { createUpdater } = require('./updater.cjs');
 const { shouldShowWindowFor, portInUse } = require('./launch.cjs');
+const { planAlerts, notificationFor, trayState, mapPathFor } = require('./alerts.cjs');
 
 const args = process.argv.slice(1);
 const flag = (name) => args.includes(name);
@@ -80,6 +81,7 @@ function runApp() {
 
   let win = null;
   let tray = null;
+  let trayImages = null;
   let server = null;
   let quitting = false;
   let rebuildTray = () => undefined;
@@ -138,8 +140,12 @@ function runApp() {
   }
 
   function createTray() {
-    const image = nativeImage.createFromPath(path.join(ICONS, process.platform === 'win32' ? 'tray.png' : 'tray@2x.png'));
-    tray = new Tray(process.platform === 'darwin' ? image.resize({ width: 18, height: 18 }) : image);
+    const load = (name) => {
+      const image = nativeImage.createFromPath(path.join(ICONS, process.platform === 'win32' ? `${name}.png` : `${name}@2x.png`));
+      return process.platform === 'darwin' ? image.resize({ width: 18, height: 18 }) : image;
+    };
+    trayImages = { plain: load('tray'), alert: load('tray-alert') };
+    tray = new Tray(trayImages.plain);
     tray.setToolTip(`HoldMySession ${app.getVersion()}`);
     const rebuild = () =>
       tray.setContextMenu(
@@ -169,6 +175,50 @@ function runApp() {
     setInterval(rebuild, 30_000).unref();
     tray.on('click', showWindow);
     rebuildTray = rebuild;
+  }
+
+  // --- Alerts: tell the user when a session starts waiting on them ---
+
+  let alerted = new Set();
+
+  function showTrayState(count) {
+    if (!tray || !trayImages) return;
+    const state = trayState(count, app.getVersion());
+    tray.setImage(state.alert ? trayImages.alert : trayImages.plain);
+    tray.setToolTip(state.tooltip);
+    // A Mac shows the count beside the menu bar icon.
+    if (process.platform === 'darwin') tray.setTitle(state.macTitle);
+  }
+
+  function openMapFor(wait) {
+    showWindow();
+    win.loadURL(`${baseUrl}${mapPathFor(wait)}`);
+  }
+
+  function announce(batch) {
+    const { title, body } = notificationFor(batch);
+    if (Notification.isSupported()) {
+      const note = new Notification({ title, body });
+      note.on('click', () => openMapFor(batch[0]));
+      note.show();
+    } else if (tray && process.platform === 'win32') {
+      tray.displayBalloon({ title, content: body, iconType: 'info' });
+    }
+  }
+
+  async function pollNeedsYou() {
+    try {
+      const response = await fetch(`http://localhost:${PORT}/api/needs-you`, { signal: AbortSignal.timeout(5000) });
+      if (!response.ok) return;
+      const { enabled, waiting } = await response.json();
+      const focused = Boolean(win && win.isVisible() && win.isFocused() && !win.isMinimized());
+      const plan = planAlerts({ waiting, alerted, enabled, windowFocused: focused });
+      alerted = plan.alerted;
+      showTrayState(enabled ? waiting.length : 0);
+      if (plan.notify.length > 0) announce(plan.notify);
+    } catch {
+      // The server is busy or starting: ask again next time.
+    }
   }
 
   function quit() {
@@ -236,6 +286,8 @@ function runApp() {
         return;
       }
     }
+    setInterval(pollNeedsYou, 5000).unref();
+    setTimeout(pollNeedsYou, 2500).unref();
     if (!BACKGROUND) showWindow();
   });
 }

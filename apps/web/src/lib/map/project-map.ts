@@ -1,4 +1,5 @@
 import type { AgentInvocation, SessionSummary, TokenUsage } from '../parsers/types'
+import { describeWaiting, type NotificationInfo, type WaitingInfo } from './waiting'
 import type { PendingQuestion } from './pending-requests'
 import { deriveSessionStatus, SUBAGENT_CACHE_WINDOW_MS } from '../status/session-status'
 import type { SessionStatus } from '../status/session-status'
@@ -66,6 +67,8 @@ export interface MapNode {
   toolCalls: number | null
   timestamp: string | null
   pendingQuestions: PendingQuestion[]
+  /** For a session that needs the user: what it is waiting for. Null otherwise. */
+  waiting: WaitingInfo | null
 }
 
 export interface MapEdge {
@@ -95,6 +98,8 @@ export interface MapSessionInput {
   pendingQuestions: PendingQuestion[]
   /** Latest Notification hook event for this session, ISO timestamp, or null. */
   lastNotificationAt: string | null
+  /** What that Notification said, so a waiting session can say what it waits for. */
+  notification?: NotificationInfo | null
   /** Session-level total tokens across input, output and cache. */
   totalTokens: number
   /** Background tasks of this session that are still running. 0 when none. */
@@ -195,6 +200,10 @@ function sessionNode(
     toolCalls: summary.toolCallCount,
     timestamp: summary.lastActiveAt,
     pendingQuestions: input.pendingQuestions,
+    waiting:
+      status === 'needs-you'
+        ? describeWaiting({ question: input.pendingQuestions[0]?.questions[0]?.question, notification: input.notification })
+        : null,
   }
 }
 
@@ -238,6 +247,7 @@ function subagentNode(sessionId: string, agent: AgentInvocation, index: number):
     toolCalls: agent.totalToolUseCount ?? null,
     timestamp: agent.timestamp,
     pendingQuestions: [],
+    waiting: null,
   }
 }
 

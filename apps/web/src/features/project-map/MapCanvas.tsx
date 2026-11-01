@@ -572,7 +572,7 @@ function NodeView({ node, selected, multiSelected, editMode, canMove, onClick, o
           messages={node.subtitle.split('·')[1]?.trim() ?? ''}
           model={model}
           relation={relationTag(node.parentRelation)}
-          kind={node.needsYou ? (node.pendingQuestions.length > 0 ? 'Question' : 'Permission') : null}
+          kind={node.needsYou ? (node.waiting?.kind === 'question' ? 'Question' : node.waiting?.kind === 'plan' ? 'Plan' : node.waiting?.kind === 'permission' ? 'Permission' : 'Waiting') : null}
           pulse={node.status === 'active' || node.status === 'running'}
         />
       ) : (

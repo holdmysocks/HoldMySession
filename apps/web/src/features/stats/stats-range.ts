@@ -22,19 +22,21 @@ export function rangeStartDay(range: StatsRange, today: string): string | null {
 /**
  * Stats for the days from `startDay` on. Daily figures are cut exactly. The per-model token
  * breakdown only exists for all history, so each model's is scaled by its share of its own daily
- * tokens that fall in the range. Hours of the day and the longest session stay as for all history.
+ * tokens that fall in the range. The longest session stays as for all history.
  */
-export function filterStatsRange(stats: StatsCache, startDay: string | null): StatsCache {
-  if (!startDay) return stats
-  const dailyActivity = stats.dailyActivity.filter((d) => d.date >= startDay)
-  const dailyModelTokens = stats.dailyModelTokens.filter((d) => d.date >= startDay)
+export function filterStatsRange(stats: StatsCache, startDay: string | null, endDay: string | null = null): StatsCache {
+  if (!startDay && !endDay) return stats
+  // The days from `startDay` up to, but not including, `endDay`.
+  const inRangeDay = (day: string) => (!startDay || day >= startDay) && (!endDay || day < endDay)
+  const dailyActivity = stats.dailyActivity.filter((d) => inRangeDay(d.date))
+  const dailyModelTokens = stats.dailyModelTokens.filter((d) => inRangeDay(d.date))
 
   const inRange: Record<string, number> = {}
   const allTime: Record<string, number> = {}
   for (const day of stats.dailyModelTokens) {
     for (const [model, tokens] of Object.entries(day.tokensByModel)) {
       allTime[model] = (allTime[model] ?? 0) + tokens
-      if (day.date >= startDay) inRange[model] = (inRange[model] ?? 0) + tokens
+      if (inRangeDay(day.date)) inRange[model] = (inRange[model] ?? 0) + tokens
     }
   }
   const modelUsage: ModelUsage = {}
@@ -51,20 +53,46 @@ export function filterStatsRange(stats: StatsCache, startDay: string | null): St
     }
   }
 
+  // The hours of the day follow the range when the stats carry them per day. Otherwise they stay as for all history.
+  let hourCounts = stats.hourCounts
+  if (stats.hourCountsByDay) {
+    hourCounts = {}
+    for (const [day, hours] of Object.entries(stats.hourCountsByDay)) {
+      if (!inRangeDay(day)) continue
+      for (const [hour, n] of Object.entries(hours)) hourCounts[hour] = (hourCounts[hour] ?? 0) + n
+    }
+  }
+
   return {
     ...stats,
     dailyActivity,
     dailyModelTokens,
     modelUsage,
+    hourCounts,
     totalSessions: dailyActivity.reduce((sum, d) => sum + d.sessionCount, 0),
     totalMessages: dailyActivity.reduce((sum, d) => sum + d.messageCount, 0),
   }
 }
 
 /** Cost from `startDay` on, from a day-by-day cost. */
-export function costFrom(byDay: Record<string, number>, startDay: string | null): number {
+export function costFrom(byDay: Record<string, number>, startDay: string | null, endDay: string | null = null): number {
   let total = 0
-  for (const [day, usd] of Object.entries(byDay)) if (!startDay || day >= startDay) total += usd
+  for (const [day, usd] of Object.entries(byDay)) if ((!startDay || day >= startDay) && (!endDay || day < endDay)) total += usd
   return total
+}
+
+/** The period of the same length that came just before the range, as [start, end), or null for all history. */
+export function previousPeriod(range: StatsRange, today: string): { start: string; end: string; label: string } | null {
+  const start = rangeStartDay(range, today)
+  if (!start) return null
+  const days = RANGE_DAYS[range as Exclude<StatsRange, 'all'>]
+  const label = range === '1y' ? 'the year before' : `the ${days} days before`
+  return { start: addDays(start, -days), end: start, label }
+}
+
+/** Change from `before` to `now` as a whole percent, or null when there is nothing before it to compare with. */
+export function percentChange(now: number, before: number): number | null {
+  if (!(before > 0) || !Number.isFinite(now)) return null
+  return Math.round(((now - before) / before) * 100)
 }
 

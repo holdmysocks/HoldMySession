@@ -8,7 +8,7 @@ import { backgroundTaskDir, countRunningBackgroundTasks } from '@/lib/scanner/ba
 import { findPendingQuestions } from '@/lib/map/pending-requests'
 import { buildProjectMap, tokenTotal } from '@/lib/map/project-map'
 import type { MapSessionInput } from '@/lib/map/project-map'
-import { latestNotificationBySession, readRecentEvents } from '@/lib/events/event-inbox'
+import { latestNotificationBySession, latestNotificationDetails, readRecentEvents } from '@/lib/events/event-inbox'
 import type { HookEvent } from '@/lib/events/event-inbox'
 import { filterArchivedSessions, filterHiddenSessions, filterVisibleSessions } from '@/lib/map/session-visibility'
 import {
@@ -17,6 +17,8 @@ import {
 import type { MapProject, ProjectMapResponse, SessionDetailInput } from '@/features/project-map/project-map.api'
 
 const HOOK_EVENTS_SHOWN = 100
+
+const notificationInfo = (d: { message: string | null; notificationType: string | null } | undefined) => (d ? { message: d.message, type: d.notificationType } : null)
 
 /** The projects on this computer's map dropdown. Server only. */
 export async function computeMapProjects(): Promise<MapProject[]> {
@@ -35,7 +37,9 @@ export async function computeProjectMap(projectKey: string): Promise<ProjectMapR
   const hiddenNoProjectCount = filterHiddenSessions(inProject).length
   const hiddenArchivedCount = filterArchivedSessions(inProject).length
 
-  const notifications = latestNotificationBySession(await readRecentEvents())
+  const events = await readRecentEvents()
+  const notifications = latestNotificationBySession(events)
+  const notificationDetails = latestNotificationDetails(events)
 
   const inputs: MapSessionInput[] = []
   for (const session of sessions) {
@@ -55,6 +59,7 @@ export async function computeProjectMap(projectKey: string): Promise<ProjectMapR
       backgroundTaskCount: await countRunningBackgroundTasks(backgroundTaskDir(session.projectKey, session.sessionId)),
       pendingQuestions: detail.pendingQuestions,
       lastNotificationAt: notifications.get(session.sessionId) ?? null,
+      notification: notificationInfo(notificationDetails.get(session.sessionId)),
       totalTokens: detail.totalTokens,
     })
   }

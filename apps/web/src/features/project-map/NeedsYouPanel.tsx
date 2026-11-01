@@ -2,11 +2,11 @@ import type { MapNode } from '@/lib/map/project-map'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { useNow } from '@/features/sessions/useNow'
 import { formatDuration } from '@/lib/utils/format'
-import { truncateLabel } from './format-node'
+import { WAITING_TAG } from '@/lib/map/waiting'
 
-/** What a session waits for: a question it asked, or a permission or notification. */
-export function askKind(node: MapNode): 'QUESTION' | 'PERMISSION' {
-  return node.pendingQuestions.length > 0 ? 'QUESTION' : 'PERMISSION'
+/** The tag for what a session waits for: a question, a permission, a plan, or just a wait. */
+export function askKind(node: MapNode): string {
+  return WAITING_TAG[node.waiting?.kind ?? 'other']
 }
 
 /** The sessions that wait on the user, longest wait first. */
@@ -53,7 +53,6 @@ export function NeedsYouPanel({
       ) : (
         waiting.map((node) => {
           const title = privacyMode ? anonymizeSessionName(node.title) : node.title
-          const question = node.pendingQuestions[0]?.questions[0]
           const picked = selectedId === node.id
           return (
             <button
@@ -69,7 +68,7 @@ export function NeedsYouPanel({
               <span className="min-w-0 flex-[1_1_200px]">
                 <b className="block truncate font-display text-lg">{title}</b>
                 <span className="block text-[13px] text-[#C9B27A]">
-                  {question ? truncateLabel(question.question, 90) : 'Waiting on you'} · {waitingFor(node, now)}
+                  {node.waiting?.text ?? 'Waiting on you'} · {waitingFor(node, now)}
                 </span>
               </span>
               <span

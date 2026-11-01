@@ -46,3 +46,28 @@ describe('stats range', () => {
     expect(costFrom({ '2026-10-01': 5, '2026-10-30': 7 }, null)).toBe(12)
   })
 })
+
+import { previousPeriod, percentChange } from './stats-range'
+
+describe('comparing with the period before', () => {
+  it('finds the period of the same length just before the range', () => {
+    expect(previousPeriod('7d', '2026-10-31')).toEqual({ start: '2026-10-18', end: '2026-10-25', label: 'the 7 days before' })
+    expect(previousPeriod('1y', '2026-10-31')?.label).toBe('the year before')
+    expect(previousPeriod('all', '2026-10-31')).toBeNull()
+  })
+
+  it('cuts a window with an end, and the hours of the day follow it', () => {
+    const withHours = { ...stats, hourCountsByDay: { '2026-10-01': { '9': 2 }, '2026-10-30': { '14': 3, '9': 1 } }, hourCounts: { '9': 3, '14': 3 } } as unknown as StatsCache
+    expect(filterStatsRange(withHours, '2026-10-25').hourCounts).toEqual({ '14': 3, '9': 1 })
+    const before = filterStatsRange(withHours, '2026-10-01', '2026-10-25')
+    expect(before.dailyActivity).toHaveLength(1)
+    expect(before.hourCounts).toEqual({ '9': 2 })
+    expect(costFrom({ '2026-10-01': 5, '2026-10-30': 7 }, '2026-10-01', '2026-10-25')).toBe(5)
+  })
+
+  it('gives a percent change, and nothing when there is nothing to compare with', () => {
+    expect(percentChange(120, 100)).toBe(20)
+    expect(percentChange(50, 100)).toBe(-50)
+    expect(percentChange(10, 0)).toBeNull()
+  })
+})

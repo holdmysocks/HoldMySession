@@ -234,6 +234,8 @@ export const StatsCacheSchema = z.object({
   longestSession: LongestSessionSchema,
   firstSessionDate: z.string(),
   hourCounts: z.record(z.string(), z.number()),
+  /** Session starts by local day and hour, when the history database has them. Lets the hours follow a range. */
+  hourCountsByDay: z.record(z.string(), z.record(z.string(), z.number())).optional(),
   totalSpeculationTimeSavedMs: z.number().optional(),
 })
 

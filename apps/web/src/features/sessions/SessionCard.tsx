@@ -6,6 +6,7 @@ import { formatAgo, formatDuration, formatTokenCount } from '@/lib/utils/format'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { SourceBadge } from '@/components/ui/SourceBadge'
 import { STATUS_PULSE } from '@/components/ui/session-status-style'
+import { describeWaiting } from '@/lib/map/waiting'
 import { StatusBadge } from './StatusBadge'
 import { RunningTimer } from './RunningTimer'
 
@@ -18,7 +19,7 @@ export function SessionCard({
   status,
   now,
 }: {
-  session: SessionSummary & { machine?: { id: string; name: string } | null; hasOpenQuestion?: boolean }
+  session: SessionSummary & { machine?: { id: string; name: string } | null; hasOpenQuestion?: boolean; notification?: { message: string | null; type: string | null } | null }
   status: SessionStatus
   now: number
 }) {
@@ -27,6 +28,9 @@ export function SessionCard({
   const nameLabel = session.sessionName ? (privacyMode ? anonymizeSessionName(session.sessionName) : session.sessionName) : null
   const displayBranch = session.branch ? anonymizeBranch(session.branch) : null
   const waiting = status === 'needs-you'
+  const waitingText = session.hasOpenQuestion
+    ? 'Asked you a question'
+    : describeWaiting({ notification: session.notification }).text
 
   return (
     <Link
@@ -61,7 +65,7 @@ export function SessionCard({
         </span>
         {waiting && (
           <span className="mt-1 block text-xs text-yellow-400">
-            {session.hasOpenQuestion ? 'Asked you a question' : 'Waiting on you'} · waiting {formatDuration(Math.max(0, now - new Date(session.lastActiveAt).getTime()))}
+            {waitingText} · waiting {formatDuration(Math.max(0, now - new Date(session.lastActiveAt).getTime()))}
           </span>
         )}
       </span>

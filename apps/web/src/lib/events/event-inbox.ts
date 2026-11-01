@@ -91,3 +91,24 @@ export function latestNotificationBySession(events: HookEvent[]): Map<string, st
 
   return latest
 }
+
+export interface NotificationDetail {
+  ts: string
+  message: string | null
+  notificationType: string | null
+}
+
+/** The latest Notification per session with what it said. Same ordering rule as `latestNotificationBySession`. */
+export function latestNotificationDetails(events: HookEvent[]): Map<string, NotificationDetail> {
+  const latest = new Map<string, NotificationDetail>()
+  for (const event of events) {
+    if (event.event !== 'Notification') continue
+    const time = Date.parse(event.ts)
+    if (Number.isNaN(time)) continue
+    const current = latest.get(event.sessionId)
+    if (current === undefined || time > Date.parse(current.ts)) {
+      latest.set(event.sessionId, { ts: event.ts, message: event.message ?? null, notificationType: event.notificationType ?? null })
+    }
+  }
+  return latest
+}

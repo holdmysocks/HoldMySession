@@ -11,7 +11,8 @@ import { StatsView } from '@/features/stats/StatsView'
 import { LatestSessions } from '@/features/stats/LatestSessions'
 import { MapThumb } from '@/features/stats/MapThumb'
 import { ProjectsTable } from '@/features/project-analytics/ProjectsTable'
-import { costFrom, filterStatsRange, RANGES, rangeStartDay } from '@/features/stats/stats-range'
+import { costFrom, filterStatsRange, percentChange, previousPeriod, RANGES, rangeStartDay } from '@/features/stats/stats-range'
+import { forecastMonth } from '@/lib/pricing/forecast'
 import { tokenBreakdown } from '@/features/stats/token-breakdown'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { dailyActivityToCSV, dailyTokensToCSV, modelUsageToCSV, statsToJSON, downloadFile } from '@/lib/utils/export-utils'
@@ -19,6 +20,7 @@ import { ExportDropdown } from '@/components/ExportDropdown'
 import { historyCostQuery } from '@/features/history/price-history.queries'
 import { subscriptionQuery } from '@/features/history/subscription.queries'
 import { summarizeSubscription } from '@/lib/pricing/subscription'
+import { periodOnDay } from '@/lib/pricing/subscription'
 import { formatAgo } from '@/lib/utils/format'
 import type { StatsCache } from '@/lib/parsers/types'
 
@@ -101,6 +103,31 @@ function StatsPage() {
     return { tokens: all > 0 ? mine / all : null, usd: wholeUSD && apiUSD !== null ? apiUSD / wholeUSD : null }
   }, [selected, stats, allStats, startDay, datedCost, apiUSD])
 
+  // Against the period of the same length just before the range, where the history reaches back that far.
+  const compare = useMemo(() => {
+    const prev = previousPeriod(range, today)
+    if (!prev || !baseStats || !stats) return null
+    const before = filterStatsRange(baseStats, prev.start, prev.end)
+    if (before.dailyActivity.length === 0) return null
+    const sum = (s: StatsCache, f: (d: StatsCache['dailyActivity'][number]) => number) => s.dailyActivity.reduce((n, d) => n + f(d), 0)
+    return {
+      label: prev.label,
+      tokens: percentChange(tokenBreakdown(stats.modelUsage).total, tokenBreakdown(before.modelUsage).total),
+      usd: cost && apiUSD !== null ? percentChange(apiUSD, costFrom(cost.byDay, prev.start, prev.end)) : null,
+      time: percentChange(openTimeOf(stats) ?? 0, openTimeOf(before) ?? 0),
+      sessions: percentChange(stats.totalSessions, before.totalSessions),
+      messages: percentChange(stats.totalMessages, before.totalMessages),
+      toolCalls: percentChange(sum(stats, (d) => d.toolCallCount), sum(before, (d) => d.toolCallCount)),
+    }
+  }, [range, today, baseStats, stats, cost, apiUSD])
+
+  // This month at API prices, and what the plan costs, for the page about everything.
+  const forecast = useMemo(() => {
+    if (selected || !datedCost) return null
+    const plan = subscription ? periodOnDay(subscription.periods, today) : null
+    return forecastMonth(datedCost.byDay, today, plan && plan.tier !== 'api' ? plan.monthlyUSD : null)
+  }, [selected, datedCost, subscription, today])
+
   const week = useMemo(() => weekOf(baseStats, weekStart), [baseStats, weekStart])
   // Counted per day when the history has it, so it follows the range. Otherwise all the sessions' time.
   const durationMs = (stats ? openTimeOf(stats) : null) ?? (selected ? selected.totalDurationMs : projects.reduce((sum, p) => sum + p.totalDurationMs, 0))
@@ -151,6 +178,8 @@ function StatsPage() {
           range={range}
           onRange={setRange}
           rhythmTitle={selected ? 'Your rhythm here' : 'Your rhythm'}
+          compare={compare}
+          forecast={forecast}
         >
           {selected ? (
             <LatestSessions projectName={selected.projectName} machineId={machineId} />

@@ -7,6 +7,7 @@ import { mapProjectValue, type MapProject } from './project-map.api'
 import { mapProjectsQuery, projectMapQuery, hookEventsQuery } from './project-map.queries'
 import { MapCanvas, type NodeMove } from './MapCanvas'
 import { MapTree } from './MapTree'
+import { waitingSentence } from '@/lib/map/waiting'
 import { NeedsYouPanel, waitingFor, waitingNodes } from './NeedsYouPanel'
 import { NodeDetailPanel } from './NodeDetailPanel'
 import { HookEventsPanel } from './HookEventsPanel'
@@ -18,10 +19,12 @@ import { useMachineScope } from '@/features/link/useMachineScope'
 interface ProjectMapPageProps {
   /** Project key (directory name), from the URL. */
   project: string | undefined
+  /** A session to have picked when the page opens. */
+  session?: string
   onProjectChange: (projectKey: string) => void
 }
 
-export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps) {
+export function ProjectMapPage({ project, session, onProjectChange }: ProjectMapPageProps) {
   const { privacyMode, anonymizeProjectName, anonymizePath, anonymizeSessionName } = usePrivacy()
   const scope = useMachineScope()
   // With a node chosen the list is that node's. With all machines it holds every connected machine's projects.
@@ -38,7 +41,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
   const eventsQuery = useQuery(hookEventsQuery(machineId))
 
   const now = useNow()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(session ? `session:${session}` : null)
   const [editMode, setEditMode] = useState(false)
   const [panelsHidden, setPanelsHidden] = useState(false)
   // In editor mode cards snap to a grid. Holding Alt while dragging places one freely.
@@ -231,8 +234,7 @@ export function ProjectMapPage({ project, onProjectChange }: ProjectMapPageProps
               {waiting.length} NEED YOU
             </span>
             <span className="min-w-0 font-semibold">
-              {privacyMode ? anonymizeSessionName(first.title) : first.title}
-              {first.pendingQuestions.length > 0 ? ' asked you a question' : ' is waiting on you'}{' '}
+              {waitingSentence(privacyMode ? anonymizeSessionName(first.title) : first.title, first.waiting ?? { kind: 'other', text: 'is waiting on you' })}{' '}
               <span className="font-normal text-[#4A3200]">
                 · {waitingFor(first, now)}
                 {waiting.length > 1 ? `, and ${waiting.length - 1} more` : ''}

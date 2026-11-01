@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as DashboardRouteImport } from './routes/_dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiNeedsYouRouteImport } from './routes/api.needs-you'
 import { Route as ApiHistoryRestoreRouteImport } from './routes/api.history-restore'
 import { Route as ApiHistoryBackupRouteImport } from './routes/api.history-backup'
 import { Route as DashboardStatsRouteImport } from './routes/_dashboard/stats'
@@ -30,6 +31,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNeedsYouRoute = ApiNeedsYouRouteImport.update({
+  id: '/api/needs-you',
+  path: '/api/needs-you',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHistoryRestoreRoute = ApiHistoryRestoreRouteImport.update({
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/stats': typeof DashboardStatsRoute
   '/api/history-backup': typeof ApiHistoryBackupRoute
   '/api/history-restore': typeof ApiHistoryRestoreRoute
+  '/api/needs-you': typeof ApiNeedsYouRoute
   '/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
   '/api/link/ping': typeof ApiLinkPingRoute
   '/api/link/poll': typeof ApiLinkPollRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/stats': typeof DashboardStatsRoute
   '/api/history-backup': typeof ApiHistoryBackupRoute
   '/api/history-restore': typeof ApiHistoryRestoreRoute
+  '/api/needs-you': typeof ApiNeedsYouRoute
   '/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
   '/api/link/ping': typeof ApiLinkPingRoute
   '/api/link/poll': typeof ApiLinkPollRoute
@@ -126,6 +134,7 @@ export interface FileRoutesById {
   '/_dashboard/stats': typeof DashboardStatsRoute
   '/api/history-backup': typeof ApiHistoryBackupRoute
   '/api/history-restore': typeof ApiHistoryRestoreRoute
+  '/api/needs-you': typeof ApiNeedsYouRoute
   '/_dashboard/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
   '/api/link/ping': typeof ApiLinkPingRoute
   '/api/link/poll': typeof ApiLinkPollRoute
@@ -142,6 +151,7 @@ export interface FileRouteTypes {
     | '/stats'
     | '/api/history-backup'
     | '/api/history-restore'
+    | '/api/needs-you'
     | '/sessions/$sessionId'
     | '/api/link/ping'
     | '/api/link/poll'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/stats'
     | '/api/history-backup'
     | '/api/history-restore'
+    | '/api/needs-you'
     | '/sessions/$sessionId'
     | '/api/link/ping'
     | '/api/link/poll'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/_dashboard/stats'
     | '/api/history-backup'
     | '/api/history-restore'
+    | '/api/needs-you'
     | '/_dashboard/sessions/$sessionId'
     | '/api/link/ping'
     | '/api/link/poll'
@@ -184,6 +196,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRouteWithChildren
   ApiHistoryBackupRoute: typeof ApiHistoryBackupRoute
   ApiHistoryRestoreRoute: typeof ApiHistoryRestoreRoute
+  ApiNeedsYouRoute: typeof ApiNeedsYouRoute
   ApiLinkPingRoute: typeof ApiLinkPingRoute
   ApiLinkPollRoute: typeof ApiLinkPollRoute
   ApiLinkPushRoute: typeof ApiLinkPushRoute
@@ -204,6 +217,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/needs-you': {
+      id: '/api/needs-you'
+      path: '/api/needs-you'
+      fullPath: '/api/needs-you'
+      preLoaderRoute: typeof ApiNeedsYouRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/history-restore': {
@@ -311,6 +331,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRouteWithChildren,
   ApiHistoryBackupRoute: ApiHistoryBackupRoute,
   ApiHistoryRestoreRoute: ApiHistoryRestoreRoute,
+  ApiNeedsYouRoute: ApiNeedsYouRoute,
   ApiLinkPingRoute: ApiLinkPingRoute,
   ApiLinkPollRoute: ApiLinkPollRoute,
   ApiLinkPushRoute: ApiLinkPushRoute,

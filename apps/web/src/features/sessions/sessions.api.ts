@@ -8,7 +8,7 @@ import { dropdownKey, labelScratch, visibleInLists } from '@/lib/projects/projec
 import { UNLINKED_PROJECT_KEY, UNLINKED_PROJECT_NAME } from '@/lib/projects/unlinked'
 import type { ScratchMode } from '@/features/settings/settings.types'
 import { deriveSessionStatus } from '@/lib/status/session-status'
-import { latestNotificationBySession, readRecentEvents } from '@/lib/events/event-inbox'
+import { latestNotificationBySession, latestNotificationDetails, readRecentEvents } from '@/lib/events/event-inbox'
 
 export const getSessionList = createServerFn({ method: 'GET' }).handler(
   async () => {
@@ -40,6 +40,8 @@ type PaginatedSessionsInput = z.infer<typeof paginatedSessionsInputSchema>
 export interface SessionStatusSignals {
   /** Latest Notification hook event for the session, ISO timestamp, or null. */
   lastNotificationAt: string | null
+  /** What the latest Notification said, so a waiting session can show what it waits for. */
+  notification?: { message: string | null; type: string | null } | null
   /** True only for active sessions with an unanswered AskUserQuestion. */
   hasOpenQuestion: boolean
   /** Set for a session of another machine, which has no transcript here: no detail page, no live status. */
@@ -187,7 +189,9 @@ export const getPaginatedSessions = createServerFn({ method: 'GET' })
     )
     const hiddenNoProjectCount = filterHiddenSessions(all).length + view.live.reduce((n, l) => n + l.hiddenNoProjectCount, 0)
     const hiddenArchivedCount = filterArchivedSessions(all).length + view.live.reduce((n, l) => n + l.hiddenArchivedCount, 0)
-    const notifications = latestNotificationBySession(await readRecentEvents())
+    const events = await readRecentEvents()
+    const notifications = latestNotificationBySession(events)
+    const details = latestNotificationDetails(events)
 
     // "Needs you" and "Done" depend on signals, so those are worked out before the list is cut into pages.
     // Only a running session has an open question to look for, so the scan stays small.
@@ -227,6 +231,7 @@ export const getPaginatedSessions = createServerFn({ method: 'GET' })
             ...summary,
             machine: { id: machineId, name: machineName ?? '' },
             lastNotificationAt: summary.lastNotificationAt ?? null,
+            notification: (summary as { notification?: { message: string | null; type: string | null } | null }).notification ?? null,
             hasOpenQuestion: summary.hasOpenQuestion ?? false,
           }
         }
@@ -234,6 +239,9 @@ export const getPaginatedSessions = createServerFn({ method: 'GET' })
           ...summary,
           machine: null,
           lastNotificationAt: notifications.get(summary.sessionId) ?? null,
+          notification: details.has(summary.sessionId)
+            ? { message: details.get(summary.sessionId)!.message, type: details.get(summary.sessionId)!.notificationType }
+            : null,
           hasOpenQuestion: summary.isActive && (await findPendingQuestions(filePath)).length > 0,
         }
       }),

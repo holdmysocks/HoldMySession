@@ -7,6 +7,8 @@ import { RhythmGrid } from './RhythmGrid'
 import { StartHours } from './StartHours'
 import { tokenBreakdown } from './token-breakdown'
 import { RANGES, type StatsRange } from './stats-range'
+import { MonthForecast } from './MonthForecast'
+import type { MonthForecast as Forecast } from '@/lib/pricing/forecast'
 import { formatMoney } from '@/features/project-analytics/ProjectsTable'
 
 const RANGE_NAME: Record<StatsRange, string> = {
@@ -48,8 +50,14 @@ export interface StatsViewProps {
   onRange: (range: StatsRange) => void
   /** Heading of the rhythm grid. */
   rhythmTitle?: string
+  /** Percent change against the period of the same length just before the range, where there is one to compare with. */
+  compare?: { label: string; tokens: number | null; usd: number | null; time: number | null; sessions: number | null; messages: number | null; toolCalls: number | null } | null
+  /** This month's forecast. Overall only. */
+  forecast?: Forecast | null
   children?: ReactNode
 }
+
+const signed = (p: number) => `${p >= 0 ? '+' : '-'}${Math.abs(p)}%`
 
 /** The whole Stats page body, for everything or for one project: headline, chart, totals, rhythm, models and hours. */
 export function StatsView({
@@ -64,6 +72,8 @@ export function StatsView({
   range,
   onRange,
   rhythmTitle = 'Your rhythm',
+  compare,
+  forecast,
   children,
 }: StatsViewProps) {
   const breakdown = tokenBreakdown(stats.modelUsage)
@@ -73,14 +83,15 @@ export function StatsView({
   const pct = (v: number | null | undefined) => (v === null || v === undefined ? null : Math.round(v * 100))
 
   const kpis = [
-    { label: 'Sessions', value: stats.totalSessions.toLocaleString(), delta: week.sessions > 0 ? `+${week.sessions.toLocaleString()} this week` : '' },
-    { label: 'Messages', value: stats.totalMessages.toLocaleString(), delta: week.messages > 0 ? `+${week.messages.toLocaleString()} this week` : '' },
+    { label: 'Sessions', value: stats.totalSessions.toLocaleString(), delta: week.sessions > 0 ? `+${week.sessions.toLocaleString()} this week` : '', change: compare?.sessions ?? null },
+    { label: 'Messages', value: stats.totalMessages.toLocaleString(), delta: week.messages > 0 ? `+${week.messages.toLocaleString()} this week` : '', change: compare?.messages ?? null },
     {
       label: 'Time with Claude',
       value: durationMs >= 3_600_000 ? `${Math.round(durationMs / 3_600_000).toLocaleString()} h` : formatDuration(durationMs),
       delta: weekDurationMs && weekDurationMs > 0 ? `+${Math.max(1, Math.round(weekDurationMs / 3_600_000))} h this week` : '',
+      change: compare?.time ?? null,
     },
-    { label: 'Tool calls', value: toolCalls.toLocaleString(), delta: week.toolCalls > 0 ? `+${week.toolCalls.toLocaleString()} this week` : '' },
+    { label: 'Tool calls', value: toolCalls.toLocaleString(), delta: week.toolCalls > 0 ? `+${week.toolCalls.toLocaleString()} this week` : '', change: compare?.toolCalls ?? null },
   ]
 
   return (
@@ -100,6 +111,7 @@ export function StatsView({
           </button>
           <div className="mt-2.5 flex flex-wrap gap-2">
             {week.tokens > 0 && <Chip>+{formatTokenCount(week.tokens)} tokens this week</Chip>}
+            {compare && compare.tokens !== null && <Chip neutral>{signed(compare.tokens)} vs {compare.label}</Chip>}
             {pct(share?.tokens) !== null && <Chip neutral>{pct(share?.tokens)}% of all your tokens</Chip>}
           </div>
           {open && (
@@ -131,6 +143,7 @@ export function StatsView({
           </div>
           <div className="mt-3.5 flex flex-wrap gap-2">
             {(weekUSD ?? 0) > 0.005 && <Chip>+{formatMoney(weekUSD!)} this week</Chip>}
+            {compare && compare.usd !== null && <Chip neutral>{signed(compare.usd)} vs {compare.label}</Chip>}
             {plan && multiple !== null && multiple >= 1.05 && (
               <Chip>About {multiple >= 10 ? Math.round(multiple) : multiple.toFixed(1)}x what you paid</Chip>
             )}
@@ -167,10 +180,20 @@ export function StatsView({
           <div key={k.label} className="py-[22px] pr-6">
             <div className="text-[color:var(--hms-mute)]">{k.label}</div>
             <div className="font-display text-[44px] font-bold leading-[1.1]">{k.value}</div>
-            <div className="min-h-[20px] text-[13px] font-semibold" style={{ color: 'var(--hms-chip-ink)' }}>{k.delta}</div>
+            <div className="min-h-[20px] text-[13px]">
+              <span className="font-semibold" style={{ color: 'var(--hms-chip-ink)' }}>{k.delta}</span>
+              {k.change !== null && (
+                <span className="text-[color:var(--hms-mute)]">
+                  {k.delta ? ' · ' : ''}
+                  {signed(k.change)} vs before
+                </span>
+              )}
+            </div>
           </div>
         ))}
       </section>
+
+      {forecast && <MonthForecast forecast={forecast} />}
 
       <div className="flex flex-wrap gap-10">
         <section aria-label="Rhythm" className="flex min-w-0 flex-[2_1_460px] flex-col">

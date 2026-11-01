@@ -55,6 +55,7 @@ export function statsFromHistory(db: Db, options: HistoryStatsOptions = {}): Sta
 
   const activity = new Map<string, { messageCount: number; sessionCount: number; toolCallCount: number; durationMs: number }>()
   const hourCounts: Record<string, number> = {}
+  const hourCountsByDay: Record<string, Record<string, number>> = {}
   let totalMessages = 0
   let firstSessionDate: string | null = null
   let longest = { sessionId: '', duration: 0, messageCount: 0, timestamp: '' }
@@ -99,6 +100,11 @@ export function statsFromHistory(db: Db, options: HistoryStatsOptions = {}): Sta
     if (!Number.isNaN(started.getTime())) {
       const hour = String(started.getHours())
       hourCounts[hour] = (hourCounts[hour] ?? 0) + 1
+      const startDay = localDay(startedIso)
+      if (startDay) {
+        const hours = (hourCountsByDay[startDay] ??= {})
+        hours[hour] = (hours[hour] ?? 0) + 1
+      }
     }
     if (Number(row.duration_ms) > longest.duration) {
       longest = {
@@ -153,5 +159,6 @@ export function statsFromHistory(db: Db, options: HistoryStatsOptions = {}): Sta
     longestSession: { ...longest, timestamp: longest.timestamp || new Date().toISOString() },
     firstSessionDate: firstSessionDate ?? new Date().toISOString(),
     hourCounts,
+    hourCountsByDay,
   }
 }

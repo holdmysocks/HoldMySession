@@ -64,6 +64,8 @@ export const SettingsSchema = z.object({
   checkForUpdates: z.boolean().default(true),
   /** Desktop app: download new releases in the background and install them when the app next quits. */
   autoUpdate: z.boolean().default(true),
+  /** Desktop app: a notification and a count on the tray icon when a session starts waiting on the user. */
+  needsYouAlerts: z.boolean().default(true),
   link: LinkSchema.default({ role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' }),
   projects: ProjectsSchema.default({ scratch: 'group', scratchByName: false, hidden: [] }),
   pricingOverrides: z
@@ -311,6 +313,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoScan: { enabled: true, intervalMinutes: 15 },
   checkForUpdates: true,
   autoUpdate: true,
+  needsYouAlerts: true,
   link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' },
   projects: { scratch: 'group', scratchByName: false, hidden: [] },
   pricingOverrides: {},
