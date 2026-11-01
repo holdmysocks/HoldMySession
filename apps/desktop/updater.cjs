@@ -108,6 +108,16 @@ function createUpdater(o) {
   let staged = null; // { version, dir }
   let installOnQuit = false;
 
+  // An update that was unpacked but never installed, or whose folder could not be cleared while the swap step ran from it.
+  // Nothing is downloading at start-up, so anything left is stale.
+  try {
+    for (const entry of fs.readdirSync(updatesDir, { withFileTypes: true })) {
+      if (entry.isDirectory()) fs.rmSync(path.join(updatesDir, entry.name), { recursive: true, force: true });
+    }
+  } catch {
+    // No updates folder yet: the normal case.
+  }
+
   // A swap that failed last time left a note, since the app was not running to say so.
   try {
     state = { phase: 'error', version: null, percent: null, error: fs.readFileSync(errorFile, 'utf8').trim() };
@@ -219,40 +229,74 @@ function createUpdater(o) {
     }
   }
 
-  /** Starts the swap script and returns the process. Tells the caller through `onStarted` once it is running. */
-  function spawnSwap(restart, onStarted) {
-    fs.mkdirSync(updatesDir, { recursive: true });
-    const script = path.join(updatesDir, platform === 'win32' ? 'apply-update.ps1' : 'apply-update.sh');
-    fs.writeFileSync(script, helperScript(platform), { mode: 0o755 });
-    const target = targetPath();
-    const common = [String(o.pid), staged.dir, target];
-    const child =
-      platform === 'win32'
-        ? spawn(
-            powershellPath(),
-            ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', script,
-              '-ParentPid', common[0], '-Source', common[1], '-Target', common[2], '-Exe', o.exePath, '-Relaunch', restart ? '1' : '0', '-Log', errorFile],
-            { detached: true, stdio: 'ignore', windowsHide: true },
-          )
-        : spawn('/bin/sh', [script, ...common, restart ? '1' : '0', errorFile], { detached: true, stdio: 'ignore' });
-    // Without a handler a failure to start would be thrown in the main process, and the app would quit with nothing said.
-    child.once('error', (error) => failed(`The update step could not be started: ${(error && error.message) || error}`));
-    child.once('spawn', () => {
+  /** Starts a program and says whether Windows (or the system) accepted it. It is let go of at once, so it outlives this app. */
+  function launch(cmd, argv, options) {
+    return new Promise((resolve, reject) => {
+      let child;
+      try {
+        child = spawn(cmd, argv, { detached: true, stdio: 'ignore', ...options });
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      child.once('error', reject);
+      child.once('spawn', resolve);
       child.unref();
-      if (onStarted) onStarted();
     });
-    return child;
+  }
+
+  /**
+   * Starts the swap step, and resolves once it is running. On Windows the first choice is the new version's own
+   * program in Node mode, which needs no PowerShell; PowerShell, by its full path, is the second choice.
+   */
+  async function spawnSwap(restart) {
+    fs.mkdirSync(updatesDir, { recursive: true });
+    const target = targetPath();
+    if (platform === 'win32') {
+      const trace = path.join(updatesDir, 'apply-update.log');
+      try {
+        const script = path.join(updatesDir, 'apply-update.cjs');
+        const argsFile = path.join(updatesDir, 'apply-update.json');
+        fs.copyFileSync(path.join(__dirname, 'swap.cjs'), script);
+        fs.writeFileSync(
+          argsFile,
+          JSON.stringify({ parentPid: o.pid, source: staged.dir, target, exe: o.exePath, relaunch: restart, errorFile, traceFile: trace }),
+        );
+        await launch(path.join(staged.dir, 'HoldMySession.exe'), [script, argsFile], {
+          windowsHide: true,
+          env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+        });
+        return;
+      } catch (error) {
+        try {
+          fs.appendFileSync(trace, `${new Date().toISOString()} the swap step could not be started with the new program (${(error && error.message) || error}), trying PowerShell\n`);
+        } catch {
+          // The log is a courtesy.
+        }
+      }
+      const script = path.join(updatesDir, 'apply-update.ps1');
+      fs.writeFileSync(script, helperScript(platform));
+      await launch(
+        powershellPath(),
+        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', script,
+          '-ParentPid', String(o.pid), '-Source', staged.dir, '-Target', target, '-Exe', o.exePath, '-Relaunch', restart ? '1' : '0', '-Log', errorFile],
+        { windowsHide: true },
+      );
+      return;
+    }
+    const script = path.join(updatesDir, 'apply-update.sh');
+    fs.writeFileSync(script, helperScript(platform), { mode: 0o755 });
+    await launch('/bin/sh', [script, String(o.pid), staged.dir, target, restart ? '1' : '0', errorFile]);
   }
 
   function install(restart) {
     if (!staged || state.phase === 'installing') return;
     state = { ...state, phase: 'installing' };
     // The app only quits once the update step is running. If it cannot start, the app stays open and says why.
-    try {
-      spawnSwap(restart, () => o.quit());
-    } catch (error) {
-      failed(`The update step could not be started: ${(error && error.message) || error}`);
-    }
+    spawnSwap(restart).then(
+      () => o.quit(),
+      (error) => failed(`The update step could not be started: ${(error && error.message) || error}`),
+    );
   }
 
   return {
@@ -267,11 +311,8 @@ function createUpdater(o) {
     applyOnQuit: () => {
       if (installOnQuit && staged && state.phase === 'ready') {
         state = { ...state, phase: 'installing' };
-        try {
-          spawnSwap(false);
-        } catch (error) {
-          failed(`The update step could not be started: ${(error && error.message) || error}`);
-        }
+        // The app is already quitting. If the step cannot be started, the note is there for the next start.
+        spawnSwap(false).catch((error) => failed(`The update step could not be started: ${(error && error.message) || error}`));
       }
     },
   };
