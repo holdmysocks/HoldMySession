@@ -27,10 +27,15 @@ function parseSums(text, name) {
 function helperScript(platform) {
   if (platform === 'win32') {
     return `param([int]$ParentPid,[string]$Source,[string]$Target,[string]$Exe,[int]$Relaunch,[string]$Log)
+# A step-by-step note beside the error file, so a swap that goes wrong can be read afterwards.
+$Trace = Join-Path (Split-Path $Log -Parent) 'apply-update.log'
+function Note($text) { try { Add-Content -Path $Trace -Value ((Get-Date -Format 's') + ' ' + $text) } catch { } }
+Set-Content -Path $Trace -Value ((Get-Date -Format 's') + ' started, waiting for process ' + $ParentPid)
 try {
   for ($i = 0; $i -lt 120; $i++) { if (-not (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue)) { break }; Start-Sleep -Milliseconds 500 }
   # The app's own files are swapped as a whole, so files an older version had do not pile up. A version keeps them
   # as the folder resources\\app (older ones) or the single file resources\\app.asar. The old copy is kept until the new one is in place.
+  Note 'the program has quit, swapping the files'
   $items = @(@('resources\\app', 'app.old'), @('resources\\app.asar', 'app.asar.old'))
   foreach ($item in $items) { Remove-Item -Recurse -Force (Join-Path $Target ('resources\\' + $item[1])) -ErrorAction SilentlyContinue }
   foreach ($item in $items) {
@@ -41,6 +46,7 @@ try {
     }
     if (-not $moved) { throw "Could not replace the program files: $last" }
   }
+  Note 'old files moved aside, copying the new ones'
   $done = $false
   for ($i = 0; $i -lt 40 -and -not $done; $i++) {
     try { Copy-Item -Path (Join-Path $Source '*') -Destination $Target -Recurse -Force -ErrorAction Stop; $done = $true } catch { $last = $_.Exception.Message; Start-Sleep -Milliseconds 500 }
@@ -53,6 +59,7 @@ try {
     }
     throw "Could not replace the program files: $last"
   }
+  Note 'new files in place'
   # The new version starts first. Clearing the old copy can take a while when it is thousands of files.
   if ($Relaunch -eq 1) { Start-Process -FilePath $Exe; $Relaunch = 0 }
   foreach ($item in $items) {
@@ -60,8 +67,9 @@ try {
     if (Test-Path $aside) { if ((Get-Item $aside).PSIsContainer) { cmd.exe /c rd /s /q ('"' + $aside + '"') } else { Remove-Item -Force $aside -ErrorAction SilentlyContinue } }
   }
   Remove-Item -Recurse -Force (Split-Path $Source -Parent) -ErrorAction SilentlyContinue
-} catch { Set-Content -Path $Log -Value $_.Exception.Message }
-if ($Relaunch -eq 1) { Start-Process -FilePath $Exe }
+  Note 'done'
+} catch { Note ('failed: ' + $_.Exception.Message); Set-Content -Path $Log -Value $_.Exception.Message }
+if ($Relaunch -eq 1) { Note 'starting the program again'; Start-Process -FilePath $Exe }
 `;
   }
   return `#!/bin/sh
