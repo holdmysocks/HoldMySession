@@ -1,6 +1,6 @@
 {
   "name": "holdmysession-desktop",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "private": true,
   "description": "The HoldMySession desktop app: a tray icon and a window around the same server, for Windows and Mac",
   "license": "MIT",
