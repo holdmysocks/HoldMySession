@@ -25,6 +25,9 @@ const START = flag('--holdmysession-start');
 const STATUSLINE = flag('--holdmysession-statusline');
 const BACKGROUND = flag('--background');
 
+// Started only to answer a hook: no Dock icon for it on a Mac, which would flash for a moment each time.
+if (process.platform === 'darwin' && (NOTIFY || START || STATUSLINE)) app.dock?.hide();
+
 // The server, hook script and built pages. Packaged, they sit next to this file. From a checkout, in apps/web.
 const WEB_DIR = app.isPackaged || require('node:fs').existsSync(path.join(__dirname, 'web'))
   ? path.join(__dirname, 'web')
@@ -115,11 +118,17 @@ function runApp() {
     quit: () => quit(),
   });
 
+  // On a Mac the app lives in the menu bar while its window is closed, so the Dock icon shows only with the window.
+  const dockHide = () => process.platform === 'darwin' && app.dock?.hide();
+  const dockShow = () => (process.platform === 'darwin' ? app.dock?.show() : undefined);
+
   function showWindow() {
+    dockShow();
     if (!win) createWindow();
     if (win.isMinimized()) win.restore();
     win.show();
     win.focus();
+    if (process.platform === 'darwin') app.focus({ steal: true });
   }
 
   function createWindow() {
@@ -152,6 +161,7 @@ function runApp() {
       if (!quitting) {
         event.preventDefault();
         win.hide();
+        dockHide();
       }
     });
     win.on('closed', () => {
@@ -337,6 +347,7 @@ function runApp() {
     setTimeout(pollNeedsYou, 2500).unref();
     setInterval(pollLimits, 30_000).unref();
     setTimeout(pollLimits, 4000).unref();
-    if (!BACKGROUND) showWindow();
+    if (BACKGROUND) dockHide();
+    else showWindow();
   });
 }

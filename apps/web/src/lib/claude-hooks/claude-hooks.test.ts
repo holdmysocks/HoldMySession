@@ -12,6 +12,18 @@ describe('hook commands', () => {
     expect(c.notify).toBe('"C:/Program Files/HoldMySession/HoldMySession.exe" --holdmysession-notify')
     expect(c.start).toBe('"C:/Program Files/HoldMySession/HoldMySession.exe" --holdmysession-start')
   })
+  it('runs the notify hook as plain Node on a Mac, so no Dock icon flashes, and still starts the app with its flag', () => {
+    const c = hookCommands({ exePath: '/Applications/HoldMySession.app/Contents/MacOS/HoldMySession', appDir: '/Applications/HoldMySession.app/Contents/Resources/app.asar/web', platform: 'darwin' })
+    expect(c.notify).toBe('ELECTRON_RUN_AS_NODE=1 "/Applications/HoldMySession.app/Contents/MacOS/HoldMySession" "/Applications/HoldMySession.app/Contents/Resources/app.asar/web/bin/holdmysession-hook.mjs"')
+    expect(c.start).toBe('"/Applications/HoldMySession.app/Contents/MacOS/HoldMySession" --holdmysession-start')
+    // Both are recognised as ours, so they are found, updated in place and removed like the others.
+    expect(isHookInstalled(addHook(addHook({}, 'notify', c.notify), 'start', c.start), 'notify')).toBe(true)
+    expect(installedCommand(addHook({}, 'notify', c.notify), 'notify')).toBe(c.notify)
+    expect(isHookInstalled(removeHook(addHook({}, 'notify', c.notify), 'notify'), 'notify')).toBe(false)
+  })
+  it('keeps the flags on Windows', () => {
+    expect(hookCommands({ exePath: 'C:\\H\\HoldMySession.exe', appDir: 'x', platform: 'win32' }).notify).toBe('"C:/H/HoldMySession.exe" --holdmysession-notify')
+  })
   it('uses node and the scripts of a source checkout', () => {
     expect(commands.notify).toBe('node "C:/Apps/HoldMySession/apps/web/bin/holdmysession-hook.mjs"')
     expect(commands.start).toBe('node "C:/Apps/HoldMySession/apps/web/bin/ensure-running.mjs"')

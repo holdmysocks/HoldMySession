@@ -28,10 +28,14 @@ export interface HookCommands {
 
 const slash = (p: string) => p.replace(/\\/g, '/')
 
-export function hookCommands(opts: { exePath?: string | null; appDir: string }): HookCommands {
+export function hookCommands(opts: { exePath?: string | null; appDir: string; platform?: string }): HookCommands {
   if (opts.exePath) {
     const exe = `"${slash(opts.exePath)}"`
-    return { notify: `${exe} --holdmysession-notify`, start: `${exe} --holdmysession-start` }
+    const start = `${exe} --holdmysession-start`
+    // On a Mac, running the program for every event would flash its Dock icon each time. Run as plain Node, it never
+    // starts the app. The shell on a Mac takes the variable in front of the command. (On Windows it might not.)
+    if (opts.platform === 'darwin') return { notify: `ELECTRON_RUN_AS_NODE=1 ${exe} "${slash(opts.appDir)}/bin/holdmysession-hook.mjs"`, start }
+    return { notify: `${exe} --holdmysession-notify`, start }
   }
   const bin = slash(opts.appDir) + '/bin'
   return { notify: `node "${bin}/holdmysession-hook.mjs"`, start: `node "${bin}/ensure-running.mjs"` }

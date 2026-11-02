@@ -8,6 +8,16 @@ describe('statusLineCommand', () => {
   it('uses the installed program with forward slashes', () => {
     expect(statusLineCommand({ exePath: 'C:\\HoldMySession\\HoldMySession.exe', appDir: 'x' })).toBe(OURS)
   })
+  it('runs as plain Node on a Mac, so the Dock icon never flashes', () => {
+    expect(statusLineCommand({ exePath: '/Applications/HoldMySession.app/Contents/MacOS/HoldMySession', appDir: '/Applications/HoldMySession.app/Contents/Resources/app.asar/web', platform: 'darwin' })).toBe(
+      'ELECTRON_RUN_AS_NODE=1 "/Applications/HoldMySession.app/Contents/MacOS/HoldMySession" "/Applications/HoldMySession.app/Contents/Resources/app.asar/web/bin/holdmysession-statusline.mjs"',
+    )
+    // The same command is recognised as ours, so it can be found, updated and removed like the others.
+    expect(isOurStatusLine({ command: statusLineCommand({ exePath: '/A.app/Contents/MacOS/A', appDir: '/A.app/Contents/Resources/app.asar/web', platform: 'darwin' }) })).toBe(true)
+  })
+  it('uses the program\'s own flag on Windows', () => {
+    expect(statusLineCommand({ exePath: 'C:\\H\\HoldMySession.exe', appDir: 'x', platform: 'win32' })).toBe('"C:/H/HoldMySession.exe" --holdmysession-statusline')
+  })
   it('uses node and the script from a checkout', () => {
     expect(statusLineCommand({ appDir: 'C:\\src\\apps\\web' })).toBe('node "C:/src/apps/web/bin/holdmysession-statusline.mjs"')
   })

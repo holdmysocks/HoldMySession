@@ -13,7 +13,9 @@ const slash = (p: string) => p.replace(/\\/g, '/')
 const isObject = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v)
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 
-export function statusLineCommand(opts: { exePath?: string | null; appDir: string }): string {
+export function statusLineCommand(opts: { exePath?: string | null; appDir: string; platform?: string }): string {
+  // On a Mac it runs after every answer, so it runs as plain Node and never starts the app, which would flash its Dock icon.
+  if (opts.exePath && opts.platform === 'darwin') return `ELECTRON_RUN_AS_NODE=1 "${slash(opts.exePath)}" "${slash(opts.appDir)}/bin/holdmysession-statusline.mjs"`
   if (opts.exePath) return `"${slash(opts.exePath)}" --holdmysession-statusline`
   return `node "${slash(opts.appDir)}/bin/holdmysession-statusline.mjs"`
 }

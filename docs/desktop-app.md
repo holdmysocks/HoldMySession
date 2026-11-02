@@ -20,7 +20,19 @@ It needs the app to be in a folder it may write to (not Program Files), a releas
 
 On a master, Settings, Linked machines shows the machine's addresses (local network, tailnet and computer name) and a **pairing code** to paste on each node, which holds every address and the token, so a node works over either network. Turning on **Listen on the network** asks Windows for the firewall permission it needs (Windows shows its own permission prompt), limited to your own network and the tailnet, and the page offers **Restart now** to apply it. If you decline the prompt, the card says what is missing and has an **Allow through the firewall** button. On a Mac the system asks the first time. A node only makes outgoing connections, so it needs no firewall permission, and when it cannot connect it says why (refused, no answer, name not found).
 
-The programs are not signed, so Windows SmartScreen or macOS Gatekeeper will warn on first run. On Windows choose More info, then Run anyway. On a Mac, Control-click the app, choose Open, then Open again.
+The programs are not signed by a developer, so Windows SmartScreen or macOS Gatekeeper will warn on first run. On Windows choose More info, then Run anyway.
+
+### On a Mac
+
+Open the `.dmg` (or unzip the zip) and drag `HoldMySession` onto Applications. The app is signed ad hoc, which Apple Silicon needs in order to run it at all, but it is not notarized, so macOS refuses an app downloaded from the internet the first time. Either run this once, in Terminal:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/HoldMySession.app
+```
+
+or open it, then System Settings, Privacy and Security, and choose **Open Anyway**. (Control-click, Open, no longer offers this on recent macOS.) An app downloaded with `gh` or `curl` is not quarantined, so it needs neither.
+
+It lives in the menu bar when its window is closed, and its Dock icon shows only while the window is open. The Claude Code hooks and the status line on a Mac run the program as plain Node (`ELECTRON_RUN_AS_NODE=1 …`), so running them never starts the app or flashes its Dock icon. If it will not open, check the signature with `codesign --verify --deep --strict --verbose=2 /Applications/HoldMySession.app`.
 
 The app's data is in `~/.holdmysession`, the same folder the command line uses, so switching between them keeps everything. To uninstall, delete the folder you unzipped.
 
@@ -45,7 +57,7 @@ node scripts/package.mjs win32 x64 --build      # Windows zip
 node scripts/package.mjs darwin arm64 x64       # Mac zips, Apple Silicon and Intel
 ```
 
-`--build` runs `npm run build` in `apps/web` first. The program's own files are packed into one `resources/app.asar`, so a build is a few dozen files, not tens of thousands. The script stages the built web app with its production dependencies, packages it with Electron for each platform and architecture, puts the icon on the Windows program (done with `resedit`, so no Windows tooling is needed), and writes `release/HoldMySession-<version>-<win|mac>-<arch>.zip` and `release/SHA256SUMS.txt`. Mac builds can be made from Windows or Linux, but they are not signed or notarised.
+`--build` runs `npm run build` in `apps/web` first. The program's own files are packed into one `resources/app.asar`, so a build is a few dozen files, not tens of thousands. The script stages the built web app with its production dependencies, packages it with Electron for each platform and architecture, puts the icon on the Windows program (done with `resedit`, so no Windows tooling is needed), and writes `release/HoldMySession-<version>-<win|mac>-<arch>.zip` and `release/SHA256SUMS.txt`. Mac builds can be made from Windows or Linux, but they are not notarised. On Linux, with `rcodesign` (`cargo install apple-codesign`; set `RCODESIGN` to its path if it is not on `PATH`) the app is signed ad hoc, and with `xorriso` the script also writes `release/HoldMySession-<version>-mac-<arch>.dmg`, an ISO image with the app and a shortcut to Applications, which macOS opens like any disk image. The zip stays the file the in-app updater downloads, so a Mac release needs both. With neither tool the zip is unsigned, and on Apple Silicon needs `codesign --force --deep --sign - HoldMySession.app` once.
 
 The version is the one in `apps/web/package.json`. The sidebar shows it, links it to the releases page, and says when a newer release is published (Settings, About and updates, can turn that check off).
 

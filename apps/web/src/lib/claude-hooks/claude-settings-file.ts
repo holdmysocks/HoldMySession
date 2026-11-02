@@ -32,6 +32,7 @@ function currentCommands(): HookCommands {
   return hookCommands({
     exePath: process.env.HOLDMYSESSION_EXE || null,
     appDir: process.env.HOLDMYSESSION_APP_DIR || process.cwd(),
+    platform: process.platform,
   })
 }
 
@@ -132,7 +133,7 @@ export function previousStatusLinePath(): string {
 }
 
 function currentStatusLineCommand(): string {
-  return statusLineCommand({ exePath: process.env.HOLDMYSESSION_EXE || null, appDir: process.env.HOLDMYSESSION_APP_DIR || process.cwd() })
+  return statusLineCommand({ exePath: process.env.HOLDMYSESSION_EXE || null, appDir: process.env.HOLDMYSESSION_APP_DIR || process.cwd(), platform: process.platform })
 }
 
 function readPrevious(): unknown {
