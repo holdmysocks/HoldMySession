@@ -52,6 +52,20 @@ describe('bin/holdmysession-statusline.mjs', () => {
     expect(snap?.sevenDay?.usedPercentage).toBe(20)
   })
 
+  it('remembers that a 5-hour window was reported, and does not invent one for a plan that has none', () => {
+    run(limits(undefined, 20))
+    expect(readUsageSnapshot(usageFilePath())?.fiveHourSeenAt).toBeNull()
+    run(limits(30, 20))
+    const seen = readUsageSnapshot(usageFilePath())?.fiveHourSeenAt
+    expect(seen).toBeTruthy()
+    run(limits(undefined, 25))
+    expect(readUsageSnapshot(usageFilePath())?.fiveHourSeenAt).toBe(seen)
+  })
+
+  it('prints only the week for a plan with no 5-hour window', () => {
+    expect(run(limits(undefined, 41)).stdout).toBe('7d 41%\n')
+  })
+
   it('writes nothing and prints nothing without limits', () => {
     const r = run(JSON.stringify({ session_id: 'abc', model: { display_name: 'x' } }))
     expect(r.status).toBe(0)

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient, queryOptions } from '@tanstack/react-query'
 import { getDesktopState, setNeedsYouAlerts, setOpenAtLogin } from './desktop.api'
+import { settingsQuery } from '@/features/settings/settings.queries'
+import { setLimitsSettings } from '@/features/usage/usage.api'
 
 export const desktopStateQuery = queryOptions({
   queryKey: ['desktop-state'],
@@ -28,7 +30,13 @@ export function DesktopPanel() {
       queryClient.invalidateQueries({ queryKey: ['settings'] })
     },
   })
+  const { data: settings } = useQuery(settingsQuery)
+  const limitAlerts = useMutation({
+    mutationFn: (enabled: boolean) => setLimitsSettings({ data: { alerts: enabled } }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
+  })
   if (!data?.desktop) return null
+  const limitsOn = settings?.limits.alerts ?? true
   const mac = data.platform === 'darwin'
   const on = data.openAtLogin
   return (
@@ -73,6 +81,25 @@ export function DesktopPanel() {
         className={`relative inline-flex h-[30px] w-[52px] shrink-0 cursor-pointer items-center rounded-full border-[1.5px] transition-colors disabled:opacity-50 ${data.alerts ? 'border-brand-400 bg-brand-400/20' : 'border-[color:var(--hms-line)]'}`}
       >
         <span className={`inline-block h-[21px] w-[21px] rounded-full transition-transform ${data.alerts ? 'translate-x-[26px] bg-brand-400' : 'translate-x-[3px] bg-gray-400'}`} />
+      </button>
+    </section>
+    <section aria-label="Limit alerts" className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-[color:var(--hms-rule)] py-[18px]">
+      <div>
+        <h2 className="text-base font-semibold">Alert me about my limits</h2>
+        <p className="text-[13px] text-[color:var(--hms-mute)]">
+          A notification as a limit passes 75% and 90%, and when it resets. The {mac ? 'menu bar' : 'tray'} icon turns yellow, then red. Needs "Show my real limits" in Settings, under Claude Code.
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={limitsOn}
+        aria-label="Alert me about my limits"
+        disabled={limitAlerts.isPending}
+        onClick={() => limitAlerts.mutate(!limitsOn)}
+        className={`relative inline-flex h-[30px] w-[52px] shrink-0 cursor-pointer items-center rounded-full border-[1.5px] transition-colors disabled:opacity-50 ${limitsOn ? 'border-brand-400 bg-brand-400/20' : 'border-[color:var(--hms-line)]'}`}
+      >
+        <span className={`inline-block h-[21px] w-[21px] rounded-full transition-transform ${limitsOn ? 'translate-x-[26px] bg-brand-400' : 'translate-x-[3px] bg-gray-400'}`} />
       </button>
     </section>
     </>

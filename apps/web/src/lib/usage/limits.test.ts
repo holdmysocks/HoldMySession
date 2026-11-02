@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FIVE_HOUR_MS, SEVEN_DAY_MS, freshest, liveWindow, mergeSnapshots, paceOf, parseRateLimits, snapshotFromStored, timeLeft } from './limits'
+import { DANGER_AT, FIVE_HOUR_MEMORY_MS, FIVE_HOUR_MS, SEVEN_DAY_MS, WARN_AT, freshest, hasFiveHourLimit, severityOf, liveWindow, mergeSnapshots, paceOf, parseRateLimits, snapshotFromStored, timeLeft } from './limits'
 
 const NOW = Date.parse('2026-11-02T12:00:00Z')
 const sec = (ms: number) => Math.round(ms / 1000)
@@ -7,7 +7,7 @@ const sec = (ms: number) => Math.round(ms / 1000)
 describe('parseRateLimits', () => {
   it('reads both windows from a status line input', () => {
     const snap = parseRateLimits({ rate_limits: { five_hour: { used_percentage: 62.5, resets_at: 1800000000 }, seven_day: { used_percentage: 18, resets_at: 1800500000 } } }, new Date(NOW))
-    expect(snap).toEqual({ updatedAt: new Date(NOW).toISOString(), fiveHour: { usedPercentage: 62.5, resetsAt: 1800000000 }, sevenDay: { usedPercentage: 18, resetsAt: 1800500000 } })
+    expect(snap).toEqual({ updatedAt: new Date(NOW).toISOString(), fiveHour: { usedPercentage: 62.5, resetsAt: 1800000000 }, sevenDay: { usedPercentage: 18, resetsAt: 1800500000 }, fiveHourSeenAt: new Date(NOW).toISOString() })
   })
   it('keeps a window that arrives without the other', () => {
     const snap = parseRateLimits({ rate_limits: { five_hour: { used_percentage: 5, resets_at: 1800000000 } } })
@@ -55,7 +55,7 @@ describe('liveWindow and mergeSnapshots', () => {
 
 describe('snapshotFromStored and freshest', () => {
   it('round-trips and rejects junk', () => {
-    const snap = { updatedAt: '2026-11-02T12:00:00.000Z', fiveHour: { usedPercentage: 10, resetsAt: 5 }, sevenDay: null }
+    const snap = { updatedAt: '2026-11-02T12:00:00.000Z', fiveHour: { usedPercentage: 10, resetsAt: 5 }, sevenDay: null, fiveHourSeenAt: null }
     expect(snapshotFromStored(JSON.parse(JSON.stringify(snap)))).toEqual(snap)
     for (const bad of [null, 3, {}, { updatedAt: 'nope' }, { updatedAt: 5 }]) expect(snapshotFromStored(bad)).toBeNull()
   })
@@ -109,4 +109,44 @@ describe('timeLeft', () => {
     [NOW + 3 * 24 * 3_600_000 + 5 * 3_600_000, '3d 5h'],
     [NOW - 1000, '0m'],
   ])('formats %s', (reset, text) => expect(timeLeft(sec(reset), NOW)).toBe(text))
+})
+
+describe('severityOf', () => {
+  it('turns yellow at 75 and red at 90', () => {
+    expect([WARN_AT, DANGER_AT]).toEqual([75, 90])
+    expect([0, 50, 74.9].map(severityOf)).toEqual(['ok', 'ok', 'ok'])
+    expect([75, 80, 89.9].map(severityOf)).toEqual(['warn', 'warn', 'warn'])
+    expect([90, 99, 100].map(severityOf)).toEqual(['danger', 'danger', 'danger'])
+  })
+})
+
+describe('the 5-hour limit of a plan', () => {
+  const week = { usedPercentage: 10, resetsAt: sec(NOW + 3 * 24 * 3_600_000) }
+  it('is absent for a plan that only ever reports the week, such as Ultra', () => {
+    const snap = parseRateLimits({ rate_limits: { seven_day: { used_percentage: 10, resets_at: week.resetsAt } } }, new Date(NOW))!
+    expect(snap.fiveHourSeenAt).toBeNull()
+    expect(hasFiveHourLimit(snap, NOW)).toBe(false)
+    expect(hasFiveHourLimit(null, NOW)).toBe(false)
+  })
+  it('is present once a window has been reported, and stays so between windows', () => {
+    const first = parseRateLimits({ rate_limits: { five_hour: { used_percentage: 5, resets_at: sec(NOW + 3_600_000) }, seven_day: { used_percentage: 1, resets_at: week.resetsAt } } }, new Date(NOW))!
+    expect(first.fiveHourSeenAt).toBe(new Date(NOW).toISOString())
+    const later = NOW + 8 * 3_600_000
+    const weekOnly = { updatedAt: new Date(later).toISOString(), fiveHour: null, sevenDay: week }
+    const merged = mergeSnapshots(first, weekOnly, later)
+    expect(merged.fiveHour).toBeNull()
+    expect(merged.fiveHourSeenAt).toBe(new Date(NOW).toISOString())
+    expect(hasFiveHourLimit(merged, later)).toBe(true)
+  })
+  it('is forgotten after a month without one', () => {
+    const snap = { updatedAt: new Date(NOW).toISOString(), fiveHour: null, sevenDay: null, fiveHourSeenAt: new Date(NOW - FIVE_HOUR_MEMORY_MS - 1000).toISOString() }
+    expect(hasFiveHourLimit(snap, NOW)).toBe(false)
+  })
+  it('reads an older file that holds a window as having one', () => {
+    expect(hasFiveHourLimit({ updatedAt: 'x', fiveHour: { usedPercentage: 1, resetsAt: 5 }, sevenDay: null }, NOW)).toBe(true)
+  })
+  it('keeps the seen time through storage', () => {
+    const snap = { updatedAt: '2026-11-02T12:00:00.000Z', fiveHour: null, sevenDay: null, fiveHourSeenAt: '2026-11-01T12:00:00.000Z' }
+    expect(snapshotFromStored(JSON.parse(JSON.stringify(snap)))).toEqual(snap)
+  })
 })

@@ -81,6 +81,14 @@ Choose how scratch sessions appear (grouped as Unlinked Sessions, listed folder 
 
 With the Needs you hook on, the desktop app shows a notification the moment a session starts waiting on you, says what it wants, and puts a count on the tray (menu bar) icon. Clicking the notification opens the Map on that session. There is no alert while the window is in front of you, and Settings, General can turn it off.
 
+### Usage limits
+
+A chip in the header shows how much of your subscription limit you have used, and how long until it resets. It turns yellow from 75% and red from 90%. Click it for both meters and what the current pace means ("limit reached around 9:52 pm at this pace", or "on pace to finish near 76%"), and open "What used it" for the sessions that spent the most.
+
+The numbers are the real ones, from Claude Code. In Settings, Claude Code, switch on **Show my real limits**: it makes HoldMySession Claude Code's status line, which is the one place Claude Code reports them. A status line you already have is saved and keeps running, looks the same, and comes back exactly when you switch this off. Until then the chip shows a labelled estimate counted from your transcripts.
+
+The 5-hour limit is drawn only for plans that have one. Some plans, such as Ultra, only have the weekly limit, so you never see a 5-hour meter there. It is shown once Claude Code has reported a 5-hour window, and Settings can force it always on or off. The desktop app also tells you as a limit passes 75% and 90%, and when a limit you had run up resets (Settings, General).
+
 ### Claude Code hooks
 
 From Settings you can switch on two optional hooks, which add entries to Claude Code's `settings.json` and remove only those entries when switched off:

@@ -7,7 +7,7 @@ import { scanAllSessionsWithPaths } from '@/lib/scanner/session-scanner'
 import { readStatusLineState, type StatusLineState } from '@/lib/claude-hooks/claude-settings-file'
 import { EMPTY_CALIBRATION, calibrationFromStored, estimatedPercentage, limitOf, withGuess, type Calibration } from './calibration'
 import { burnBySession, currentBlock, impliedLimit, totalsSince, type Block, type Totals } from './estimate'
-import { FIVE_HOUR_MS, SEVEN_DAY_MS, liveWindow, paceOf, type LimitWindow, type Pace } from './limits'
+import { FIVE_HOUR_MS, SEVEN_DAY_MS, hasFiveHourLimit, liveWindow, paceOf, type LimitWindow, type Pace } from './limits'
 import { readRecentEvents } from './recent-events'
 import { readUsageSnapshot } from './usage-file'
 
@@ -51,6 +51,11 @@ export interface UsageOverview {
     block: (Block & WindowEstimate) | null
     week: Totals & WindowEstimate
   }
+  /**
+   * Whether the 5-hour meter is drawn at all. Not for a plan with no 5-hour limit, such as Ultra, and never when
+   * the setting says never. When false, no 5-hour number appears anywhere, estimates included.
+   */
+  fiveHourShown: boolean
   statusLine: StatusLineState
 }
 
@@ -76,11 +81,13 @@ function saveCalibration(c: Calibration): void {
 /** Everything the Limits views need, for this computer. Server only. */
 export async function buildUsageOverview(nowMs: number = Date.now()): Promise<UsageOverview> {
   const snapshot = readUsageSnapshot()
-  const fiveHour = liveWindow(snapshot?.fiveHour ?? null, nowMs)
+  const mode = readSettingsFile().limits.fiveHour
+  const fiveHourShown = mode === 'always' || (mode === 'auto' && hasFiveHourLimit(snapshot, nowMs))
+  const fiveHour = fiveHourShown ? liveWindow(snapshot?.fiveHour ?? null, nowMs) : null
   const sevenDay = liveWindow(snapshot?.sevenDay ?? null, nowMs)
 
   const events = await readRecentEvents(getMergedPricing(readSettingsFile()), nowMs)
-  const block = currentBlock(events, nowMs)
+  const block = fiveHourShown ? currentBlock(events, nowMs) : null
   const weekFrom = sevenDay ? sevenDay.resetsAt * 1000 - SEVEN_DAY_MS : nowMs - SEVEN_DAY_MS
   const week = totalsSince(events, nowMs)
   const weekSinceReset = totalsSince(events, nowMs, nowMs - weekFrom)
@@ -112,6 +119,7 @@ export async function buildUsageOverview(nowMs: number = Date.now()): Promise<Us
 
   return {
     now: nowMs,
+    fiveHourShown,
     real: {
       fiveHour: fiveHour && { ...fiveHour, pace: paceOf(fiveHour, FIVE_HOUR_MS, nowMs) },
       sevenDay: sevenDay && { ...sevenDay, pace: paceOf(sevenDay, SEVEN_DAY_MS, nowMs) },

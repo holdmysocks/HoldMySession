@@ -16,7 +16,7 @@ const os = require('node:os');
 const { pathToFileURL } = require('node:url');
 const { createUpdater } = require('./updater.cjs');
 const { shouldShowWindowFor, portInUse } = require('./launch.cjs');
-const { planAlerts, notificationFor, trayState, mapPathFor } = require('./alerts.cjs');
+const { planAlerts, notificationFor, trayState, mapPathFor, planLimitAlerts, limitsText } = require('./alerts.cjs');
 
 const args = process.argv.slice(1);
 const flag = (name) => args.includes(name);
@@ -201,9 +201,15 @@ function runApp() {
 
   let alerted = new Set();
 
-  function showTrayState(count) {
+  // What the tray shows is the sessions waiting and the limits Claude Code last reported. Each is updated by its own poll.
+  let waitingCount = 0;
+  let lastLimits = null;
+  let limitState = {};
+
+  function showTrayState(count = waitingCount) {
+    waitingCount = count;
     if (!tray || !trayImages) return;
-    const state = trayState(count, app.getVersion());
+    const state = trayState(count, app.getVersion(), limitsText(lastLimits));
     tray.setImage(state.alert ? trayImages.alert : trayImages.plain);
     tray.setToolTip(state.tooltip);
     // A Mac shows the count beside the menu bar icon.
@@ -215,14 +221,35 @@ function runApp() {
     win.loadURL(`${baseUrl}${mapPathFor(wait)}`);
   }
 
-  function announce(batch) {
-    const { title, body } = notificationFor(batch);
+  function toast(title, body, onClick) {
     if (Notification.isSupported()) {
       const note = new Notification({ title, body });
-      note.on('click', () => openMapFor(batch[0]));
+      note.on('click', onClick);
       note.show();
     } else if (tray && process.platform === 'win32') {
       tray.displayBalloon({ title, content: body, iconType: 'info' });
+    }
+  }
+
+  function announce(batch) {
+    const { title, body } = notificationFor(batch);
+    toast(title, body, () => openMapFor(batch[0]));
+  }
+
+  // The limits: a notification as a window passes 75% and 90%, and when one that was run up resets.
+  async function pollLimits() {
+    try {
+      const response = await fetch(`http://localhost:${PORT}/api/limits`, { signal: AbortSignal.timeout(5000) });
+      if (!response.ok) return;
+      const limits = await response.json();
+      lastLimits = limits;
+      const focused = Boolean(win && win.isVisible() && win.isFocused() && !win.isMinimized());
+      const plan = planLimitAlerts({ limits, state: limitState, windowFocused: focused, nowMs: Date.now() });
+      limitState = plan.state;
+      showTrayState();
+      for (const note of plan.notify) toast(note.title, note.body, showWindow);
+    } catch {
+      // The server is busy or starting: ask again next time.
     }
   }
 
@@ -308,6 +335,8 @@ function runApp() {
     }
     setInterval(pollNeedsYou, 5000).unref();
     setTimeout(pollNeedsYou, 2500).unref();
+    setInterval(pollLimits, 30_000).unref();
+    setTimeout(pollLimits, 4000).unref();
     if (!BACKGROUND) showWindow();
   });
 }

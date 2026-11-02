@@ -48,8 +48,14 @@ describe('SettingsSchema', () => {
     const result = SettingsSchema.safeParse(input)
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data).toEqual({ ...input, dataSources: [], autoScan: { enabled: true, intervalMinutes: 15 }, checkForUpdates: true, autoUpdate: true, needsYouAlerts: true, link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' }, projects: { scratch: 'group', scratchByName: false, hidden: [] } })
+      expect(result.data).toEqual({ ...input, dataSources: [], autoScan: { enabled: true, intervalMinutes: 15 }, checkForUpdates: true, autoUpdate: true, needsYouAlerts: true, limits: { fiveHour: 'auto', alerts: true }, link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' }, projects: { scratch: 'group', scratchByName: false, hidden: [] } })
     }
+  })
+
+  it('draws the 5-hour limit only for plans that report one, for a file that predates the setting', () => {
+    expect(SettingsSchema.parse({ version: 1 }).limits).toEqual({ fiveHour: 'auto', alerts: true })
+    expect(SettingsSchema.safeParse({ version: 1, limits: { fiveHour: 'sometimes' } }).success).toBe(false)
+    expect(SettingsSchema.parse({ version: 1, limits: { fiveHour: 'never' } }).limits).toEqual({ fiveHour: 'never', alerts: true })
   })
 
   it('turns the automatic scan on every 15 minutes for a file that predates it', () => {

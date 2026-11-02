@@ -50,6 +50,10 @@ describe('buildUsageOverview', () => {
       }),
     )
   }
+  const mode = (fiveHour: string) => {
+    fs.mkdirSync(path.join(root, 'data'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'data', 'settings.json'), JSON.stringify({ version: 1, limits: { fiveHour, alerts: true } }))
+  }
   const build = async () => (await import('./overview')).buildUsageOverview(NOW)
 
   it('is empty with nothing on this computer', async () => {
@@ -69,6 +73,7 @@ describe('buildUsageOverview', () => {
   })
 
   it('finds the running 5-hour block and ranks sessions by what they used in it', async () => {
+    mode('always')
     transcript('big', [answer(2, 'a', { o: 9000 }), answer(1, 'b', { o: 1000 })])
     transcript('small', [answer(1.5, 'c', { o: 1000 })])
     transcript('older', [answer(30, 'd', { o: 5000 })])
@@ -81,6 +86,7 @@ describe('buildUsageOverview', () => {
   })
 
   it('has no running block once the last one ended', async () => {
+    mode('always')
     transcript('s1', [answer(6, 'a', { o: 100 })])
     expect((await build()).estimate.block).toBeNull()
   })
@@ -103,6 +109,7 @@ describe('buildUsageOverview', () => {
   })
 
   it('learns the limit from a real report and then estimates a share', async () => {
+    mode('always')
     transcript('s1', [answer(1, 'a', { o: 2000 })])
     report(40, null)
     const first = await build()
@@ -118,7 +125,58 @@ describe('buildUsageOverview', () => {
     expect(JSON.parse(fs.readFileSync(path.join(root, 'data', 'usage-calibration.json'), 'utf-8')).fiveHour).toEqual([5000])
   })
 
+  describe('a plan with no 5-hour limit', () => {
+    const weekOnly = () => {
+      fs.mkdirSync(path.join(root, 'data'), { recursive: true })
+      fs.writeFileSync(
+        path.join(root, 'data', 'usage.json'),
+        JSON.stringify({ updatedAt: new Date(NOW - 60_000).toISOString(), fiveHour: null, sevenDay: { usedPercentage: 30, resetsAt: (NOW + 3 * 24 * H) / 1000 } }),
+      )
+    }
+
+    it('shows nothing about 5 hours, estimates included, while busy', async () => {
+      transcript('s1', [answer(1, 'a', { o: 2000 })])
+      weekOnly()
+      const o = await build()
+      expect(o.fiveHourShown).toBe(false)
+      expect(o.real.fiveHour).toBeNull()
+      expect(o.estimate.block).toBeNull()
+      expect(o.real.sevenDay?.usedPercentage).toBe(30)
+      expect(o.estimate.week.tokens).toBe(2000)
+    })
+    it('shows nothing about 5 hours before any report either', async () => {
+      transcript('s1', [answer(1, 'a', { o: 2000 })])
+      const o = await build()
+      expect(o.fiveHourShown).toBe(false)
+      expect(o.estimate.block).toBeNull()
+    })
+    it('shows it for a plan that has reported one', async () => {
+      transcript('s1', [answer(1, 'a', { o: 2000 })])
+      report(40, 10)
+      expect((await build()).fiveHourShown).toBe(true)
+    })
+    it('never shows it when the setting says never, whatever Claude Code reports', async () => {
+      transcript('s1', [answer(1, 'a', { o: 2000 })])
+      report(40, 10)
+      mode('never')
+      const o = await build()
+      expect(o.fiveHourShown).toBe(false)
+      expect(o.real.fiveHour).toBeNull()
+      expect(o.estimate.block).toBeNull()
+      expect(o.real.sevenDay?.usedPercentage).toBe(10)
+    })
+    it('always shows it when the setting says always', async () => {
+      transcript('s1', [answer(1, 'a', { o: 2000 })])
+      weekOnly()
+      mode('always')
+      const o = await build()
+      expect(o.fiveHourShown).toBe(true)
+      expect(o.estimate.block?.tokens).toBe(2000)
+    })
+  })
+
   it('does not learn from a report with very little used', async () => {
+    mode('always')
     transcript('s1', [answer(1, 'a', { o: 2000 })])
     report(1, null)
     const o = await build()

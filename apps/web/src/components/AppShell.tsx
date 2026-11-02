@@ -7,6 +7,7 @@ import { useHistoryRefresh } from '@/features/history/useHistoryRefresh'
 import { MachineFilter } from '@/features/link/MachineFilter'
 import { ProjectFilter } from '@/features/project-analytics/ProjectFilter'
 import { updateInfoQuery } from '@/features/updates/updates.queries'
+import { LimitsChip } from '@/features/usage/LimitsChip'
 
 /** The three pages in the menu. Settings is the gear. */
 const NAV_ITEMS = [
@@ -102,6 +103,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <NavPill currentPath={currentPath} className="hidden md:flex" />
 
           <div className="flex items-center gap-2">
+            <LimitsChip />
             {/* Drawn only on a master with linked nodes. It chooses whose data every page shows. */}
             {currentPath.startsWith('/stats') && <ProjectFilter />}
             <MachineFilter />

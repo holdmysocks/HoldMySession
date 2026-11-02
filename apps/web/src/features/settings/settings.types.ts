@@ -54,6 +54,14 @@ export const ProjectsSchema = z.object({
     .default([]),
 })
 
+export const FIVE_HOUR_MODES = ['auto', 'always', 'never'] as const
+
+export const LimitsSchema = z.object({
+  fiveHour: z.enum(FIVE_HOUR_MODES).default('auto'),
+  /** Desktop app: a notification as a limit passes 75% and 90%, and when it resets. */
+  alerts: z.boolean().default(true),
+})
+
 export const SettingsSchema = z.object({
   version: z.literal(1),
   subscriptionTier: z
@@ -66,6 +74,8 @@ export const SettingsSchema = z.object({
   autoUpdate: z.boolean().default(true),
   /** Desktop app: a notification and a count on the tray icon when a session starts waiting on the user. */
   needsYouAlerts: z.boolean().default(true),
+  /** The subscription limits. `fiveHour` auto draws the 5-hour meter only for a plan Claude Code reports one for. */
+  limits: LimitsSchema.default({ fiveHour: 'auto', alerts: true }),
   link: LinkSchema.default({ role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' }),
   projects: ProjectsSchema.default({ scratch: 'group', scratchByName: false, hidden: [] }),
   pricingOverrides: z
@@ -90,6 +100,8 @@ export type ModelPricingOverride = z.infer<typeof ModelPricingOverrideSchema>
 export type Settings = z.infer<typeof SettingsSchema>
 export type AutoScanSetting = z.infer<typeof AutoScanSchema>
 export type LinkSetting = z.infer<typeof LinkSchema>
+export type LimitsSetting = z.infer<typeof LimitsSchema>
+export type FiveHourMode = (typeof FIVE_HOUR_MODES)[number]
 export type ProjectsSetting = z.infer<typeof ProjectsSchema>
 export type ScratchMode = (typeof SCRATCH_MODES)[number]
 export type SubscriptionTierId = Settings['subscriptionTier']
@@ -314,6 +326,7 @@ export const DEFAULT_SETTINGS: Settings = {
   checkForUpdates: true,
   autoUpdate: true,
   needsYouAlerts: true,
+  limits: { fiveHour: 'auto', alerts: true },
   link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' },
   projects: { scratch: 'group', scratchByName: false, hidden: [] },
   pricingOverrides: {},

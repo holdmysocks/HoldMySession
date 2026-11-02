@@ -13,6 +13,7 @@ import { HistoryPanel } from '@/features/history/HistoryPanel'
 import { BackupPanel } from '@/features/history/BackupPanel'
 import { LinkPanel } from '@/features/link/LinkPanel'
 import { HooksPanel } from '@/features/hooks/HooksPanel'
+import { StatusLinePanel } from '@/features/usage/StatusLinePanel'
 import { DesktopPanel } from '@/features/desktop/DesktopPanel'
 import { ProjectsPanel } from '@/features/projects/ProjectsPanel'
 import { UpdatesPanel } from '@/features/updates/UpdatesPanel'
@@ -114,7 +115,7 @@ function SettingsForm({ settings, tab, onTab }: { settings: Settings; tab: Setti
       ),
     },
     { id: 'machines', label: 'Machines', content: <LinkPanel /> },
-    { id: 'claude', label: 'Claude Code', content: <HooksPanel /> },
+    { id: 'claude', label: 'Claude Code', content: <><HooksPanel /><StatusLinePanel /></> },
     {
       id: 'pricing',
       label: 'Plan and pricing',

@@ -54,6 +54,8 @@ function record(input, dir, now) {
     updatedAt: new Date(now).toISOString(),
     fiveHour: live(fiveHour, now) ?? live(previous?.fiveHour, now),
     sevenDay: live(sevenDay, now) ?? live(previous?.sevenDay, now),
+    // When a 5-hour window was last reported at all. Some plans never have one.
+    fiveHourSeenAt: fiveHour ? new Date(now).toISOString() : (previous?.fiveHourSeenAt ?? null),
   };
   mkdirSync(dir, { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;

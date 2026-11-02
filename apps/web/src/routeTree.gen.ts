@@ -16,6 +16,7 @@ import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/setti
 import { Route as DashboardStatsRouteImport } from './routes/_dashboard/stats'
 import { Route as ApiHistoryBackupRouteImport } from './routes/api.history-backup'
 import { Route as ApiHistoryRestoreRouteImport } from './routes/api.history-restore'
+import { Route as ApiLimitsRouteImport } from './routes/api.limits'
 import { Route as ApiNeedsYouRouteImport } from './routes/api.needs-you'
 import { Route as DashboardSessionsIndexRouteImport } from './routes/_dashboard/sessions/index'
 import { Route as DashboardSessionsSessionIdRouteImport } from './routes/_dashboard/sessions/$sessionId'
@@ -56,6 +57,11 @@ const ApiHistoryBackupRoute = ApiHistoryBackupRouteImport.update({
 const ApiHistoryRestoreRoute = ApiHistoryRestoreRouteImport.update({
   id: '/api/history-restore',
   path: '/api/history-restore',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLimitsRoute = ApiLimitsRouteImport.update({
+  id: '/api/limits',
+  path: '/api/limits',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiNeedsYouRoute = ApiNeedsYouRouteImport.update({
@@ -102,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/stats': typeof DashboardStatsRoute
   '/api/history-backup': typeof ApiHistoryBackupRoute
   '/api/history-restore': typeof ApiHistoryRestoreRoute
+  '/api/limits': typeof ApiLimitsRoute
   '/api/needs-you': typeof ApiNeedsYouRoute
   '/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
   '/api/link/ping': typeof ApiLinkPingRoute
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/stats': typeof DashboardStatsRoute
   '/api/history-backup': typeof ApiHistoryBackupRoute
   '/api/history-restore': typeof ApiHistoryRestoreRoute
+  '/api/limits': typeof ApiLimitsRoute
   '/api/needs-you': typeof ApiNeedsYouRoute
   '/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
   '/api/link/ping': typeof ApiLinkPingRoute
@@ -134,6 +142,7 @@ export interface FileRoutesById {
   '/_dashboard/stats': typeof DashboardStatsRoute
   '/api/history-backup': typeof ApiHistoryBackupRoute
   '/api/history-restore': typeof ApiHistoryRestoreRoute
+  '/api/limits': typeof ApiLimitsRoute
   '/api/needs-you': typeof ApiNeedsYouRoute
   '/_dashboard/sessions/$sessionId': typeof DashboardSessionsSessionIdRoute
   '/api/link/ping': typeof ApiLinkPingRoute
@@ -151,6 +160,7 @@ export interface FileRouteTypes {
     | '/stats'
     | '/api/history-backup'
     | '/api/history-restore'
+    | '/api/limits'
     | '/api/needs-you'
     | '/sessions/$sessionId'
     | '/api/link/ping'
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/stats'
     | '/api/history-backup'
     | '/api/history-restore'
+    | '/api/limits'
     | '/api/needs-you'
     | '/sessions/$sessionId'
     | '/api/link/ping'
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | '/_dashboard/stats'
     | '/api/history-backup'
     | '/api/history-restore'
+    | '/api/limits'
     | '/api/needs-you'
     | '/_dashboard/sessions/$sessionId'
     | '/api/link/ping'
@@ -196,6 +208,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRouteWithChildren
   ApiHistoryBackupRoute: typeof ApiHistoryBackupRoute
   ApiHistoryRestoreRoute: typeof ApiHistoryRestoreRoute
+  ApiLimitsRoute: typeof ApiLimitsRoute
   ApiNeedsYouRoute: typeof ApiNeedsYouRoute
   ApiLinkPingRoute: typeof ApiLinkPingRoute
   ApiLinkPollRoute: typeof ApiLinkPollRoute
@@ -252,6 +265,13 @@ declare module '@tanstack/react-router' {
       path: '/api/history-restore'
       fullPath: '/api/history-restore'
       preLoaderRoute: typeof ApiHistoryRestoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/limits': {
+      id: '/api/limits'
+      path: '/api/limits'
+      fullPath: '/api/limits'
+      preLoaderRoute: typeof ApiLimitsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/needs-you': {
@@ -331,6 +351,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRouteWithChildren,
   ApiHistoryBackupRoute: ApiHistoryBackupRoute,
   ApiHistoryRestoreRoute: ApiHistoryRestoreRoute,
+  ApiLimitsRoute: ApiLimitsRoute,
   ApiNeedsYouRoute: ApiNeedsYouRoute,
   ApiLinkPingRoute: ApiLinkPingRoute,
   ApiLinkPollRoute: ApiLinkPollRoute,

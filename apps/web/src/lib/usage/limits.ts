@@ -17,6 +17,32 @@ export interface UsageSnapshot {
   updatedAt: string
   fiveHour: LimitWindow | null
   sevenDay: LimitWindow | null
+  /**
+   * When Claude Code last reported a 5-hour window at all. Some plans have none, and the 5-hour meter is
+   * only drawn for a plan that does. Between windows there is none either, so this outlasts the window.
+   */
+  fiveHourSeenAt?: string | null
+}
+
+/** From this share the meter turns yellow, and from the next it turns red. */
+export const WARN_AT = 75
+export const DANGER_AT = 90
+
+export type Severity = 'ok' | 'warn' | 'danger'
+
+export function severityOf(usedPercentage: number): Severity {
+  return usedPercentage >= DANGER_AT ? 'danger' : usedPercentage >= WARN_AT ? 'warn' : 'ok'
+}
+
+/** How long after the last 5-hour report a plan still counts as having a 5-hour limit. */
+export const FIVE_HOUR_MEMORY_MS = 30 * 24 * 3_600_000
+
+/** Whether a 5-hour window has been reported lately. Without one, the plan has no 5-hour limit to show. */
+export function hasFiveHourLimit(snapshot: UsageSnapshot | null, nowMs: number): boolean {
+  const seen = snapshot?.fiveHourSeenAt ? Date.parse(snapshot.fiveHourSeenAt) : NaN
+  if (!Number.isNaN(seen)) return nowMs - seen <= FIVE_HOUR_MEMORY_MS
+  // An older file, from before this was recorded, counts if it holds a window.
+  return snapshot?.fiveHour != null
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -35,7 +61,7 @@ export function parseRateLimits(input: unknown, now: Date = new Date()): UsageSn
   const fiveHour = windowFrom(input.rate_limits.five_hour)
   const sevenDay = windowFrom(input.rate_limits.seven_day)
   if (!fiveHour && !sevenDay) return null
-  return { updatedAt: now.toISOString(), fiveHour, sevenDay }
+  return { updatedAt: now.toISOString(), fiveHour, sevenDay, fiveHourSeenAt: fiveHour ? now.toISOString() : null }
 }
 
 /** A window that has not reset yet. Claude Code drops a window once its time passes, and so do we. */
@@ -52,6 +78,7 @@ export function mergeSnapshots(previous: UsageSnapshot | null, next: UsageSnapsh
     updatedAt: next.updatedAt,
     fiveHour: liveWindow(next.fiveHour, nowMs) ?? liveWindow(previous?.fiveHour ?? null, nowMs),
     sevenDay: liveWindow(next.sevenDay, nowMs) ?? liveWindow(previous?.sevenDay ?? null, nowMs),
+    fiveHourSeenAt: next.fiveHour ? next.updatedAt : (next.fiveHourSeenAt ?? previous?.fiveHourSeenAt ?? null),
   }
 }
 
@@ -62,7 +89,8 @@ export function snapshotFromStored(value: unknown): UsageSnapshot | null {
     isObject(w) && Number.isFinite(Number(w.usedPercentage)) && Number.isFinite(Number(w.resetsAt))
       ? { usedPercentage: Math.min(100, Math.max(0, Number(w.usedPercentage))), resetsAt: Number(w.resetsAt) }
       : null
-  return { updatedAt: value.updatedAt, fiveHour: read(value.fiveHour), sevenDay: read(value.sevenDay) }
+  const seen = typeof value.fiveHourSeenAt === 'string' && !Number.isNaN(Date.parse(value.fiveHourSeenAt)) ? value.fiveHourSeenAt : null
+  return { updatedAt: value.updatedAt, fiveHour: read(value.fiveHour), sevenDay: read(value.sevenDay), fiveHourSeenAt: seen }
 }
 
 /** Of two snapshots, the one reported last. Machines each keep their own, and the limit belongs to the account. */
