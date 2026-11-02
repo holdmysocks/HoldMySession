@@ -118,38 +118,66 @@ test('runs as a program of its own, from a file of arguments', async () => {
   assert.ok(fs.existsSync(path.join(root, 'program', 'resources', 'app.asar')));
 });
 
-test('ends programs running from the folder when a file turns out to be locked, then carries on', async () => {
-  const root = layout({ 'HoldMySession.exe': 'old', 'resources/app.asar': 'old archive' }, { 'HoldMySession.exe': 'new', 'resources/app.asar': 'new archive' });
+function lockedBy(code, message) {
+  // Holds the first rename until another program has been ended. The first look, before any file is touched, finds nothing.
   let held = true;
+  let looks = 0;
   const killed = [];
-  const { o } = options(root, {
-    delayMs: 1,
-    findProcesses: (folder) => {
-      assert.strictEqual(folder, path.join(root, 'program'));
-      return [{ pid: process.pid, name: 'this one' }, { pid: 4242, name: 'HoldMySession.exe' }];
+  return {
+    killed,
+    looks: () => looks,
+    findProcesses: () => {
+      looks += 1;
+      return looks === 1 ? [] : [{ pid: process.pid, name: 'this one' }, { pid: 4242, name: 'HoldMySession.exe' }];
     },
     killProcess: (pid) => {
       killed.push(pid);
       held = false;
     },
     rename: (from, to) => {
-      if (held && from.endsWith('app.asar')) throw Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' });
+      if (held && from.endsWith('app.asar')) throw Object.assign(new Error(message), { code });
       fs.renameSync(from, to);
     },
+  };
+}
+
+for (const [code, message] of [
+  ['EBUSY', 'EBUSY: resource busy or locked'],
+  ['EPIPE', 'EPIPE, The process cannot access the file because it is being used by another process.'],
+  ['UNKNOWN', 'UNKNOWN: unknown error'],
+]) {
+  test(`ends programs running from the folder when a file fails with ${code}, then carries on`, async () => {
+    const root = layout({ 'HoldMySession.exe': 'old', 'resources/app.asar': 'old archive' }, { 'HoldMySession.exe': 'new', 'resources/app.asar': 'new archive' });
+    const lock = lockedBy(code, message);
+    const { o } = options(root, { delayMs: 5, ...lock });
+    const result = await applyUpdate(o);
+    assert.strictEqual(result.ok, true);
+    assert.deepStrictEqual(lock.killed, [4242], 'it ended the other program and never itself');
+    assert.strictEqual(fs.readFileSync(path.join(root, 'program', 'resources', 'app.asar'), 'utf8'), 'new archive');
+    const log = fs.readFileSync(o.traceFile, 'utf8');
+    assert.match(log, new RegExp(`a file could not be changed \\(${code}`));
+    assert.match(log, /ended HoldMySession\.exe 4242/);
   });
-  const result = await applyUpdate(o);
-  assert.strictEqual(result.ok, true);
-  assert.deepStrictEqual(killed, [4242], 'it ended the other program and never itself');
-  assert.strictEqual(fs.readFileSync(path.join(root, 'program', 'resources', 'app.asar'), 'utf8'), 'new archive');
-  const log = fs.readFileSync(o.traceFile, 'utf8');
-  assert.match(log, /a file is locked \(EBUSY\)/);
-  assert.match(log, /ended HoldMySession\.exe 4242/);
+}
+
+test('ends other programs running from the folder before it touches a file, and never itself', async () => {
+  const root = layout({ 'HoldMySession.exe': 'old', 'resources/app.asar': 'old' }, { 'HoldMySession.exe': 'new', 'resources/app.asar': 'new' });
+  const killed = [];
+  const { o } = options(root, {
+    findProcesses: () => [{ pid: process.pid, name: 'this one' }, { pid: 777, name: 'HoldMySession.exe' }],
+    killProcess: (pid) => killed.push(pid),
+  });
+  assert.strictEqual((await applyUpdate(o)).ok, true);
+  assert.deepStrictEqual(killed, [777]);
+  assert.match(fs.readFileSync(o.traceFile, 'utf8'), /ended HoldMySession\.exe 777/);
 });
 
-test('does not look for programs to end when nothing is locked', async () => {
+test('looks once and ends nothing when nothing else is running from the folder', async () => {
   const root = layout({ 'HoldMySession.exe': 'old', 'resources/app.asar': 'old' }, { 'HoldMySession.exe': 'new', 'resources/app.asar': 'new' });
-  const { o } = options(root, { findProcesses: () => assert.fail('it must not look'), killProcess: () => assert.fail('it must not kill') });
+  let looks = 0;
+  const { o } = options(root, { findProcesses: () => { looks += 1; return []; }, killProcess: () => assert.fail('it must not kill') });
   assert.strictEqual((await applyUpdate(o)).ok, true);
+  assert.strictEqual(looks, 1);
 });
 
 test('gives up with a note and puts the old files back when the lock never goes', async () => {

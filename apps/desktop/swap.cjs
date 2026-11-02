@@ -47,8 +47,6 @@ async function retry(fn, tries, delayMs, onError) {
   throw last;
 }
 
-/** An error that means "something has this file open". */
-const isLocked = (error) => error && ['EBUSY', 'EPERM', 'EACCES'].includes(error.code);
 
 /**
  * The programs running from a folder, as [{pid, name}]. On Windows that is asked of the system (PowerShell by its
@@ -138,15 +136,18 @@ async function applyUpdate(o) {
   const patience = (o.waitSeconds ?? 60) * 1000;
   for (let waited = 0; isRunning(o.parentPid) && waited < patience; waited += delayMs) await sleep(delayMs);
 
-  // Something else may still have the program's files open: a copy a Claude Code hook started in the meantime, or a
-  // helper that has not exited. Anything running from the program's folder is in the way of replacing it, so it is
-  // ended, at most every couple of seconds, once a file turns out to be locked.
+  // Something else may have the program's files open: helpers of the old app that have not exited, or a copy a Claude Code
+  // hook started in the meantime. Windows reports that in several ways (EBUSY, EPERM, EPIPE, "being used by another
+  // process"), so any failure counts. Anything running from the program's folder is in the way of replacing it, and is
+  // ended. It is done once before the first file is touched, and again, at most every couple of seconds, after a failure.
   let lastCleared = 0;
-  const clearLockers = async (error) => {
-    if (!isLocked(error) || Date.now() - lastCleared < 2000) return;
-    lastCleared = Date.now();
+  const clearLockers = async (reason, first = false) => {
+    if (!first) {
+      if (Date.now() - lastCleared < 2000) return;
+      lastCleared = Date.now();
+    }
     const others = findProcesses(o.target).filter((p) => p.pid !== process.pid);
-    note(`a file is locked (${error.code}). Running from the program's folder: ${others.length ? others.map((p) => `${p.name} ${p.pid}`).join(', ') : 'nothing found'}`);
+    note(`${reason}. Running from the program's folder: ${others.length ? others.map((p) => `${p.name} ${p.pid}`).join(', ') : 'nothing found'}`);
     for (const p of others) {
       try {
         killProcess(p.pid);
@@ -155,20 +156,23 @@ async function applyUpdate(o) {
         note(`could not end ${p.name} ${p.pid}: ${killError && killError.message}`);
       }
     }
-    await sleep(Math.min(400, delayMs * 4));
+    if (others.length) await sleep(Math.min(800, delayMs * 8));
   };
+  const onFailure = (error) => clearLockers(`a file could not be changed (${(error && (error.code || error.message)) || 'unknown'}: ${(error && error.message) || ''})`.slice(0, 300));
 
   let moved = [];
   try {
-    note('the program has quit, moving the old files aside');
+    note('the program has quit, checking nothing else holds its files');
+    await clearLockers('looking before the first file is touched', true);
+    note('moving the old files aside');
     clearAside();
     for (const item of ITEMS) {
-      await retry(() => (fs.existsSync(place(item)) ? rename(place(item), aside(item)) : undefined), tries, delayMs, clearLockers);
+      await retry(() => (fs.existsSync(place(item)) ? rename(place(item), aside(item)) : undefined), tries, delayMs, onFailure);
       if (fs.existsSync(aside(item))) moved.push(item);
     }
     note('copying the new files in');
     for (const name of fs.readdirSync(o.source)) {
-      await retry(() => fs.cpSync(path.join(o.source, name), path.join(o.target, name), { recursive: true, force: true }), tries, delayMs, clearLockers);
+      await retry(() => fs.cpSync(path.join(o.source, name), path.join(o.target, name), { recursive: true, force: true }), tries, delayMs, onFailure);
     }
     note('new files in place');
   } catch (error) {
