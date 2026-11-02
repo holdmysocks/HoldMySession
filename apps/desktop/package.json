@@ -1,0 +1,26 @@
+{
+  "name": "holdmysession-desktop",
+  "version": "0.9.1",
+  "private": true,
+  "description": "The HoldMySession desktop app: a tray icon and a window around the same server, for Windows and Mac",
+  "license": "MIT",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "icons": "node scripts/make-icons.mjs",
+    "package": "node scripts/package.mjs",
+    "package:win": "node scripts/package.mjs win32 x64",
+    "package:mac": "node scripts/package.mjs darwin arm64 x64"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "45.2.1",
+    "png-to-ico": "^3.0.0",
+    "png2icons": "^2.0.1",
+    "resedit": "^3.1.0"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1",
+    "glob": "^14.0.3"
+  }
+}
