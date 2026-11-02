@@ -117,3 +117,67 @@ test('runs as a program of its own, from a file of arguments', async () => {
   assert.strictEqual(fs.readFileSync(path.join(root, 'program', 'HoldMySession.exe'), 'utf8'), 'new');
   assert.ok(fs.existsSync(path.join(root, 'program', 'resources', 'app.asar')));
 });
+
+test('ends programs running from the folder when a file turns out to be locked, then carries on', async () => {
+  const root = layout({ 'HoldMySession.exe': 'old', 'resources/app.asar': 'old archive' }, { 'HoldMySession.exe': 'new', 'resources/app.asar': 'new archive' });
+  let held = true;
+  const killed = [];
+  const { o } = options(root, {
+    delayMs: 1,
+    findProcesses: (folder) => {
+      assert.strictEqual(folder, path.join(root, 'program'));
+      return [{ pid: process.pid, name: 'this one' }, { pid: 4242, name: 'HoldMySession.exe' }];
+    },
+    killProcess: (pid) => {
+      killed.push(pid);
+      held = false;
+    },
+    rename: (from, to) => {
+      if (held && from.endsWith('app.asar')) throw Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' });
+      fs.renameSync(from, to);
+    },
+  });
+  const result = await applyUpdate(o);
+  assert.strictEqual(result.ok, true);
+  assert.deepStrictEqual(killed, [4242], 'it ended the other program and never itself');
+  assert.strictEqual(fs.readFileSync(path.join(root, 'program', 'resources', 'app.asar'), 'utf8'), 'new archive');
+  const log = fs.readFileSync(o.traceFile, 'utf8');
+  assert.match(log, /a file is locked \(EBUSY\)/);
+  assert.match(log, /ended HoldMySession\.exe 4242/);
+});
+
+test('does not look for programs to end when nothing is locked', async () => {
+  const root = layout({ 'HoldMySession.exe': 'old', 'resources/app.asar': 'old' }, { 'HoldMySession.exe': 'new', 'resources/app.asar': 'new' });
+  const { o } = options(root, { findProcesses: () => assert.fail('it must not look'), killProcess: () => assert.fail('it must not kill') });
+  assert.strictEqual((await applyUpdate(o)).ok, true);
+});
+
+test('gives up with a note and puts the old files back when the lock never goes', async () => {
+  const root = layout({ 'HoldMySession.exe': 'old', 'resources/app.asar': 'old archive' }, { 'HoldMySession.exe': 'new', 'resources/app.asar': 'new archive' });
+  const { o, starts } = options(root, {
+    delayMs: 1,
+    findProcesses: () => [],
+    rename: (from) => {
+      if (from.endsWith('app.asar')) throw Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' });
+    },
+  });
+  const result = await applyUpdate(o);
+  assert.strictEqual(result.ok, false);
+  assert.strictEqual(fs.readFileSync(path.join(root, 'program', 'resources', 'app.asar'), 'utf8'), 'old archive');
+  assert.match(fs.readFileSync(o.errorFile, 'utf8'), /EBUSY/);
+  assert.deepStrictEqual(starts, [o.exe]);
+});
+
+test("uses the new version's own copy of this step when it has one", async () => {
+  const root = layout({ 'HoldMySession.exe': 'old' }, { 'HoldMySession.exe': 'new' });
+  // A real archive is needed for this, which a test without Electron cannot make. The delegation is tried and skipped here.
+  const { o } = options(root, { relaunch: false });
+  const { start, findProcesses, killProcess, rename, ...plain } = o; // eslint-disable-line no-unused-vars
+  const argsFile = path.join(root, 'args.json');
+  fs.writeFileSync(argsFile, JSON.stringify(plain));
+  await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [path.join(__dirname, 'swap.cjs'), argsFile], { stdio: 'ignore' });
+    child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`exit ${code}`))));
+  });
+  assert.strictEqual(fs.readFileSync(path.join(root, 'program', 'HoldMySession.exe'), 'utf8'), 'new');
+});
