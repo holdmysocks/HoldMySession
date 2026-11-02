@@ -1,6 +1,6 @@
 {
   "name": "holdmysession",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Local observability dashboard for Claude Code sessions",
   "type": "module",
   "license": "MIT",

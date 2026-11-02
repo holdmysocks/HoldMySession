@@ -44,8 +44,20 @@ export function listenHost() {
 }
 
 /**
- * Builds the server without listening. `distDir` is the built app, and `host` and `port` are only used
- * to read request URLs. Call `.listen(port, host)` on what it returns.
+ * The address a request was made to, from its Host header, as host or host:port. The framework checks that a
+ * request came from the page it was served to by comparing the browser's Origin or Referer with the request's own
+ * address, so that address has to be the one the browser used: a LAN address, a machine name or a tailnet name,
+ * not only the one the server listens on. A Host that is not a plain host and port falls back to the listening one.
+ */
+export function authorityOf(hostHeader, host, port) {
+  const fallback = `${host}:${port}`;
+  if (typeof hostHeader !== 'string') return fallback;
+  return /^(\[[0-9a-fA-F:.]+\]|[A-Za-z0-9._-]+)(:\d{1,5})?$/.test(hostHeader) ? hostHeader : fallback;
+}
+
+/**
+ * Builds the server without listening. `distDir` is the built app, and `host` and `port` are what it listens on, and only
+ * stand in for a request that has no usable Host header. Call `.listen(port, host)` on what it returns.
  */
 export async function createAppServer({ distDir, host, port }) {
   process.env.NODE_ENV = 'production';
@@ -78,7 +90,7 @@ export async function createAppServer({ distDir, host, port }) {
 
   const server = createServer(async (req, res) => {
     try {
-      const url = new URL(req.url, `http://${host}:${port}`);
+      const url = new URL(req.url, `http://${authorityOf(req.headers.host, host, port)}`);
 
       // Try static files first (client assets)
       const staticFile = await tryServeStatic(url.pathname);
