@@ -6,9 +6,9 @@ See where your Claude Code usage goes: every session, every agent, every token, 
 
 ## Get it
 
-**Desktop app (Windows and Mac).** Download the zip for your system from the [releases page](https://github.com/holdmysocks/HoldMySession/releases), unzip it anywhere you can write to, and run HoldMySession. It opens a window, stays in the tray (menu bar on a Mac) when you close it, and is also at http://localhost:3000 in any browser on that machine. It can update itself from Settings. More in [docs/desktop-app.md](docs/desktop-app.md).
+**Desktop app (Windows and Mac).** Download the zip for Windows, or the disk image (`.dmg`) for a Mac with Apple Silicon, from the [releases page](https://github.com/holdmysocks/HoldMySession/releases). Unzip the Windows zip anywhere you can write to and run HoldMySession; on a Mac, drag the app onto Applications. It opens a window, stays in the tray (menu bar on a Mac) when you close it, and is also at http://localhost:3000 in any browser on that machine. It can update itself from Settings. More in [docs/desktop-app.md](docs/desktop-app.md).
 
-The programs are not code-signed, so Windows SmartScreen or macOS Gatekeeper warns the first time. On Windows choose **More info**, then **Run anyway**. On a Mac, Control-click the app, choose **Open**, then **Open** again.
+The programs are not code-signed, so Windows SmartScreen or macOS Gatekeeper warns the first time. On Windows choose **More info**, then **Run anyway**. On a Mac, run `xattr -dr com.apple.quarantine /Applications/HoldMySession.app` once in Terminal, or open System Settings, Privacy and Security, and choose **Open Anyway**.
 
 **From source.** Needs Node.js 22.13 or newer.
 
@@ -137,7 +137,7 @@ The desktop app is in `apps/desktop`. Releases are built on your own machine, no
 cd apps/desktop
 npm install
 node scripts/package.mjs win32 x64 --build      # Windows zip
-node scripts/package.mjs darwin arm64 x64       # Mac zips
+node scripts/package.mjs darwin arm64 x64       # Mac zips, and a .dmg with the tools described in docs/desktop-app.md
 ```
 
 Code is organised by feature under `apps/web/src/features`, with the scanner, parsers, history database and linking in `apps/web/src/lib`. See [CONTRIBUTING.md](CONTRIBUTING.md) and the notes in [docs](docs).
