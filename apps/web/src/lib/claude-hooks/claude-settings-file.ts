@@ -98,7 +98,7 @@ export function setHook(kind: HookKind, enabled: boolean): HookState {
       fs.renameSync(tmp, file)
     } catch (e) {
       fs.rmSync(tmp, { force: true })
-      throw new Error(`Could not write ${file}: ${(e as Error).message}`)
+      throw new Error(`Could not write ${file}: ${(e as Error).message}`, { cause: e })
     }
   }
   return readHookState()

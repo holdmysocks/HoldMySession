@@ -5,5 +5,5 @@ import { SettingsSchema, type Settings } from './settings.types'
 export const getSettings = createServerFn({ method: 'GET' }).handler(async (): Promise<Settings> => readSettingsFile())
 
 export const saveSettings = createServerFn({ method: 'POST' })
-  .inputValidator((input: Settings) => SettingsSchema.parse(input))
+  .validator((input: Settings) => SettingsSchema.parse(input))
   .handler(async ({ data }): Promise<Settings> => writeSettingsFile(data))

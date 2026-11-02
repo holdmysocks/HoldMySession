@@ -169,7 +169,7 @@ export interface PaginatedSessionsResponse extends PaginatedSessionsResult<Sessi
 }
 
 export const getPaginatedSessions = createServerFn({ method: 'GET' })
-  .inputValidator((input: unknown) => paginatedSessionsInputSchema.parse(input))
+  .validator((input: unknown) => paginatedSessionsInputSchema.parse(input))
   .handler(async ({ data }): Promise<PaginatedSessionsResponse> => {
     // Sessions with no project, and archived sessions, are left out of the list, the page and the project dropdown.
     // On a master the list covers the machine chosen: this computer's live sessions, and the others' from the history.

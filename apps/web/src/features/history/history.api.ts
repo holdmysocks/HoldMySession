@@ -108,7 +108,7 @@ export const getPriceEntries = createServerFn({ method: 'GET' }).handler(async (
 })
 
 export const createPriceEntry = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => newEntrySchema.parse(input))
+  .validator((input: unknown) => newEntrySchema.parse(input))
   .handler(async ({ data }): Promise<PriceEntry> => {
     const { openHistoryDb } = await import('@/lib/history/history-db')
     const { addPriceEntry } = await import('@/lib/history/price-store')
@@ -121,7 +121,7 @@ export const createPriceEntry = createServerFn({ method: 'POST' })
   })
 
 export const removePriceEntry = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ id: z.number().int() }).parse(input))
+  .validator((input: unknown) => z.object({ id: z.number().int() }).parse(input))
   .handler(async ({ data }): Promise<boolean> => {
     const { openHistoryDb } = await import('@/lib/history/history-db')
     const { deletePriceEntry } = await import('@/lib/history/price-store')
@@ -135,7 +135,7 @@ export const removePriceEntry = createServerFn({ method: 'POST' })
 
 /** Estimated cost with each day priced as it was that day. Null if the history cannot be used yet. */
 export const getHistoryCost = createServerFn({ method: 'GET' })
-  .inputValidator((input: unknown) => z.object({ projectPath: z.string().optional(), machineId: z.string().optional() }).parse(input))
+  .validator((input: unknown) => z.object({ projectPath: z.string().optional(), machineId: z.string().optional() }).parse(input))
   .handler(async ({ data }): Promise<HistoryCost | null> => {
     const { openHistoryDb } = await import('@/lib/history/history-db')
     const { historyCost } = await import('@/lib/history/history-cost')
@@ -183,7 +183,7 @@ const newPeriodSchema = z.object({
 })
 
 export const createSubscriptionPeriod = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => newPeriodSchema.parse(input))
+  .validator((input: unknown) => newPeriodSchema.parse(input))
   .handler(async ({ data }): Promise<SubscriptionPeriod> => {
     const { openHistoryDb } = await import('@/lib/history/history-db')
     const { addSubscriptionPeriod } = await import('@/lib/history/subscription-store')
@@ -196,7 +196,7 @@ export const createSubscriptionPeriod = createServerFn({ method: 'POST' })
   })
 
 export const removeSubscriptionPeriod = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ id: z.number().int() }).parse(input))
+  .validator((input: unknown) => z.object({ id: z.number().int() }).parse(input))
   .handler(async ({ data }): Promise<boolean> => {
     const { openHistoryDb } = await import('@/lib/history/history-db')
     const { deleteSubscriptionPeriod } = await import('@/lib/history/subscription-store')
@@ -210,7 +210,7 @@ export const removeSubscriptionPeriod = createServerFn({ method: 'POST' })
 
 /** Turns the automatic scan on or off and sets how often it runs. Takes effect at the scheduler's next look. */
 export const setAutoScan = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => AutoScanSchema.parse(input))
+  .validator((input: unknown) => AutoScanSchema.parse(input))
   .handler(async ({ data }) => {
     const { readSettingsFile, writeSettingsFile } = await import('@/lib/settings-file')
     return writeSettingsFile({ ...readSettingsFile(), autoScan: data }).autoScan
@@ -239,7 +239,7 @@ export const backUpNow = createServerFn({ method: 'POST' }).handler(async (): Pr
 })
 
 export const removeBackup = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ name: z.string().min(1).max(200) }).parse(input))
+  .validator((input: unknown) => z.object({ name: z.string().min(1).max(200) }).parse(input))
   .handler(async ({ data }): Promise<boolean> => {
     const { deleteBackup } = await import('@/lib/history/backup')
     return deleteBackup(data.name)

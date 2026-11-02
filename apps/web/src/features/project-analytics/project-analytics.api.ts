@@ -95,7 +95,7 @@ export function aggregateProjectAnalytics(
 const analyticsInputSchema = z.object({ machineId: z.string().optional() })
 
 export const getProjectAnalytics = createServerFn({ method: 'GET' })
-  .inputValidator((input: unknown) => analyticsInputSchema.parse(input ?? {}))
+  .validator((input: unknown) => analyticsInputSchema.parse(input ?? {}))
   .handler(async ({ data }): Promise<ProjectAnalyticsResult> => {
     // On a master, projects span the machines chosen: this computer's live sessions, and the others' from the history.
     const { machineView } = await import('@/lib/link/scoped')
@@ -112,7 +112,7 @@ export const getProjectAnalytics = createServerFn({ method: 'GET' })
 const projectStatsInputSchema = z.object({ projectPath: z.string().min(1), machineId: z.string().optional() })
 
 export const getProjectStats = createServerFn({ method: 'GET' })
-  .inputValidator((input: unknown) => projectStatsInputSchema.parse(input))
+  .validator((input: unknown) => projectStatsInputSchema.parse(input))
   .handler(async ({ data }): Promise<StatsCache | null> => {
     const { loadHistoryStats } = await import('@/lib/history/history-read')
     return (

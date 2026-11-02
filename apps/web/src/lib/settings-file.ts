@@ -36,6 +36,6 @@ export function writeSettingsFile(settings: Settings): Settings {
     } catch {
       // Ignore cleanup errors
     }
-    throw new Error(`Failed to save settings: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    throw new Error(`Failed to save settings: ${error instanceof Error ? error.message : 'Unknown error'}`, { cause: error })
   }
 }

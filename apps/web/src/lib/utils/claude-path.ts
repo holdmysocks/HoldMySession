@@ -127,7 +127,7 @@ export async function getDataSources(): Promise<DataSource[]> {
   const claudeDir = getClaudeDir()
   const platform = await detectCurrentPlatform()
 
-  let available = false
+  let available: boolean
   try {
     await fs.access(claudeDir)
     available = true

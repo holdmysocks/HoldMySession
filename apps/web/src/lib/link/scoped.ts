@@ -93,7 +93,7 @@ export async function nodeMapProjects(): Promise<{ hasNodes: boolean; selfName: 
   if (readSettingsFile().link.role !== 'master') return { hasNodes: false, selfName: '', projects: [] }
   const db = openHistoryDb()
   let machines: Array<{ id: string; name: string }>
-  let selfName = ''
+  let selfName: string
   try {
     const self = selfMachineId(db)
     const rows = db.prepare('SELECT machine_id, name FROM machines').all()

@@ -70,7 +70,7 @@ export const getMachineProjects = createServerFn({ method: 'GET' }).handler(asyn
 })
 
 export const saveProjectPrefs = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => ProjectsSchema.parse(input))
+  .validator((input: unknown) => ProjectsSchema.parse(input))
   .handler(async ({ data }): Promise<ProjectsSetting> => {
     const { readSettingsFile, writeSettingsFile } = await import('@/lib/settings-file')
     return writeSettingsFile({ ...readSettingsFile(), projects: data }).projects

@@ -7,7 +7,7 @@ const inputSchema = z.object({ machineId: z.string().optional() })
 // The history database is read first, so Stats still has the history when the Claude folder has been cleared,
 // and so a master can show one machine or all of them. If it cannot be used, the session files are read as before.
 export const getStats = createServerFn({ method: 'GET' })
-  .inputValidator((input: unknown) => inputSchema.parse(input ?? {}))
+  .validator((input: unknown) => inputSchema.parse(input ?? {}))
   .handler(async ({ data }) => {
     const { loadHistoryStats } = await import('@/lib/history/history-read')
     const fromHistory = await loadHistoryStats({ machineId: data.machineId })

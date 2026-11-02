@@ -106,7 +106,7 @@ async function updateLink(change: (link: LinkSetting) => LinkSetting): Promise<L
 }
 
 export const setLinkRole = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ role: z.enum(['node', 'master']) }).parse(input))
+  .validator((input: unknown) => z.object({ role: z.enum(['node', 'master']) }).parse(input))
   .handler(async ({ data }) => {
     const { generateToken } = await import('@/lib/link/auth')
     return updateLink((link) => ({
@@ -123,7 +123,7 @@ export const regenerateNodeToken = createServerFn({ method: 'POST' }).handler(as
 })
 
 export const setListen = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ listen: z.enum(['local', 'network']) }).parse(input))
+  .validator((input: unknown) => z.object({ listen: z.enum(['local', 'network']) }).parse(input))
   .handler(async ({ data }) => {
     const state = await updateLink((link) => ({ ...link, listen: data.listen }))
     // Turning the network on is when the firewall permission is needed, so ask for it now.
@@ -167,7 +167,7 @@ export interface ConnectResult {
  * that answers is used, with the rest kept, so the same node works on the local network and over a tailnet.
  */
 export const connectToMaster = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ code: z.string().max(4000).optional(), url: z.string().max(500).optional(), token: z.string().max(200).optional() }).parse(input))
+  .validator((input: unknown) => z.object({ code: z.string().max(4000).optional(), url: z.string().max(500).optional(), token: z.string().max(200).optional() }).parse(input))
   .handler(async ({ data }): Promise<ConnectResult> => {
     const { normalizeMasterUrl, pushToMaster, noteGoodAddress } = await import('@/lib/link/node-sync')
     const { parsePairingCode } = await import('@/lib/link/addresses')
@@ -229,7 +229,7 @@ export const disconnectFromMaster = createServerFn({ method: 'POST' }).handler(a
 
 /** Sends what changed to the master now, without scanning. */
 export const syncNow = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ everything: z.boolean() }).parse(input))
+  .validator((input: unknown) => z.object({ everything: z.boolean() }).parse(input))
   .handler(async ({ data }) => {
     const { readSettingsFile } = await import('@/lib/settings-file')
     const { openHistoryDb } = await import('@/lib/history/history-db')
@@ -245,7 +245,7 @@ export const syncNow = createServerFn({ method: 'POST' })
   })
 
 export const renameMachineName = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ machineId: z.string().min(1), name: z.string().max(200) }).parse(input))
+  .validator((input: unknown) => z.object({ machineId: z.string().min(1), name: z.string().max(200) }).parse(input))
   .handler(async ({ data }): Promise<LinkState> => {
     const { readSettingsFile } = await import('@/lib/settings-file')
     const { openHistoryDb } = await import('@/lib/history/history-db')
@@ -265,7 +265,7 @@ export const renameMachineName = createServerFn({ method: 'POST' })
   })
 
 export const removeLinkedMachine = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ machineId: z.string().min(1), deleteData: z.boolean() }).parse(input))
+  .validator((input: unknown) => z.object({ machineId: z.string().min(1), deleteData: z.boolean() }).parse(input))
   .handler(async ({ data }): Promise<LinkState> => {
     const { readSettingsFile } = await import('@/lib/settings-file')
     const { openHistoryDb } = await import('@/lib/history/history-db')

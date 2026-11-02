@@ -90,7 +90,7 @@ export function checkBackupFile(file: string): BackupCheck {
     return { schemaVersion: version, sessions: Number(db.prepare('SELECT COUNT(*) AS n FROM sessions').get()?.n ?? 0) }
   } catch (error) {
     if (error instanceof Error && /not a HoldMySession|newer version|damaged/.test(error.message)) throw error
-    throw new Error('This is not a HoldMySession history database.')
+    throw new Error('This is not a HoldMySession history database.', { cause: error })
   } finally {
     db?.close()
   }

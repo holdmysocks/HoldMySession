@@ -19,7 +19,7 @@ export const getDesktopState = createServerFn({ method: 'GET' }).handler(async (
 
 /** Turns "start with the computer" on or off, and answers with what the system now says. */
 export const setOpenAtLogin = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ enabled: z.boolean() }).parse(input))
+  .validator((input: unknown) => z.object({ enabled: z.boolean() }).parse(input))
   .handler(async ({ data }): Promise<DesktopState> => {
     const { desktopBridge } = await import('@/lib/desktop-bridge')
     const bridge = desktopBridge()
@@ -30,7 +30,7 @@ export const setOpenAtLogin = createServerFn({ method: 'POST' })
 
 /** Turns the needs-you alerts on or off. The desktop app reads the setting each time it asks which sessions wait. */
 export const setNeedsYouAlerts = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ enabled: z.boolean() }).parse(input))
+  .validator((input: unknown) => z.object({ enabled: z.boolean() }).parse(input))
   .handler(async ({ data }): Promise<DesktopState> => {
     const { desktopBridge } = await import('@/lib/desktop-bridge')
     const { readSettingsFile, writeSettingsFile } = await import('@/lib/settings-file')

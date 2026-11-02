@@ -64,7 +64,7 @@ export const updateNow = createServerFn({ method: 'POST' }).handler(async (): Pr
 })
 
 export const setCheckForUpdates = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ enabled: z.boolean() }).parse(input))
+  .validator((input: unknown) => z.object({ enabled: z.boolean() }).parse(input))
   .handler(async ({ data }) => {
     const { readSettingsFile, writeSettingsFile } = await import('@/lib/settings-file')
     return writeSettingsFile({ ...readSettingsFile(), checkForUpdates: data.enabled }).checkForUpdates
@@ -72,7 +72,7 @@ export const setCheckForUpdates = createServerFn({ method: 'POST' })
 
 /** Install updates by themselves: downloaded in the background when found, and installed when the app next quits. */
 export const setAutoUpdate = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ enabled: z.boolean() }).parse(input))
+  .validator((input: unknown) => z.object({ enabled: z.boolean() }).parse(input))
   .handler(async ({ data }) => {
     const { readSettingsFile, writeSettingsFile } = await import('@/lib/settings-file')
     const saved = writeSettingsFile({ ...readSettingsFile(), autoUpdate: data.enabled }).autoUpdate

@@ -9,48 +9,33 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as DashboardRouteImport } from './routes/_dashboard'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ApiNeedsYouRouteImport } from './routes/api.needs-you'
-import { Route as ApiHistoryRestoreRouteImport } from './routes/api.history-restore'
-import { Route as ApiHistoryBackupRouteImport } from './routes/api.history-backup'
-import { Route as DashboardStatsRouteImport } from './routes/_dashboard/stats'
-import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
+import { Route as DashboardRouteImport } from './routes/_dashboard'
 import { Route as DashboardMapRouteImport } from './routes/_dashboard/map'
+import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
+import { Route as DashboardStatsRouteImport } from './routes/_dashboard/stats'
+import { Route as ApiHistoryBackupRouteImport } from './routes/api.history-backup'
+import { Route as ApiHistoryRestoreRouteImport } from './routes/api.history-restore'
+import { Route as ApiNeedsYouRouteImport } from './routes/api.needs-you'
 import { Route as DashboardSessionsIndexRouteImport } from './routes/_dashboard/sessions/index'
-import { Route as ApiLinkRespondRouteImport } from './routes/api.link.respond'
-import { Route as ApiLinkPushRouteImport } from './routes/api.link.push'
-import { Route as ApiLinkPollRouteImport } from './routes/api.link.poll'
-import { Route as ApiLinkPingRouteImport } from './routes/api.link.ping'
 import { Route as DashboardSessionsSessionIdRouteImport } from './routes/_dashboard/sessions/$sessionId'
+import { Route as ApiLinkPingRouteImport } from './routes/api.link.ping'
+import { Route as ApiLinkPollRouteImport } from './routes/api.link.poll'
+import { Route as ApiLinkPushRouteImport } from './routes/api.link.push'
+import { Route as ApiLinkRespondRouteImport } from './routes/api.link.respond'
 
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/_dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiNeedsYouRoute = ApiNeedsYouRouteImport.update({
-  id: '/api/needs-you',
-  path: '/api/needs-you',
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/_dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiHistoryRestoreRoute = ApiHistoryRestoreRouteImport.update({
-  id: '/api/history-restore',
-  path: '/api/history-restore',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiHistoryBackupRoute = ApiHistoryBackupRouteImport.update({
-  id: '/api/history-backup',
-  path: '/api/history-backup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardStatsRoute = DashboardStatsRouteImport.update({
-  id: '/stats',
-  path: '/stats',
+const DashboardMapRoute = DashboardMapRouteImport.update({
+  id: '/map',
+  path: '/map',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
@@ -58,35 +43,30 @@ const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardMapRoute = DashboardMapRouteImport.update({
-  id: '/map',
-  path: '/map',
+const DashboardStatsRoute = DashboardStatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
   getParentRoute: () => DashboardRoute,
+} as any)
+const ApiHistoryBackupRoute = ApiHistoryBackupRouteImport.update({
+  id: '/api/history-backup',
+  path: '/api/history-backup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHistoryRestoreRoute = ApiHistoryRestoreRouteImport.update({
+  id: '/api/history-restore',
+  path: '/api/history-restore',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNeedsYouRoute = ApiNeedsYouRouteImport.update({
+  id: '/api/needs-you',
+  path: '/api/needs-you',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardSessionsIndexRoute = DashboardSessionsIndexRouteImport.update({
   id: '/sessions/',
   path: '/sessions/',
   getParentRoute: () => DashboardRoute,
-} as any)
-const ApiLinkRespondRoute = ApiLinkRespondRouteImport.update({
-  id: '/api/link/respond',
-  path: '/api/link/respond',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiLinkPushRoute = ApiLinkPushRouteImport.update({
-  id: '/api/link/push',
-  path: '/api/link/push',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiLinkPollRoute = ApiLinkPollRouteImport.update({
-  id: '/api/link/poll',
-  path: '/api/link/poll',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiLinkPingRoute = ApiLinkPingRouteImport.update({
-  id: '/api/link/ping',
-  path: '/api/link/ping',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardSessionsSessionIdRoute =
   DashboardSessionsSessionIdRouteImport.update({
@@ -94,6 +74,26 @@ const DashboardSessionsSessionIdRoute =
     path: '/sessions/$sessionId',
     getParentRoute: () => DashboardRoute,
   } as any)
+const ApiLinkPingRoute = ApiLinkPingRouteImport.update({
+  id: '/api/link/ping',
+  path: '/api/link/ping',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLinkPollRoute = ApiLinkPollRouteImport.update({
+  id: '/api/link/poll',
+  path: '/api/link/poll',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLinkPushRoute = ApiLinkPushRouteImport.update({
+  id: '/api/link/push',
+  path: '/api/link/push',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLinkRespondRoute = ApiLinkRespondRouteImport.update({
+  id: '/api/link/respond',
+  path: '/api/link/respond',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -205,13 +205,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_dashboard': {
-      id: '/_dashboard'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -219,32 +212,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/needs-you': {
-      id: '/api/needs-you'
-      path: '/api/needs-you'
-      fullPath: '/api/needs-you'
-      preLoaderRoute: typeof ApiNeedsYouRouteImport
+    '/_dashboard': {
+      id: '/_dashboard'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/history-restore': {
-      id: '/api/history-restore'
-      path: '/api/history-restore'
-      fullPath: '/api/history-restore'
-      preLoaderRoute: typeof ApiHistoryRestoreRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/history-backup': {
-      id: '/api/history-backup'
-      path: '/api/history-backup'
-      fullPath: '/api/history-backup'
-      preLoaderRoute: typeof ApiHistoryBackupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_dashboard/stats': {
-      id: '/_dashboard/stats'
-      path: '/stats'
-      fullPath: '/stats'
-      preLoaderRoute: typeof DashboardStatsRouteImport
+    '/_dashboard/map': {
+      id: '/_dashboard/map'
+      path: '/map'
+      fullPath: '/map'
+      preLoaderRoute: typeof DashboardMapRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/settings': {
@@ -254,12 +233,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/_dashboard/map': {
-      id: '/_dashboard/map'
-      path: '/map'
-      fullPath: '/map'
-      preLoaderRoute: typeof DashboardMapRouteImport
+    '/_dashboard/stats': {
+      id: '/_dashboard/stats'
+      path: '/stats'
+      fullPath: '/stats'
+      preLoaderRoute: typeof DashboardStatsRouteImport
       parentRoute: typeof DashboardRoute
+    }
+    '/api/history-backup': {
+      id: '/api/history-backup'
+      path: '/api/history-backup'
+      fullPath: '/api/history-backup'
+      preLoaderRoute: typeof ApiHistoryBackupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/history-restore': {
+      id: '/api/history-restore'
+      path: '/api/history-restore'
+      fullPath: '/api/history-restore'
+      preLoaderRoute: typeof ApiHistoryRestoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/needs-you': {
+      id: '/api/needs-you'
+      path: '/api/needs-you'
+      fullPath: '/api/needs-you'
+      preLoaderRoute: typeof ApiNeedsYouRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_dashboard/sessions/': {
       id: '/_dashboard/sessions/'
@@ -268,18 +268,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSessionsIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/api/link/respond': {
-      id: '/api/link/respond'
-      path: '/api/link/respond'
-      fullPath: '/api/link/respond'
-      preLoaderRoute: typeof ApiLinkRespondRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_dashboard/sessions/$sessionId': {
+      id: '/_dashboard/sessions/$sessionId'
+      path: '/sessions/$sessionId'
+      fullPath: '/sessions/$sessionId'
+      preLoaderRoute: typeof DashboardSessionsSessionIdRouteImport
+      parentRoute: typeof DashboardRoute
     }
-    '/api/link/push': {
-      id: '/api/link/push'
-      path: '/api/link/push'
-      fullPath: '/api/link/push'
-      preLoaderRoute: typeof ApiLinkPushRouteImport
+    '/api/link/ping': {
+      id: '/api/link/ping'
+      path: '/api/link/ping'
+      fullPath: '/api/link/ping'
+      preLoaderRoute: typeof ApiLinkPingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/link/poll': {
@@ -289,19 +289,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLinkPollRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/link/ping': {
-      id: '/api/link/ping'
-      path: '/api/link/ping'
-      fullPath: '/api/link/ping'
-      preLoaderRoute: typeof ApiLinkPingRouteImport
+    '/api/link/push': {
+      id: '/api/link/push'
+      path: '/api/link/push'
+      fullPath: '/api/link/push'
+      preLoaderRoute: typeof ApiLinkPushRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_dashboard/sessions/$sessionId': {
-      id: '/_dashboard/sessions/$sessionId'
-      path: '/sessions/$sessionId'
-      fullPath: '/sessions/$sessionId'
-      preLoaderRoute: typeof DashboardSessionsSessionIdRouteImport
-      parentRoute: typeof DashboardRoute
+    '/api/link/respond': {
+      id: '/api/link/respond'
+      path: '/api/link/respond'
+      fullPath: '/api/link/respond'
+      preLoaderRoute: typeof ApiLinkRespondRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }

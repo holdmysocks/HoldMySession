@@ -143,7 +143,7 @@ const machineSchema = z.object({ machineId: z.string().optional() })
  * are listed. Scratch folders and hidden projects are left out here, so every machine follows this computer's choices.
  */
 export const getMapProjects = createServerFn({ method: 'GET' })
-  .inputValidator((input: unknown) => machineSchema.parse(input ?? {}))
+  .validator((input: unknown) => machineSchema.parse(input ?? {}))
   .handler(async ({ data }): Promise<MapProject[]> => {
     const { readProjectPrefs } = await import('@/lib/projects/prefs-server')
     const { prefs, selfId } = readProjectPrefs()
@@ -167,7 +167,7 @@ const projectMapInputSchema = z.object({
 })
 
 export const getProjectMap = createServerFn({ method: 'GET' })
-  .inputValidator((input: unknown) => projectMapInputSchema.parse(input))
+  .validator((input: unknown) => projectMapInputSchema.parse(input))
   .handler(async ({ data }): Promise<ProjectMapResponse> => {
     const { remoteCallFor } = await import('@/lib/link/remote-call')
     const remote = await remoteCallFor<ProjectMapResponse>(data.machineId, 'project-map', { projectKey: data.projectKey })
@@ -177,7 +177,7 @@ export const getProjectMap = createServerFn({ method: 'GET' })
   })
 
 export const getHookEvents = createServerFn({ method: 'GET' })
-  .inputValidator((input: unknown) => machineSchema.parse(input ?? {}))
+  .validator((input: unknown) => machineSchema.parse(input ?? {}))
   .handler(async ({ data }): Promise<HookEvent[]> => {
     const { remoteCallFor } = await import('@/lib/link/remote-call')
     const remote = await remoteCallFor<HookEvent[]>(data.machineId, 'hook-events', {})

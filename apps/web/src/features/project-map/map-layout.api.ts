@@ -9,12 +9,12 @@ const saveInput = z.object({ projectKey: ProjectKeySchema, positions: NodePositi
 
 /** The layout the user arranged for a project, or an empty object when there is none. */
 export const getMapLayout = createServerFn({ method: 'GET' })
-  .inputValidator((input: unknown) => getInput.parse(input))
+  .validator((input: unknown) => getInput.parse(input))
   .handler(async ({ data }): Promise<NodePositions> => readProjectLayout(data.projectKey))
 
 /** Replaces the saved layout for a project. Empty positions clear it. */
 export const saveMapLayout = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => saveInput.parse(input))
+  .validator((input: unknown) => saveInput.parse(input))
   .handler(async ({ data }): Promise<NodePositions> => {
     await writeProjectLayout(data.projectKey, data.positions)
     return data.positions

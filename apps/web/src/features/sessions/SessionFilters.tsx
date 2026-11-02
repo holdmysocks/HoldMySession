@@ -31,9 +31,11 @@ export function SessionFilters({ projects }: SessionFiltersProps) {
   }, [])
 
   // Sync local search when URL changes externally (e.g. browser back/forward)
-  useEffect(() => {
+  const [syncedUrlSearch, setSyncedUrlSearch] = useState(urlSearch)
+  if (syncedUrlSearch !== urlSearch) {
+    setSyncedUrlSearch(urlSearch)
     setLocalSearch(urlSearch)
-  }, [urlSearch])
+  }
 
   function handleSearchChange(value: string) {
     setLocalSearch(value)

@@ -8,7 +8,7 @@ const inputSchema = z.object({ sessionId: z.string().min(1).max(200), projectKey
  * for it and answers while this page is open. Otherwise it is read from this computer.
  */
 export const getSessionDetail = createServerFn({ method: 'GET' })
-  .inputValidator((input: unknown) => inputSchema.parse(input))
+  .validator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data }) => {
     const { remoteCallFor } = await import('@/lib/link/remote-call')
     const remote = await remoteCallFor<Awaited<ReturnType<typeof import('@/lib/live/session-detail').loadSessionDetail>>>(

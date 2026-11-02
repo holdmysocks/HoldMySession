@@ -68,7 +68,7 @@ export function writeProjectLayout(
       await fs.promises.rename(temporary, target)
     } catch (error) {
       await fs.promises.rm(temporary, { force: true }).catch(() => undefined)
-      throw new Error(`Failed to save map layout: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      throw new Error(`Failed to save map layout: ${error instanceof Error ? error.message : 'Unknown error'}`, { cause: error })
     }
   })
   queue = run.catch(() => undefined)
