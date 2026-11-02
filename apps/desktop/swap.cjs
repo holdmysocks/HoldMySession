@@ -53,8 +53,9 @@ async function retry(fn, tries, delayMs, onError) {
  * full path, then wmic); elsewhere nothing is looked for. Anything that fails gives an empty list: this only helps.
  */
 function findProcessesIn(folder) {
-  if (process.platform !== 'win32') return [];
+  if (process.platform !== 'win32') return { list: [], failed: null };
   const env = { ...process.env, HMS_FOLDER: folder };
+  let powershellError = null;
   const parse = (text) =>
     text
       .split(/\r?\n/)
@@ -65,26 +66,40 @@ function findProcessesIn(folder) {
     const powershell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
     const script =
       "Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($env:HMS_FOLDER + '\\', [StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { '' + $_.ProcessId + '|' + $_.Name }";
-    return parse(execFileSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', script], { env, encoding: 'utf8', timeout: 20000, windowsHide: true }));
-  } catch {
+    return { list: parse(execFileSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', script], { env, encoding: 'utf8', timeout: 20000, windowsHide: true })), failed: null };
+  } catch (error) {
     // PowerShell could not be used. Try wmic.
+    powershellError = (error && error.message) || String(error);
   }
   try {
     const out = execFileSync('wmic', ['process', 'get', 'ProcessId,ExecutablePath', '/format:csv'], { encoding: 'utf8', timeout: 20000, windowsHide: true });
     const prefix = (folder.endsWith('\\') ? folder : folder + '\\').toLowerCase();
-    return out
+    const list = out
       .split(/\r?\n/)
       .map((line) => line.split(','))
       .filter((c) => c.length >= 3 && c[1].toLowerCase().startsWith(prefix) && /^\d+$/.test(c[2].trim()))
       .map((c) => ({ pid: Number(c[2].trim()), name: path.basename(c[1]) }));
-  } catch {
-    return [];
+    return { list, failed: null };
+  } catch (error) {
+    return { list: [], failed: `PowerShell: ${String(powershellError).split('\n')[0]}; wmic: ${String((error && error.message) || error).split('\n')[0]}` };
   }
 }
 
-function startDetached(exe) {
-  const child = spawn(exe, [], { detached: true, stdio: 'ignore', windowsHide: false });
-  child.on('error', () => undefined);
+/**
+ * The environment to start the app with again. This step runs the app's own program in Node mode, which is set up with
+ * ELECTRON_RUN_AS_NODE. A program started from here would inherit it and run as plain Node, doing nothing and exiting,
+ * so the app would never come back. Those settings are taken out.
+ */
+function relaunchEnv(env) {
+  const clean = { ...env };
+  delete clean.ELECTRON_RUN_AS_NODE;
+  delete clean.ELECTRON_NO_ASAR;
+  return clean;
+}
+
+function startDetached(exe, onError) {
+  const child = spawn(exe, [], { detached: true, stdio: 'ignore', windowsHide: false, cwd: path.dirname(exe), env: relaunchEnv(process.env) });
+  child.on('error', (error) => onError && onError(error));
   child.unref();
 }
 
@@ -108,8 +123,9 @@ async function applyUpdate(o) {
   // The same, for anything that still goes through the regular fs.
   process.noAsar = true;
   const delayMs = o.delayMs ?? 500;
-  const tries = 40;
-  const start = o.start || startDetached;
+  // Up to two minutes: the old program can take a good while to let go of its files.
+  const tries = o.tries ?? 240;
+  const start = o.start || ((exe) => startDetached(exe, (error) => note(`the program could not be started: ${error && error.message}`)));
   const findProcesses = o.findProcesses || findProcessesIn;
   const killProcess = o.killProcess || ((pid) => process.kill(pid, 'SIGKILL'));
   const rename = o.rename || fs.renameSync;
@@ -146,8 +162,10 @@ async function applyUpdate(o) {
       if (Date.now() - lastCleared < 2000) return;
       lastCleared = Date.now();
     }
-    const others = findProcesses(o.target).filter((p) => p.pid !== process.pid);
-    note(`${reason}. Running from the program's folder: ${others.length ? others.map((p) => `${p.name} ${p.pid}`).join(', ') : 'nothing found'}`);
+    const found = findProcesses(o.target);
+    const others = (Array.isArray(found) ? found : found.list).filter((p) => p.pid !== process.pid);
+    const failed = Array.isArray(found) ? null : found.failed;
+    note(`${reason}. Running from the program's folder: ${failed ? `could not look (${failed})` : others.length ? others.map((p) => `${p.name} ${p.pid}`).join(', ') : 'nothing found'}`);
     for (const p of others) {
       try {
         killProcess(p.pid);
@@ -210,7 +228,7 @@ async function applyUpdate(o) {
   return { ok: true };
 }
 
-module.exports = { applyUpdate, ITEMS };
+module.exports = { applyUpdate, ITEMS, relaunchEnv };
 
 // Run as the swap step: node swap.cjs <file with the arguments as JSON>
 if (require.main === module) {

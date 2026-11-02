@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
-const { applyUpdate } = require('./swap.cjs');
+const { applyUpdate, relaunchEnv } = require('./swap.cjs');
 
 function install(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hms-swap-'));
@@ -214,4 +214,30 @@ test('handles app.asar as a plain file, so the step itself never holds it open',
   const src = fs.readFileSync(path.join(__dirname, 'swap.cjs'), 'utf8');
   assert.match(src, /require\('original-fs'\)/);
   assert.match(src, /process\.noAsar = true/);
+});
+
+test('starts the app again without the settings that make it run as plain Node', () => {
+  const env = relaunchEnv({ PATH: 'x', ELECTRON_RUN_AS_NODE: '1', ELECTRON_NO_ASAR: '1', HOME: 'h' });
+  assert.deepStrictEqual(env, { PATH: 'x', HOME: 'h' });
+});
+
+test('says so in the log when it could not look for programs, instead of claiming there were none', async () => {
+  const root = layout({ 'HoldMySession.exe': 'old' }, { 'HoldMySession.exe': 'new' });
+  const { o } = options(root, { findProcesses: () => ({ list: [], failed: 'PowerShell: not found; wmic: not found' }) });
+  assert.strictEqual((await applyUpdate(o)).ok, true);
+  assert.match(fs.readFileSync(o.traceFile, 'utf8'), /could not look \(PowerShell: not found; wmic: not found\)/);
+});
+
+test('waits for the old program to let go for up to two minutes', async () => {
+  const root = layout({ 'HoldMySession.exe': 'old', 'resources/app.asar': 'old' }, { 'HoldMySession.exe': 'new', 'resources/app.asar': 'new' });
+  let failures = 0;
+  const { o } = options(root, {
+    delayMs: 1,
+    findProcesses: () => [],
+    rename: (from, to) => {
+      if (from.endsWith('app.asar') && failures++ < 100) throw Object.assign(new Error('EPIPE'), { code: 'EPIPE' });
+      fs.renameSync(from, to);
+    },
+  });
+  assert.strictEqual((await applyUpdate(o)).ok, true, 'it kept trying past the old 40 tries');
 });
