@@ -4,7 +4,15 @@
 //
 // The old files are moved aside first and put back if anything fails, so a failed swap leaves the old version working.
 
-const fs = require('node:fs');
+// In Electron, even looking at a file called app.asar opens it as an archive and keeps it open, which on Windows stops
+// that very file from being renamed (EBUSY). So files are handled with original-fs, which treats an archive as a plain file.
+const fs = (() => {
+  try {
+    return require('original-fs');
+  } catch {
+    return require('node:fs');
+  }
+})();
 const path = require('node:path');
 const { spawn, execFileSync } = require('node:child_process');
 
@@ -99,6 +107,8 @@ function startDetached(exe) {
  * @param {(from: string, to: string) => void} [o.rename] replaces renaming (tests)
  */
 async function applyUpdate(o) {
+  // The same, for anything that still goes through the regular fs.
+  process.noAsar = true;
   const delayMs = o.delayMs ?? 500;
   const tries = 40;
   const start = o.start || startDetached;

@@ -181,3 +181,9 @@ test("uses the new version's own copy of this step when it has one", async () =>
   });
   assert.strictEqual(fs.readFileSync(path.join(root, 'program', 'HoldMySession.exe'), 'utf8'), 'new');
 });
+
+test('handles app.asar as a plain file, so the step itself never holds it open', () => {
+  const src = fs.readFileSync(path.join(__dirname, 'swap.cjs'), 'utf8');
+  assert.match(src, /require\('original-fs'\)/);
+  assert.match(src, /process\.noAsar = true/);
+});
