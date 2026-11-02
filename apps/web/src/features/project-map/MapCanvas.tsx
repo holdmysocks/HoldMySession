@@ -577,45 +577,48 @@ function NodeView({ node, selected, multiSelected, editMode, canMove, onClick, o
           pulse={node.status === 'active' || node.status === 'running'}
           agents={node.runningAgents}
           waitingOnAgents={node.waitingOnAgents}
+          detailChars={detailRoom(node.width, chipTextOf(node.backgroundTaskCount, expired))}
         />
       ) : (
         <SubagentLines title={node.title} description={node.subtitle} look={look} pulse={node.status === 'active' || node.status === 'running'} />
       )}
-      {isSession && node.backgroundTaskCount > 0 && (
-        <TaskChip count={node.backgroundTaskCount} x={node.width - 120} y={node.height - 22} />
+      {isSession && (node.backgroundTaskCount > 0 || expired > 0) && (
+        <CardChip tasks={node.backgroundTaskCount} expired={expired} nodeWidth={node.width} y={node.height - 22} />
       )}
-      {expired > 0 && <ExpiredChip count={expired} x={node.width - 48} y={node.height - 22} />}
     </g>
   )
 }
 
 /**
- * "N tasks" chip: background tasks of this session that are still running. Green, because they
- * are what keeps a quiet session green.
+ * The chip at the bottom right of a session card: "N tasks" for background tasks still running, which keep a quiet
+ * session green, and "+N quiet agents" for subagents that were dispatched here but whose cache has expired, so they
+ * are not drawn. A card with both gets one chip, with "agents" left off, so the two never overlap or crowd the
+ * branch on the left.
  */
-function TaskChip({ count, x, y }: { count: number; x: number; y: number }) {
-  const label = `${count} ${count === 1 ? 'task' : 'tasks'}`
-  return (
-    <g aria-hidden="true">
-      <rect x={x} y={y} width={68} height={18} rx={9} fill="#00000055" />
-      <text x={x + 34} y={y + 12.5} textAnchor="middle" fill="#CFEFDC" className="text-[11px]">
-        {label}
-      </text>
-    </g>
-  )
+function chipTextOf(tasks: number, expired: number): string {
+  const parts: string[] = []
+  if (tasks > 0) parts.push(`${tasks} ${tasks === 1 ? 'task' : 'tasks'}`)
+  if (expired > 0) parts.push(tasks > 0 ? `+${expired} quiet` : `+${expired} quiet ${expired === 1 ? 'agent' : 'agents'}`)
+  return parts.join(' · ')
 }
 
-/**
- * Chip at the bottom right of a session node: N subagents were dispatched here but their
- * cache has expired, so they are not drawn.
- */
-function ExpiredChip({ count, x, y }: { count: number; x: number; y: number }) {
-  const text = `+${count} quiet ${count === 1 ? 'agent' : 'agents'}`
-  const width = text.length * 6 + 18
+const chipWidthOf = (text: string) => (text ? text.length * 6 + 18 : 0)
+
+/** How many characters of the branch and id fit beside the chip on the card's last row. The most there is room for is 34. */
+function detailRoom(nodeWidth: number, chipText: string): number {
+  if (!chipText) return 34
+  const room = nodeWidth - 8 - chipWidthOf(chipText) - 8 - 16
+  return Math.max(8, Math.min(34, Math.floor(room / 6.7)))
+}
+
+function CardChip({ tasks, expired, nodeWidth, y }: { tasks: number; expired: number; nodeWidth: number; y: number }) {
+  const text = chipTextOf(tasks, expired)
+  const width = chipWidthOf(text)
+  const right = nodeWidth - 8
   return (
     <g aria-hidden="true">
-      <rect x={x - width + 40} y={y} width={width} height={18} rx={9} fill="#00000055" />
-      <text x={x - width / 2 + 40} y={y + 12.5} textAnchor="middle" fill="#CFEFDC" className="text-[11px]">
+      <rect x={right - width} y={y} width={width} height={18} rx={9} fill="#00000055" />
+      <text x={right - width / 2} y={y + 12.5} textAnchor="middle" fill="#CFEFDC" className="text-[11px]">
         {text}
       </text>
     </g>
@@ -651,6 +654,7 @@ function SessionLines({
   pulse,
   agents,
   waitingOnAgents,
+  detailChars,
 }: {
   sessionTitle: string
   look: Look
@@ -665,6 +669,8 @@ function SessionLines({
   /** Subagents working now, and whether this session is just waiting for them. */
   agents: number
   waitingOnAgents: boolean
+  /** How many characters of the branch and id fit beside the card's chip. */
+  detailChars: number
 }) {
   const wordWidth = look.word.length * 6.6 + 16
   // Only a session that is just waiting on its agents swaps its message count for that; otherwise the flowing lines already show them.
@@ -686,7 +692,7 @@ function SessionLines({
       </text>
       {detail && (
         <text x={16} y={82} fill={look.sub} opacity={0.85} className="font-mono text-[11px]">
-          {truncateLabel(detail, 34)}
+          {truncateLabel(detail, detailChars)}
         </text>
       )}
     </>

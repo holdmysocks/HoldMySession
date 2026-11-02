@@ -219,6 +219,43 @@ describe('MapCanvas borders and expired subagents', () => {
     expect(container.querySelector('[aria-hidden="true"]')!.textContent).toBe('+2 quiet agents')
   })
 
+  it('draws one chip, not two on top of each other, for a session with running tasks and quiet agents', () => {
+    const container = renderInputs([{ ...input('aaaaaaaa-1111', [agent, { ...agent, agentId: 'agent-2' }]), backgroundTaskCount: 1 }])
+    expect(screen.getByText('1 task · +2 quiet')).toBeTruthy()
+    expect(screen.queryByText('+2 quiet agents')).toBeNull()
+    // One chip: a single rounded background, drawn in the card's bottom right corner.
+    const chips = Array.from(container.querySelectorAll('g[aria-hidden="true"] rect[rx="9"]'))
+    expect(chips).toHaveLength(1)
+    const width = Number(chips[0].getAttribute('width'))
+    const x = Number(chips[0].getAttribute('x'))
+    expect(x + width).toBe(280 - 8)
+    // Short enough to stay clear of the branch and id on the left of the card.
+    expect(x).toBeGreaterThan(140)
+  })
+
+  it('shortens a long branch so it ends before the chip on the same row', () => {
+    const long = { branch: 'feature/a-very-long-branch-name-for-testing' }
+    const container = renderInputs([{ ...input('aaaaaaaa-1111', [agent, { ...agent, agentId: 'agent-2' }], [], long), backgroundTaskCount: 1 }])
+    const chip = container.querySelector('g[aria-hidden="true"] rect[rx="9"]')!
+    const detail = Array.from(container.querySelectorAll('text')).find((el) => el.getAttribute('class')?.includes('font-mono'))!
+    expect(detail.textContent).toMatch(/…$/)
+    // About 6.7px a character, starting 16px in, and it has to stop short of the chip.
+    expect(16 + detail.textContent!.length * 6.7).toBeLessThan(Number(chip.getAttribute('x')))
+  })
+
+  it('keeps the whole branch when there is no chip', () => {
+    const container = renderInputs([input('aaaaaaaa-1111', [agent], [['agent-1', Date.now()]], { branch: 'feature/long-branch' })])
+    const detail = Array.from(container.querySelectorAll('text')).find((el) => el.getAttribute('class')?.includes('font-mono'))!
+    expect(detail.textContent).toBe('feature/long-branch · aaaaaaaa')
+  })
+
+  it('says how many tasks run, on its own, with the chip in the same corner', () => {
+    const container = renderInputs([{ ...input('aaaaaaaa-1111', []), backgroundTaskCount: 2 }])
+    expect(screen.getByText('2 tasks')).toBeTruthy()
+    const chip = container.querySelector('g[aria-hidden="true"] rect[rx="9"]')!
+    expect(Number(chip.getAttribute('x')) + Number(chip.getAttribute('width'))).toBe(280 - 8)
+  })
+
   it('shows no chip when every subagent is running', () => {
     renderInputs([input('aaaaaaaa-1111', [agent], [['agent-1', Date.now()]])])
     expect(screen.queryByText(/^\+\d+ quiet/)).toBeNull()
