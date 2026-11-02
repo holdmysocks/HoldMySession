@@ -5,13 +5,12 @@ import type { SessionStatus } from '@/lib/status/session-status'
 import { formatAgo, formatDuration, formatTokenCount } from '@/lib/utils/format'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { SourceBadge } from '@/components/ui/SourceBadge'
-import { STATUS_PULSE } from '@/components/ui/session-status-style'
 import { describeWaiting } from '@/lib/map/waiting'
 import { StatusBadge } from './StatusBadge'
 import { RunningTimer } from './RunningTimer'
 
 /** The columns of a session row, shared with the list's header so they line up. */
-export const SESSION_COLUMNS = 'md:grid md:grid-cols-[110px_minmax(0,1fr)_150px_70px_80px_90px_100px] md:items-center md:gap-x-5'
+export const SESSION_COLUMNS = 'md:grid md:grid-cols-[130px_minmax(0,1fr)_150px_70px_80px_90px_100px] md:items-center md:gap-x-5'
 
 /** One session as a ruled row. A session of another machine shows where it ran. A session waiting on the user is outlined in amber. */
 export function SessionCard({
@@ -38,8 +37,8 @@ export function SessionCard({
       params={{ sessionId: session.sessionId }}
       search={{ project: session.projectKey, machine: session.machine?.id }}
       className={`group block gap-y-2 border-b border-[color:var(--hms-rule)] px-3.5 py-4 transition-colors hover:bg-[color:var(--hms-track)] ${SESSION_COLUMNS} ${
-        waiting ? 'status-pulse-needs-you rounded-2xl border border-yellow-400 bg-yellow-400/10' : ''
-      } ${STATUS_PULSE[status] && !waiting ? STATUS_PULSE[status] : ''}`}
+        waiting ? 'rounded-2xl border border-yellow-400 bg-yellow-400/10' : ''
+      }`}
       data-status={status}
       data-machine={session.machine?.id}
     >

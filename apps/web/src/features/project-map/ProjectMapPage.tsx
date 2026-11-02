@@ -1,5 +1,5 @@
 import { PillSelect } from '@/components/ui/PillSelect'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { applyCustomPositions, layoutProjectMap, type NodePositions } from '@/lib/map/layout'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
@@ -44,6 +44,14 @@ export function ProjectMapPage({ project, session, onProjectChange }: ProjectMap
   const [selectedId, setSelectedId] = useState<string | null>(session ? `session:${session}` : null)
   const [editMode, setEditMode] = useState(false)
   const [panelsHidden, setPanelsHidden] = useState(false)
+  // The map can fill the whole window. Escape puts it back.
+  const [expanded, setExpanded] = useState(false)
+  useEffect(() => {
+    if (!expanded) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setExpanded(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [expanded])
   // In editor mode cards snap to a grid. Holding Alt while dragging places one freely.
   const [snapToGrid, setSnapToGrid] = useState(true)
   // Card positions from the editor. They belong to a project and are saved on the server.
@@ -137,12 +145,14 @@ export function ProjectMapPage({ project, session, onProjectChange }: ProjectMap
     const at = waiting.findIndex((n) => n.id === selectedId)
     setSelectedId(waiting[(at + 1) % waiting.length].id)
   }
+  // The page's words and buttons stay in a readable column. The map itself runs the full width of the screen.
+  const column = 'mx-auto w-full max-w-[1228px]'
   const pill =
     'inline-flex min-h-11 items-center rounded-full border border-[color:var(--hms-line)] bg-transparent px-[18px] font-medium text-gray-100 hover:border-gray-500'
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className={`${column} flex flex-wrap items-end justify-between gap-3`}>
         <div className="min-w-0">
           <h1 className="m-0 truncate font-display text-[32px] font-bold leading-[1.05] sm:text-[44px]">{projectTitle}</h1>
           <div className="mt-1.5 flex flex-wrap gap-x-3.5 gap-y-1 text-[13px] text-[color:var(--hms-mute)]">
@@ -179,13 +189,16 @@ export function ProjectMapPage({ project, session, onProjectChange }: ProjectMap
               Reset layout
             </button>
           )}
+          <button type="button" aria-pressed={expanded} onClick={() => setExpanded(true)} className={pill}>
+            Full screen
+          </button>
           <button type="button" aria-pressed={panelsHidden} onClick={() => setPanelsHidden((hidden) => !hidden)} className={pill}>
             {panelsHidden ? 'Show panels' : 'Hide panels'}
           </button>
         </div>
       </div>
       {(editMode || saveFailed) && (
-        <p className="-mt-2 text-xs text-[color:var(--hms-mute)]">
+        <p className={`${column} -mt-2 text-xs text-[color:var(--hms-mute)]`}>
           {editMode
             ? 'Drag a card to move it. It snaps to the grid, and holding Alt places it freely. Ctrl-click cards, or hold Ctrl and drag over empty space, to select several and move them together. Drag empty space to pan, scroll to zoom, arrow keys nudge. Your layout is saved on the server and follows you to other devices.'
             : ''}
@@ -195,7 +208,7 @@ export function ProjectMapPage({ project, session, onProjectChange }: ProjectMap
 
       <section
         aria-label="Project map"
-        className="relative flex min-w-0 flex-col overflow-hidden rounded-[32px] border border-[color:var(--hms-rule)]"
+        className={`relative flex min-w-0 flex-col overflow-hidden rounded-[32px] border border-[color:var(--hms-rule)] ${expanded ? 'fixed inset-3 z-40 bg-gray-950' : ''}`}
         style={{ background: 'radial-gradient(500px 260px at 40% 20%, var(--hms-glow), transparent), var(--color-gray-900)' }}
       >
         {mapQuery.isLoading || layoutLoading ? (
@@ -207,7 +220,7 @@ export function ProjectMapPage({ project, session, onProjectChange }: ProjectMap
             <div className="md:hidden">
               <MapTree nodes={layout.nodes} selectedId={selectedId} onSelect={setSelectedId} />
             </div>
-            <div className={`hidden md:block ${panelsHidden ? 'h-[calc(100vh-18rem)] min-h-[28rem]' : 'h-[calc(100vh-24rem)] min-h-[24rem]'}`}>
+            <div className={`hidden md:block ${expanded ? 'h-full flex-1' : panelsHidden ? 'h-[calc(100vh-14rem)] min-h-[32rem]' : 'h-[calc(100vh-18rem)] min-h-[32rem]'}`}>
               <MapCanvas
                 key={selectedValue}
                 layout={layout}
@@ -221,6 +234,16 @@ export function ProjectMapPage({ project, session, onProjectChange }: ProjectMap
           </>
         ) : (
           <p className="py-12 text-center text-sm text-gray-500">This project has no sessions yet.</p>
+        )}
+
+        {expanded && (
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="absolute right-4 top-4 z-20 inline-flex min-h-11 items-center rounded-full border border-[color:var(--hms-line)] bg-gray-900 px-[18px] text-sm font-medium text-gray-100 hover:border-gray-500"
+          >
+            Close, or press Esc
+          </button>
         )}
 
         {first && (
@@ -247,7 +270,7 @@ export function ProjectMapPage({ project, session, onProjectChange }: ProjectMap
 
       {!panelsHidden && (
         <>
-          <div className="flex flex-wrap items-stretch gap-6">
+          <div className={`${column} flex flex-wrap items-stretch gap-6`}>
             <NeedsYouPanel nodes={nodes} onSelect={setSelectedId} selectedId={selectedId} />
             <NodeDetailPanel
               node={selectedNode}
@@ -256,11 +279,13 @@ export function ProjectMapPage({ project, session, onProjectChange }: ProjectMap
               onNext={waiting.length > 1 ? nextWaiting : undefined}
             />
           </div>
-          <HookEventsPanel events={eventsQuery.data} />
+          <div className={column}>
+            <HookEventsPanel events={eventsQuery.data} />
+          </div>
         </>
       )}
 
-      <p className="text-xs text-[color:var(--hms-mute)]">
+      <p className={`${column} text-xs text-[color:var(--hms-mute)]`}>
         {hiddenNoProjectCount} hidden (no project) · {hiddenArchivedCount} archived hidden · {expiredSubagentsLabel(expiredSubagentTotal)}
       </p>
     </div>

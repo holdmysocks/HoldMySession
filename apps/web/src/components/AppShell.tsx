@@ -83,6 +83,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const updateReady = !!update?.available && !!update.latest
 
   const column = 'mx-auto w-full max-w-[1228px] px-4 sm:px-6'
+  // The map uses the whole width of the screen, so there is room to see it and zoom in. The bar above and the other pages keep their column.
+  const wide = currentPath.startsWith('/map')
+  const mainColumn = wide ? 'w-full px-4 sm:px-6' : column
 
   return (
     <div
@@ -118,7 +121,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className={`${column} min-w-0 flex-1 pb-28 pt-10 md:pb-12 md:pt-14`}>{children}</main>
+      <main className={`${mainColumn} min-w-0 flex-1 pb-28 pt-10 md:pb-12 md:pt-14`}>{children}</main>
 
       <footer className={`${column} hidden pb-6 text-xs text-gray-500 md:block`}>
         <div className="flex items-center justify-between gap-3 border-t border-gray-800 pt-4">
