@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { copyText } from '@/lib/utils/copy-text'
 import { Link } from '@tanstack/react-router'
 import type { SessionSummary } from '@/lib/parsers/types'
 import type { SessionStatus } from '@/lib/status/session-status'
@@ -109,12 +110,13 @@ function SessionIdCopyRow({ sessionId }: { sessionId: string }) {
     e.stopPropagation()
     e.preventDefault()
     try {
-      await navigator.clipboard.writeText(`claude --resume ${sessionId}`)
-      setCopied(true)
-      clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => setCopied(false), 2000)
+      if (await copyText(`claude --resume ${sessionId}`)) {
+        setCopied(true)
+        clearTimeout(timerRef.current)
+        timerRef.current = setTimeout(() => setCopied(false), 2000)
+      }
     } catch {
-      // Clipboard API unavailable: silently fail
+      // Nothing could copy: it stays as it was.
     }
   }
 

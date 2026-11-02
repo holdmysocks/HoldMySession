@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { copyText } from '@/lib/utils/copy-text'
 
 interface SessionIdDisplayProps {
   sessionId: string
@@ -15,12 +16,13 @@ export function SessionIdDisplay({ sessionId, interactive = true }: SessionIdDis
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(`claude --resume ${sessionId}`)
-      setCopied(true)
-      clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => setCopied(false), 2000)
+      if (await copyText(`claude --resume ${sessionId}`)) {
+        setCopied(true)
+        clearTimeout(timerRef.current)
+        timerRef.current = setTimeout(() => setCopied(false), 2000)
+      }
     } catch {
-      // Clipboard API unavailable — silently fail
+      // Nothing could copy: it stays as it was.
     }
   }
 

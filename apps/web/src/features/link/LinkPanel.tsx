@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { copyText } from '@/lib/utils/copy-text'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { clockPattern } from '@/lib/utils/time-format'
@@ -129,10 +130,18 @@ function MasterSection({ state, m, fail }: SectionProps) {
   const [shown, setShown] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const net = state.network
+  const [copyFailed, setCopyFailed] = useState(false)
   const copy = (text: string, label: string) => {
-    void navigator.clipboard?.writeText(text)
-    setCopied(label)
-    setTimeout(() => setCopied((c) => (c === label ? null : c)), 2000)
+    // Called straight from the click, and nothing is awaited before it copies, so a page that is not secure can still do it.
+    void copyText(text).then((ok) => {
+      setCopyFailed(!ok)
+      // The code can be selected by hand instead, so it is shown when copying did not work.
+      if (!ok && label === 'code') setShown(true)
+      if (ok) {
+        setCopied(label)
+        setTimeout(() => setCopied((c) => (c === label ? null : c)), 2000)
+      }
+    })
   }
   const on = state.link.listen === 'network'
   return (
@@ -197,9 +206,14 @@ function MasterSection({ state, m, fail }: SectionProps) {
           <p className="text-[13px] text-[color:var(--hms-mute)]">
             Paste this on a node. It holds every address and the token. Nodes send names, projects, times and token counts, never transcripts.
           </p>
-          <div className="mt-2 max-w-xl truncate font-mono text-[color:var(--hms-mute)]">
+          <div className={`mt-2 max-w-xl font-mono text-[color:var(--hms-mute)] ${shown ? 'select-all break-all' : 'truncate'}`}>
             {net.pairingCode ? (shown ? net.pairingCode : 'hms1-' + '•'.repeat(16)) : 'Not ready yet'}
           </div>
+          {copyFailed && (
+            <p role="alert" className="mt-1.5 text-[13px] text-amber-400">
+              This browser would not copy it. The code is shown above: select it and press Ctrl+C (Cmd+C on a Mac).
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className={button} onClick={() => setShown((s) => !s)}>{shown ? 'Hide' : 'Show'}</button>
