@@ -18,7 +18,7 @@ export function SessionCard({
   status,
   now,
 }: {
-  session: SessionSummary & { machine?: { id: string; name: string } | null; hasOpenQuestion?: boolean; notification?: { message: string | null; type: string | null } | null }
+  session: SessionSummary & { machine?: { id: string; name: string } | null; hasOpenQuestion?: boolean; runningSubagents?: number; notification?: { message: string | null; type: string | null } | null }
   status: SessionStatus
   now: number
 }) {
@@ -27,6 +27,10 @@ export function SessionCard({
   const nameLabel = session.sessionName ? (privacyMode ? anonymizeSessionName(session.sessionName) : session.sessionName) : null
   const displayBranch = session.branch ? anonymizeBranch(session.branch) : null
   const waiting = status === 'needs-you'
+  // A session with agents working is not done. Say what it is doing: waiting on them, or working beside them.
+  const agents = session.runningSubagents ?? 0
+  const quiet = now - new Date(session.lastActiveAt).getTime() > 2 * 60_000
+  const agentsLine = agents > 0 ? `${quiet ? 'Waiting on' : 'Working with'} ${agents} ${agents === 1 ? 'agent' : 'agents'}` : null
   const waitingText = session.hasOpenQuestion
     ? 'Asked you a question'
     : describeWaiting({ notification: session.notification }).text
@@ -62,6 +66,11 @@ export function SessionCard({
           )}
           {session.sourceLabel && <SourceBadge sourceLabel={session.sourceLabel} platform={session.sourcePlatform} />}
         </span>
+        {agentsLine && !waiting && (
+          <span className="mt-1 block text-xs" style={{ color: '#3DDC84' }}>
+            {agentsLine}
+          </span>
+        )}
         {waiting && (
           <span className="mt-1 block text-xs text-yellow-400">
             {waitingText} · waiting {formatDuration(Math.max(0, now - new Date(session.lastActiveAt).getTime()))}

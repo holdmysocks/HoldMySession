@@ -433,7 +433,8 @@ function MapEdgeLine({ edge }: { edge: PositionedEdge }) {
       fill="none"
       strokeWidth={isFork ? 3 : 2.5}
       strokeLinecap="round"
-      strokeDasharray={isFork ? '0.1 7' : undefined}
+      strokeDasharray={isFork ? '0.1 7' : '7 7'}
+      className={isFork ? undefined : 'map-edge-flow'}
       stroke={isFork ? '#3DDC8499' : '#3DDC8477'}
       style={{ filter: 'drop-shadow(0 0 6px #3DDC8455)' }}
     />
@@ -574,6 +575,8 @@ function NodeView({ node, selected, multiSelected, editMode, canMove, onClick, o
           relation={relationTag(node.parentRelation)}
           kind={node.needsYou ? (node.waiting?.kind === 'question' ? 'Question' : node.waiting?.kind === 'plan' ? 'Plan' : node.waiting?.kind === 'permission' ? 'Permission' : 'Waiting') : null}
           pulse={node.status === 'active' || node.status === 'running'}
+          agents={node.runningAgents}
+          waitingOnAgents={node.waitingOnAgents}
         />
       ) : (
         <SubagentLines title={node.title} description={node.subtitle} look={look} pulse={node.status === 'active' || node.status === 'running'} />
@@ -646,6 +649,8 @@ function SessionLines({
   relation,
   kind,
   pulse,
+  agents,
+  waitingOnAgents,
 }: {
   sessionTitle: string
   look: Look
@@ -657,9 +662,14 @@ function SessionLines({
   /** What a needs-you session is waiting for, shown in place of the message count. */
   kind: string | null
   pulse: boolean
+  /** Subagents working now, and whether this session is just waiting for them. */
+  agents: number
+  waitingOnAgents: boolean
 }) {
   const wordWidth = look.word.length * 6.6 + 16
-  const meta = [kind ?? relation, kind ? null : messages, model].filter(Boolean).join(' · ')
+  // Only a session that is just waiting on its agents swaps its message count for that; otherwise the flowing lines already show them.
+  const agentsText = agents > 0 && waitingOnAgents ? `Waiting on ${agents} ${agents === 1 ? 'agent' : 'agents'}` : null
+  const meta = [kind ?? relation, kind ? null : agentsText ?? messages, model].filter(Boolean).join(' · ')
   const detail = [branch, sessionId.slice(0, 8)].filter(Boolean).join(' · ')
   return (
     <>

@@ -128,7 +128,7 @@ describe('MapCanvas', () => {
     renderCanvas(layout)
     expect(screen.getAllByText('Fix the map labels').length).toBeGreaterThan(0)
     expect(screen.getAllByText(/^(IDLE|DONE|RUNNING|NEEDS YOU)$/).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/4 msgs · example-1/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/^Waiting on 1 agent/).length).toBeGreaterThan(0)
     expect(screen.getAllByText('feature/map · aaaaaaaa').length).toBeGreaterThan(0)
   })
 

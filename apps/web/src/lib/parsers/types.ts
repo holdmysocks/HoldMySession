@@ -15,6 +15,8 @@ export interface SessionSummary {
   userMessageCount: number
   assistantMessageCount: number
   isActive: boolean
+  /** Subagents of this session that are working now. The session is not done while there are any. */
+  runningSubagents?: number
   toolCallCount: number
   model: string | null
   version: string | null

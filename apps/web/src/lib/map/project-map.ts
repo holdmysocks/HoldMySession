@@ -69,6 +69,10 @@ export interface MapNode {
   pendingQuestions: PendingQuestion[]
   /** For a session that needs the user: what it is waiting for. Null otherwise. */
   waiting: WaitingInfo | null
+  /** Session nodes: subagents working now (the ones drawn under it). 0 for subagent nodes. */
+  runningAgents: number
+  /** Session nodes: the session itself has been quiet for a while, so it is waiting on its agents rather than working beside them. */
+  waitingOnAgents: boolean
 }
 
 export interface MapEdge {
@@ -116,11 +120,15 @@ export function tokenTotal(usage: TokenUsage | undefined): number {
   )
 }
 
+/** A session whose own transcript has not been written for this long, and has agents working, is waiting on them. */
+const PARENT_QUIET_MS = 2 * 60_000
+
 /** Session status for one map input. The pending question and notification come from the server. */
 export function sessionStatus(input: MapSessionInput, nowMs: number): SessionStatus {
   return deriveSessionStatus(
     {
-      isActive: input.summary.isActive,
+      // A session with agents still working is not done, even when its own transcript has gone quiet.
+      isActive: input.summary.isActive || input.agents.length - expiredSubagentCount(input, nowMs) > 0,
       lastActiveAt: input.summary.lastActiveAt,
       lastStopReason: input.summary.lastStopReason,
       lastNotificationAt: input.lastNotificationAt,
@@ -177,6 +185,7 @@ function sessionNode(
   relation: ParentRelation | null,
   nowMs: number,
   expiredSubagentCount: number,
+  runningAgents: number,
 ): MapNode {
   const { summary } = input
   const status = sessionStatus(input, nowMs)
@@ -204,6 +213,8 @@ function sessionNode(
       status === 'needs-you'
         ? describeWaiting({ question: input.pendingQuestions[0]?.questions[0]?.question, notification: input.notification })
         : null,
+    runningAgents,
+    waitingOnAgents: runningAgents > 0 && nowMs - Date.parse(summary.lastActiveAt) > PARENT_QUIET_MS,
   }
 }
 
@@ -248,6 +259,8 @@ function subagentNode(sessionId: string, agent: AgentInvocation, index: number):
     timestamp: agent.timestamp,
     pendingQuestions: [],
     waiting: null,
+    runningAgents: 0,
+    waitingOnAgents: false,
   }
 }
 
@@ -271,7 +284,7 @@ export function buildProjectMap(
     const sid = input.summary.sessionId
     const link = parentOf.get(sid)
     const parentId = link ? `session:${link.parentSessionId}` : null
-    const node = sessionNode(input, parentId, link?.relation ?? null, nowMs, expiredSubagentCount(input, nowMs))
+    const node = sessionNode(input, parentId, link?.relation ?? null, nowMs, expiredSubagentCount(input, nowMs), input.agents.length - expiredSubagentCount(input, nowMs))
     nodes.push(node)
     if (parentId) {
       edges.push({ id: `edge:${node.id}`, from: parentId, to: node.id, kind: 'fork' })

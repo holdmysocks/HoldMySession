@@ -43,8 +43,12 @@ export function MapTree({
         const look = LOOK[node.status]
         const isSession = node.kind === 'session'
         const title = isSession && privacyMode ? anonymizeSessionName(node.title) : node.title
+        const agentsText =
+          node.runningAgents > 0
+            ? `${node.waitingOnAgents ? 'Waiting on ' : ''}${node.runningAgents} ${node.runningAgents === 1 ? 'agent' : 'agents'}${node.waitingOnAgents ? '' : ' running'}`
+            : null
         const meta = isSession
-          ? [node.subtitle.split('·')[1]?.trim(), shortModelName(node.model)].filter(Boolean).join(' · ')
+          ? [agentsText ?? node.subtitle.split('·')[1]?.trim(), shortModelName(node.model)].filter(Boolean).join(' · ')
           : truncateLabel(node.subtitle, 40)
         return (
           <button

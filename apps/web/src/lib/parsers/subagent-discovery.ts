@@ -99,3 +99,19 @@ export async function readSubagentLastActivity(sessionDir: string): Promise<Map<
   }
   return times
 }
+
+/**
+ * How many subagents of a session are running: transcripts with a record inside `windowMs`. A transcript that has not been
+ * touched for longer than the window cannot hold such a record, so only the recently written ones are read.
+ */
+export async function countRunningSubagents(sessionDir: string, nowMs: number = Date.now(), windowMs: number = 5 * 60_000): Promise<number> {
+  const files = await discoverSubagentFiles(sessionDir)
+  let running = 0
+  for (const filePath of files.values()) {
+    const stat = await fs.promises.stat(filePath).catch(() => null)
+    if (!stat || nowMs - stat.mtimeMs > windowMs + 60_000) continue
+    const time = await readLastRecordTime(filePath)
+    if (time !== undefined && nowMs - time <= windowMs) running += 1
+  }
+  return running
+}

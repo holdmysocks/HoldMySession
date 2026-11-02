@@ -167,3 +167,20 @@ optgroup {
   background-color: var(--color-gray-900);
   color: var(--hms-ink);
 }
+
+/* A line from a session to an agent that is working flows toward the agent. Still under reduced motion. */
+@keyframes mapEdgeFlow {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+.map-edge-flow {
+  animation: mapEdgeFlow 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-edge-flow {
+    animation: none;
+  }
+}

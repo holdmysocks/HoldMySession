@@ -55,7 +55,11 @@ export function NodeDetailPanel({
         {project && <p className="mt-0.5 truncate text-xs text-[color:var(--hms-mute)]">{project}</p>}
         {!isSession && node.subtitle && <p className="mt-0.5 line-clamp-2 text-xs text-[color:var(--hms-mute)]">{node.subtitle}</p>}
         <div className={`mt-1.5 text-sm ${node.needsYou ? 'text-[#FFD25A]' : 'text-[color:var(--hms-mute)]'}`}>
-          {node.needsYou ? `${node.waiting?.text ?? 'Waiting on you'} · ${waitingFor(node, now)}` : statusLabel(node.status)}
+          {node.needsYou
+            ? `${node.waiting?.text ?? 'Waiting on you'} · ${waitingFor(node, now)}`
+            : node.runningAgents > 0
+              ? `${node.waitingOnAgents ? 'Waiting on' : 'Working with'} ${node.runningAgents} ${node.runningAgents === 1 ? 'agent' : 'agents'}`
+              : statusLabel(node.status)}
         </div>
       </div>
 
