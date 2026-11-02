@@ -5,12 +5,13 @@
 // The same program also answers Claude Code's hooks, so the hook commands need nothing but this file:
 //   --holdmysession-notify   record a Notification or Stop event (reads the hook's JSON on stdin), then exit
 //   --holdmysession-start    start the app in the background if it is not running, then exit
+//   --holdmysession-statusline  Claude Code's status line: record the subscription limits it reports, print a status line
 //   --background             start in the tray without opening the window
 
 const { app, BrowserWindow, Tray, Menu, nativeImage, shell, dialog, Notification } = require('electron');
 const path = require('node:path');
 const net = require('node:net');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const os = require('node:os');
 const { pathToFileURL } = require('node:url');
 const { createUpdater } = require('./updater.cjs');
@@ -21,6 +22,7 @@ const args = process.argv.slice(1);
 const flag = (name) => args.includes(name);
 const NOTIFY = flag('--holdmysession-notify');
 const START = flag('--holdmysession-start');
+const STATUSLINE = flag('--holdmysession-statusline');
 const BACKGROUND = flag('--background');
 
 // The server, hook script and built pages. Packaged, they sit next to this file. From a checkout, in apps/web.
@@ -64,7 +66,25 @@ async function runStartHook() {
   app.exit(0);
 }
 
-if (NOTIFY || START) {
+// The status line has to print to the output Claude Code reads, which this program may not have as its own on
+// Windows. So the script runs as a plain Node program that inherits the input and output as they were given.
+function runStatusline() {
+  try {
+    spawnSync(process.execPath, [path.join(WEB_DIR, 'bin', 'holdmysession-statusline.mjs')], {
+      stdio: 'inherit',
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+      windowsHide: true,
+      timeout: 8000,
+    });
+  } catch {
+    // A broken status line must not affect the Claude Code session.
+  }
+  app.exit(0);
+}
+
+if (STATUSLINE) {
+  runStatusline();
+} else if (NOTIFY || START) {
   app.whenReady().then(NOTIFY ? runNotifyHook : runStartHook);
 } else {
   runApp();
