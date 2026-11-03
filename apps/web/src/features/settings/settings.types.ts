@@ -22,6 +22,13 @@ export const AutoScanSchema = z.object({
 })
 
 /** Whether this install is a node (the default, working on its own or sending to a master) or a master. */
+/** The quit-when-idle choice a master holds for one of its nodes, applied the next time that node syncs. */
+export const NodeIdleSchema = z.object({
+  quit: z.boolean(),
+  minutes: z.union([z.literal(10), z.literal(30), z.literal(60), z.literal(120)]),
+  updatedAt: z.string(),
+})
+
 export const LinkSchema = z.object({
   role: z.enum(['node', 'master']).default('node'),
   /** Node: the master's address, as typed. Any address that reaches it works, local or tailnet. */
@@ -34,6 +41,8 @@ export const LinkSchema = z.object({
   nodeToken: z.string().default(''),
   /** Whether the server listens only on this computer, or on the network. Applied when the server starts. */
   listen: z.enum(['local', 'network']).default('local'),
+  /** Master: the quit-when-idle choice for each node, by machine id. */
+  nodeIdle: z.record(z.string(), NodeIdleSchema).default({}),
 })
 
 /** What to do with sessions that ran in a scratch folder (or have no folder): list them, group them, or leave them out of lists. */
@@ -66,10 +75,13 @@ export const LimitsSchema = z.object({
 export const IDLE_MINUTES = [10, 30, 60, 120] as const
 
 export const IdleSchema = z.object({
-  /** Desktop app: quit after Claude Code has gone unused, and start again with the next session or message. */
+  /** Desktop app: quit after Claude Code has gone unused, and start again with the next session or message. A master never does. */
   quit: z.boolean().default(true),
   minutes: z.union([z.literal(10), z.literal(30), z.literal(60), z.literal(120)]).default(30),
+  /** When this was last changed, here or from the master, as an ISO time. The later change wins. */
+  updatedAt: z.string().optional(),
 })
+
 
 export const SettingsSchema = z.object({
   version: z.literal(1),
@@ -88,7 +100,7 @@ export const SettingsSchema = z.object({
   idle: IdleSchema.default({ quit: true, minutes: 30 }),
   /** Desktop app: show the window when the Claude Code start hook starts the app. Off: it goes straight to the tray. */
   showWindowOnHookStart: z.boolean().default(false),
-  link: LinkSchema.default({ role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' }),
+  link: LinkSchema.default({ role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local', nodeIdle: {} }),
   projects: ProjectsSchema.default({ scratch: 'group', scratchByName: false, hidden: [] }),
   pricingOverrides: z
     .record(z.string(), ModelPricingOverrideSchema)
@@ -114,6 +126,7 @@ export type AutoScanSetting = z.infer<typeof AutoScanSchema>
 export type LinkSetting = z.infer<typeof LinkSchema>
 export type LimitsSetting = z.infer<typeof LimitsSchema>
 export type IdleSetting = z.infer<typeof IdleSchema>
+export type NodeIdleSetting = z.infer<typeof NodeIdleSchema>
 export type FiveHourMode = (typeof FIVE_HOUR_MODES)[number]
 export type ProjectsSetting = z.infer<typeof ProjectsSchema>
 export type ScratchMode = (typeof SCRATCH_MODES)[number]
@@ -342,7 +355,7 @@ export const DEFAULT_SETTINGS: Settings = {
   limits: { fiveHour: 'auto', alerts: true },
   idle: { quit: true, minutes: 30 },
   showWindowOnHookStart: false,
-  link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' },
+  link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local', nodeIdle: {} },
   projects: { scratch: 'group', scratchByName: false, hidden: [] },
   pricingOverrides: {},
   dataSources: [],

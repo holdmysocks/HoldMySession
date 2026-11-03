@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { PillSelect } from '@/components/ui/PillSelect'
 import { copyText } from '@/lib/utils/copy-text'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
@@ -111,6 +112,7 @@ export function LinkPanel() {
                   </button>
                 )}
               </div>
+              <IdleControl machine={x} onChange={(change) => m.idle.mutate({ data: { machineId: x.machineId, ...change } }, { onError: fail })} busy={m.idle.isPending} />
             </div>
           ))}
         </section>
@@ -230,6 +232,47 @@ function MasterSection({ state, m, fail }: SectionProps) {
         </div>
       </section>
     </>
+  )
+}
+
+const IDLE_OPTIONS = [
+  { value: '10', label: 'After 10 minutes' },
+  { value: '30', label: 'After 30 minutes' },
+  { value: '60', label: 'After 1 hour' },
+  { value: '120', label: 'After 2 hours' },
+]
+
+/**
+ * Whether a machine quits when Claude Code has gone unused, and after how long. This machine changes at once. For a node, the
+ * master keeps the choice and the node takes it the next time it syncs, so it also works for one that has quit.
+ */
+function IdleControl({ machine, onChange, busy }: { machine: LinkState['machines'][number]; onChange: (change: { quit?: boolean; minutes?: 10 | 30 | 60 | 120 }) => void; busy: boolean }) {
+  if (machine.staysRunning) {
+    return <div className="w-full text-[13px] text-[color:var(--hms-mute)]">Stays running, so its nodes can reach it.</div>
+  }
+  if (!machine.idle) {
+    return <div className="w-full text-[13px] text-[color:var(--hms-mute)]">Quit when idle: not reported yet. It appears after this machine updates and syncs.</div>
+  }
+  const { quit, minutes, pending } = machine.idle
+  return (
+    <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 text-[13px]">
+      <span className="text-[color:var(--hms-mute)]">Quit when Claude Code is not in use</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={quit}
+        aria-label={`Quit when idle on ${machine.name}`}
+        disabled={busy}
+        onClick={() => onChange({ quit: !quit })}
+        className={`relative inline-flex h-[26px] w-[46px] shrink-0 cursor-pointer items-center rounded-full border-[1.5px] transition-colors disabled:opacity-50 ${quit ? 'border-brand-400 bg-brand-400/20' : 'border-[color:var(--hms-line)]'}`}
+      >
+        <span className={`inline-block h-[17px] w-[17px] rounded-full transition-transform ${quit ? 'translate-x-[22px] bg-brand-400' : 'translate-x-[3px] bg-gray-400'}`} />
+      </button>
+      {quit && (
+        <PillSelect label={`Quit after, on ${machine.name}`} value={String(minutes)} onChange={(v) => onChange({ minutes: Number(v) as 10 | 30 | 60 | 120 })} options={IDLE_OPTIONS} disabled={busy} />
+      )}
+      {pending && <span className="text-amber-400">Applies when it next connects</span>}
+    </div>
   )
 }
 

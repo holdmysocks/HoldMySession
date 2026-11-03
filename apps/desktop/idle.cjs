@@ -26,19 +26,24 @@ function shouldPoll({ nowMs, lastActivityMs, windowOpen, watching }) {
 
 /**
  * Whether the app should quit for being idle. Only when it is safe: the setting is on, no window is open, nothing is
- * waiting on the user, this computer is not linked to another (a master serves the others, and a node answers its
- * master), and the start hook is installed, so the next Claude session starts the app again.
+ * waiting on the user, this computer is not a master (a master stays running so its nodes can reach it), and the start hook
+ * is installed, so the next Claude session starts the app again. A node may quit: it has sent its sessions to its master,
+ * and the master shows it as offline until it starts again.
  */
-function shouldQuitWhenIdle({ nowMs, lastActivityMs, windowOpen, watching, waitingCount, setting, linked, startHookInstalled }) {
-  if (!setting || !setting.quit || !watching || windowOpen || waitingCount > 0 || linked || !startHookInstalled) return false;
+function shouldQuitWhenIdle({ nowMs, lastActivityMs, windowOpen, watching, waitingCount, setting, master, startHookInstalled }) {
+  if (!setting || !setting.quit || !watching || windowOpen || waitingCount > 0 || master || !startHookInstalled) return false;
   const minutes = QUIT_AFTER_MINUTES.includes(setting.minutes) ? setting.minutes : 30;
   return nowMs - lastActivityMs >= (Number(process.env.HOLDMYSESSION_IDLE_MS) || minutes * 60_000);
 }
 
-/** Whether this computer is linked to another one, as a master with nodes or as a node with a master. */
-function isLinked(link) {
-  if (!link) return false;
-  if (link.role === 'master') return true;
+/** Whether this computer is a master, which stays running so its nodes can reach it. */
+function isMaster(link) {
+  return Boolean(link) && link.role === 'master';
+}
+
+/** Whether this computer is a node with a master to send its sessions to. */
+function isLinkedNode(link) {
+  if (!link || link.role === 'master') return false;
   return Boolean(link.masterUrl) || (Array.isArray(link.masterUrls) && link.masterUrls.length > 0);
 }
 
@@ -78,4 +83,4 @@ function newestTranscriptMtime(projectsDir) {
   return newest;
 }
 
-module.exports = { BUSY_MS, QUIT_AFTER_MINUTES, shouldPoll, shouldQuitWhenIdle, isLinked, hasStartHook, newestTranscriptMtime };
+module.exports = { BUSY_MS, QUIT_AFTER_MINUTES, shouldPoll, shouldQuitWhenIdle, isMaster, isLinkedNode, hasStartHook, newestTranscriptMtime };

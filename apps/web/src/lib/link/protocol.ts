@@ -44,6 +44,14 @@ export const MachineInfoSchema = z.object({
   nameUpdatedAt: z.string().max(40),
   appVersion: z.string().max(40).nullable(),
   schemaVersion: z.number().int(),
+  /** The node's quit-when-idle choice, so the master can show it. Absent from a node that predates it. */
+  idle: z
+    .object({
+      quit: z.boolean(),
+      minutes: z.union([z.literal(10), z.literal(30), z.literal(60), z.literal(120)]),
+      updatedAt: z.string().max(40).optional(),
+    })
+    .optional(),
 })
 
 export const PushSchema = z.object({
@@ -73,4 +81,6 @@ export interface PushResponse {
   nameUpdatedAt: string
   masterName: string
   shared: SharedPayload
+  /** What the master holds for this node alone. The node takes it if it is newer than its own. */
+  nodeSettings?: { idle?: { quit: boolean; minutes: 10 | 30 | 60 | 120; updatedAt: string } }
 }

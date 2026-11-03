@@ -13,6 +13,10 @@ export interface MachineSummary {
   sessions: number
   /** Connected to this master right now, so its live data can be asked for. */
   online: boolean
+  /** Its quit-when-idle choice, for this machine as it is and for a node as it last reported, or as this master has since set it. Null when unknown. */
+  idle: { quit: boolean; minutes: 10 | 30 | 60 | 120; pending: boolean } | null
+  /** This machine is a master, which stays running so its nodes can reach it, whatever the choice says. */
+  staysRunning: boolean
 }
 
 export interface LinkState {
@@ -70,6 +74,8 @@ async function readState(): Promise<LinkState> {
   const { isLinkedNode } = await import('@/lib/link/shared')
   const { linkStatus } = await import('@/lib/link/node-sync')
   const { isOnline, touchActivity } = await import('@/lib/link/channel')
+  const { reportedIdle } = await import('@/lib/link/receive')
+  const { nodeIdleView } = await import('@/lib/link/idle-policy')
   const { machineAddresses, makePairingCode } = await import('@/lib/link/addresses')
   const { firewallState } = await import('@/lib/link/firewall')
   const { desktopBridge } = await import('@/lib/desktop-bridge')
@@ -87,6 +93,10 @@ async function readState(): Promise<LinkState> {
       machines: listMachines(db).map((m) => ({
         machineId: m.machineId, name: m.name, isSelf: m.isSelf, appVersion: m.appVersion, lastSeenAt: m.lastSeenAt, sessions: m.sessions,
         online: m.isSelf || isOnline(m.machineId),
+        idle: m.isSelf
+          ? { quit: settings.idle.quit, minutes: settings.idle.minutes, pending: false }
+          : nodeIdleView(reportedIdle(db, m.machineId), settings.link.nodeIdle[m.machineId]),
+        staysRunning: m.isSelf && settings.link.role === 'master',
       })),
       network: networkState(settings.link, { machineAddresses, makePairingCode, firewallState, canRestart: desktopBridge() !== null }),
       sync: linkStatus(db),
@@ -264,6 +274,40 @@ export const renameMachineName = createServerFn({ method: 'POST' })
     return readState()
   })
 
+/**
+ * Sets whether a machine quits when Claude Code has gone unused, and after how long. For this machine it takes effect at once.
+ * A master sets it for a node by keeping the choice, which the node takes the next time it syncs, even if it has quit by then,
+ * and a change made on the node afterwards wins over it. A master itself never quits.
+ */
+export const setMachineIdle = createServerFn({ method: 'POST' })
+  .validator((input: unknown) =>
+    z.object({ machineId: z.string().min(1), quit: z.boolean().optional(), minutes: z.union([z.literal(10), z.literal(30), z.literal(60), z.literal(120)]).optional() }).parse(input),
+  )
+  .handler(async ({ data }): Promise<LinkState> => {
+    const { readSettingsFile, writeSettingsFile } = await import('@/lib/settings-file')
+    const { openHistoryDb } = await import('@/lib/history/history-db')
+    const { selfMachineId } = await import('@/lib/link/machines')
+    const { reportedIdle } = await import('@/lib/link/receive')
+    const { nodeIdleView } = await import('@/lib/link/idle-policy')
+    const settings = readSettingsFile()
+    const now = new Date().toISOString()
+    const db = openHistoryDb()
+    try {
+      if (data.machineId === selfMachineId(db)) {
+        if (settings.link.role === 'master') throw new Error('A master stays running so its nodes can reach it.')
+        writeSettingsFile({ ...settings, idle: { quit: data.quit ?? settings.idle.quit, minutes: data.minutes ?? settings.idle.minutes, updatedAt: now } })
+      } else {
+        if (settings.link.role !== 'master') throw new Error('Only a master can set this for another machine.')
+        const current = nodeIdleView(reportedIdle(db, data.machineId), settings.link.nodeIdle[data.machineId]) ?? { quit: true, minutes: 30 as const }
+        const nodeIdle = { ...settings.link.nodeIdle, [data.machineId]: { quit: data.quit ?? current.quit, minutes: data.minutes ?? current.minutes, updatedAt: now } }
+        writeSettingsFile({ ...settings, link: { ...settings.link, nodeIdle } })
+      }
+    } finally {
+      db.close()
+    }
+    return readState()
+  })
+
 export const removeLinkedMachine = createServerFn({ method: 'POST' })
   .validator((input: unknown) => z.object({ machineId: z.string().min(1), deleteData: z.boolean() }).parse(input))
   .handler(async ({ data }): Promise<LinkState> => {
@@ -274,6 +318,14 @@ export const removeLinkedMachine = createServerFn({ method: 'POST' })
     const db = openHistoryDb()
     try {
       removeMachine(db, data.machineId, data.deleteData)
+      // What this master held for the node goes with it.
+      const { readSettingsFile: read, writeSettingsFile: write } = await import('@/lib/settings-file')
+      const current = read()
+      if (current.link.nodeIdle[data.machineId]) {
+        const { [data.machineId]: _gone, ...rest } = current.link.nodeIdle
+        void _gone
+        write({ ...current, link: { ...current.link, nodeIdle: rest } })
+      }
     } finally {
       db.close()
     }

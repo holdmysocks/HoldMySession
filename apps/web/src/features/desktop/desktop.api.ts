@@ -34,10 +34,10 @@ export const setOpenAtLogin = createServerFn({ method: 'POST' })
  */
 export const setIdleQuit = createServerFn({ method: 'POST' })
   .validator((input: unknown) => z.object({ quit: z.boolean().optional(), minutes: z.union([z.literal(10), z.literal(30), z.literal(60), z.literal(120)]).optional() }).parse(input))
-  .handler(async ({ data }): Promise<{ quit: boolean; minutes: 10 | 30 | 60 | 120 }> => {
+  .handler(async ({ data }): Promise<{ quit: boolean; minutes: 10 | 30 | 60 | 120; updatedAt: string }> => {
     const { readSettingsFile, writeSettingsFile } = await import('@/lib/settings-file')
     const current = readSettingsFile()
-    const idle = { quit: data.quit ?? current.idle.quit, minutes: data.minutes ?? current.idle.minutes }
+    const idle = { quit: data.quit ?? current.idle.quit, minutes: data.minutes ?? current.idle.minutes, updatedAt: new Date().toISOString() }
     writeSettingsFile({ ...current, idle })
     return idle
   })

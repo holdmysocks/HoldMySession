@@ -1,7 +1,9 @@
 import type { Db } from '@/lib/history/sqlite'
 import { LATEST_SCHEMA_VERSION, getMeta, setMeta } from '@/lib/history/history-db'
 import type { Settings } from '@/features/settings/settings.types'
+import { readSettingsFile, writeSettingsFile } from '@/lib/settings-file'
 import { isLinkedNode, applyShared } from './shared'
+import { shouldApplyPolicy } from './idle-policy'
 import { selfMachineId } from './machines'
 import { explainConnectionError } from './explain'
 import type { PushResponse, SessionPayload } from './protocol'
@@ -127,6 +129,15 @@ export async function pushToMaster(
   return record(db, outcome)
 }
 
+/** Takes the master's quit-when-idle choice for this node, if the master changed it after this node's own was last changed. */
+function takeMasterIdleChoice(reply: PushResponse): void {
+  const policy = reply.nodeSettings?.idle
+  if (!policy) return
+  const current = readSettingsFile()
+  if (!shouldApplyPolicy(current.idle, policy)) return
+  writeSettingsFile({ ...current, idle: { quit: policy.quit, minutes: policy.minutes, updatedAt: policy.updatedAt } })
+}
+
 async function pushOnce(
   db: Db,
   settings: Settings,
@@ -146,6 +157,7 @@ async function pushOnce(
         body: JSON.stringify({
           machine: {
             machineId, name: String(self.name), nameUpdatedAt: String(self.name_updated_at), appVersion, schemaVersion: LATEST_SCHEMA_VERSION,
+            idle: settings.idle,
           },
           sessions: batch.map((b) => b.payload),
         }),
@@ -167,6 +179,7 @@ async function pushOnce(
       sent += batch.length
 
       applyShared(db, reply.shared)
+      takeMasterIdleChoice(reply)
       if (reply.nameUpdatedAt > String(self.name_updated_at)) {
         db.prepare('UPDATE machines SET name = ?, name_updated_at = ? WHERE machine_id = ?').run(reply.name, reply.nameUpdatedAt, machineId)
       }

@@ -14,6 +14,7 @@ import { Route as DashboardRouteImport } from './routes/_dashboard'
 import { Route as DashboardMapRouteImport } from './routes/_dashboard/map'
 import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
 import { Route as DashboardStatsRouteImport } from './routes/_dashboard/stats'
+import { Route as ApiFlushRouteImport } from './routes/api.flush'
 import { Route as ApiHistoryBackupRouteImport } from './routes/api.history-backup'
 import { Route as ApiHistoryRestoreRouteImport } from './routes/api.history-restore'
 import { Route as ApiLimitsRouteImport } from './routes/api.limits'
@@ -48,6 +49,11 @@ const DashboardStatsRoute = DashboardStatsRouteImport.update({
   id: '/stats',
   path: '/stats',
   getParentRoute: () => DashboardRoute,
+} as any)
+const ApiFlushRoute = ApiFlushRouteImport.update({
+  id: '/api/flush',
+  path: '/api/flush',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHistoryBackupRoute = ApiHistoryBackupRouteImport.update({
   id: '/api/history-backup',
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/map': typeof DashboardMapRoute
   '/settings': typeof DashboardSettingsRoute
   '/stats': typeof DashboardStatsRoute
+  '/api/flush': typeof ApiFlushRoute
   '/api/history-backup': typeof ApiHistoryBackupRoute
   '/api/history-restore': typeof ApiHistoryRestoreRoute
   '/api/limits': typeof ApiLimitsRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/map': typeof DashboardMapRoute
   '/settings': typeof DashboardSettingsRoute
   '/stats': typeof DashboardStatsRoute
+  '/api/flush': typeof ApiFlushRoute
   '/api/history-backup': typeof ApiHistoryBackupRoute
   '/api/history-restore': typeof ApiHistoryRestoreRoute
   '/api/limits': typeof ApiLimitsRoute
@@ -140,6 +148,7 @@ export interface FileRoutesById {
   '/_dashboard/map': typeof DashboardMapRoute
   '/_dashboard/settings': typeof DashboardSettingsRoute
   '/_dashboard/stats': typeof DashboardStatsRoute
+  '/api/flush': typeof ApiFlushRoute
   '/api/history-backup': typeof ApiHistoryBackupRoute
   '/api/history-restore': typeof ApiHistoryRestoreRoute
   '/api/limits': typeof ApiLimitsRoute
@@ -158,6 +167,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/settings'
     | '/stats'
+    | '/api/flush'
     | '/api/history-backup'
     | '/api/history-restore'
     | '/api/limits'
@@ -174,6 +184,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/settings'
     | '/stats'
+    | '/api/flush'
     | '/api/history-backup'
     | '/api/history-restore'
     | '/api/limits'
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/_dashboard/map'
     | '/_dashboard/settings'
     | '/_dashboard/stats'
+    | '/api/flush'
     | '/api/history-backup'
     | '/api/history-restore'
     | '/api/limits'
@@ -206,6 +218,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRouteWithChildren
+  ApiFlushRoute: typeof ApiFlushRoute
   ApiHistoryBackupRoute: typeof ApiHistoryBackupRoute
   ApiHistoryRestoreRoute: typeof ApiHistoryRestoreRoute
   ApiLimitsRoute: typeof ApiLimitsRoute
@@ -252,6 +265,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/stats'
       preLoaderRoute: typeof DashboardStatsRouteImport
       parentRoute: typeof DashboardRoute
+    }
+    '/api/flush': {
+      id: '/api/flush'
+      path: '/api/flush'
+      fullPath: '/api/flush'
+      preLoaderRoute: typeof ApiFlushRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/history-backup': {
       id: '/api/history-backup'
@@ -349,6 +369,7 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRouteWithChildren,
+  ApiFlushRoute: ApiFlushRoute,
   ApiHistoryBackupRoute: ApiHistoryBackupRoute,
   ApiHistoryRestoreRoute: ApiHistoryRestoreRoute,
   ApiLimitsRoute: ApiLimitsRoute,

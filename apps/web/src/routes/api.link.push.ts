@@ -41,6 +41,8 @@ export const Route = createFileRoute('/api/link/push')({
             nameUpdatedAt: result.nameUpdatedAt,
             masterName: String(self?.name ?? 'Master'),
             shared: buildShared(db, settings),
+            // The master's own choice for this node, if it has made one. The node takes it if it is newer than its own.
+            nodeSettings: settings.link.nodeIdle[result.machineId] ? { idle: settings.link.nodeIdle[result.machineId] } : undefined,
           })
         } catch (error) {
           if (error instanceof PushRefused) return json(error.status, { ok: false, message: error.message })

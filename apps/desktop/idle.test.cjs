@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { BUSY_MS, shouldPoll, shouldQuitWhenIdle, isLinked, hasStartHook, newestTranscriptMtime } = require('./idle.cjs');
+const { BUSY_MS, shouldPoll, shouldQuitWhenIdle, isMaster, isLinkedNode, hasStartHook, newestTranscriptMtime } = require('./idle.cjs');
 
 const NOW = 1_000_000_000_000;
 const MIN = 60_000;
@@ -20,7 +20,7 @@ test('polls whenever the window is open, or when activity cannot be watched', ()
   assert.strictEqual(shouldPoll({ ...base, lastActivityMs: NOW - 5 * 60 * MIN, watching: false }), true);
 });
 
-const quiet = { ...base, lastActivityMs: NOW - 31 * MIN, waitingCount: 0, setting: { quit: true, minutes: 30 }, linked: false, startHookInstalled: true };
+const quiet = { ...base, lastActivityMs: NOW - 31 * MIN, waitingCount: 0, setting: { quit: true, minutes: 30 }, master: false, startHookInstalled: true };
 
 test('quits after the chosen quiet spell, not before', () => {
   assert.strictEqual(shouldQuitWhenIdle(quiet), true);
@@ -39,17 +39,25 @@ test('never quits when that is not safe', () => {
   assert.strictEqual(shouldQuitWhenIdle({ ...quiet, setting: undefined }), false);
   assert.strictEqual(shouldQuitWhenIdle({ ...quiet, windowOpen: true }), false);
   assert.strictEqual(shouldQuitWhenIdle({ ...quiet, waitingCount: 1 }), false);
-  assert.strictEqual(shouldQuitWhenIdle({ ...quiet, linked: true }), false);
+  assert.strictEqual(shouldQuitWhenIdle({ ...quiet, master: true }), false);
   assert.strictEqual(shouldQuitWhenIdle({ ...quiet, startHookInstalled: false }), false);
   assert.strictEqual(shouldQuitWhenIdle({ ...quiet, watching: false }), false);
 });
 
-test('a computer is linked as a master, or as a node with a master', () => {
-  assert.strictEqual(isLinked({ role: 'master' }), true);
-  assert.strictEqual(isLinked({ role: 'node', masterUrl: 'http://x:3000' }), true);
-  assert.strictEqual(isLinked({ role: 'node', masterUrl: '', masterUrls: ['http://x:3000'] }), true);
-  assert.strictEqual(isLinked({ role: 'node', masterUrl: '', masterUrls: [] }), false);
-  assert.strictEqual(isLinked(undefined), false);
+test('a master stays running, and a node or an unlinked computer may quit', () => {
+  assert.strictEqual(isMaster({ role: 'master' }), true);
+  assert.strictEqual(isMaster({ role: 'node', masterUrl: 'http://x:3000' }), false);
+  assert.strictEqual(isMaster(undefined), false);
+  assert.strictEqual(shouldQuitWhenIdle({ ...quiet, master: isMaster({ role: 'node', masterUrl: 'http://x:3000' }) }), true);
+  assert.strictEqual(shouldQuitWhenIdle({ ...quiet, master: isMaster({ role: 'master' }) }), false);
+});
+
+test('a node with a master is told apart from an unlinked one, for sending its sessions first', () => {
+  assert.strictEqual(isLinkedNode({ role: 'node', masterUrl: 'http://x:3000' }), true);
+  assert.strictEqual(isLinkedNode({ role: 'node', masterUrl: '', masterUrls: ['http://x:3000'] }), true);
+  assert.strictEqual(isLinkedNode({ role: 'node', masterUrl: '', masterUrls: [] }), false);
+  assert.strictEqual(isLinkedNode({ role: 'master', masterUrl: 'http://x:3000' }), false);
+  assert.strictEqual(isLinkedNode(undefined), false);
 });
 
 test('finds the start hook in a Claude settings file', () => {

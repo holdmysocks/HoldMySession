@@ -217,7 +217,7 @@ describe('getMergedPricing', () => {
   limits: { fiveHour: 'auto', alerts: true },
   idle: { quit: true, minutes: 30 },
   showWindowOnHookStart: false,
-      link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' },
+      link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local', nodeIdle: {} },
       projects: { scratch: 'group', scratchByName: false, hidden: [] },
       dataSources: [],
       pricingOverrides: {
@@ -274,7 +274,7 @@ describe('getMergedPricing', () => {
   limits: { fiveHour: 'auto', alerts: true },
   idle: { quit: true, minutes: 30 },
   showWindowOnHookStart: false,
-      link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' },
+      link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local', nodeIdle: {} },
       projects: { scratch: 'group', scratchByName: false, hidden: [] },
       pricingOverrides: overrides,
       dataSources: [],

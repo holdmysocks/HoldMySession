@@ -17,7 +17,7 @@ const { pathToFileURL } = require('node:url');
 const { createUpdater } = require('./updater.cjs');
 const { shouldShowWindowFor, portInUse, hookLaunchArgs } = require('./launch.cjs');
 const { planAlerts, notificationFor, trayState, mapPathFor, planLimitAlerts, limitsText } = require('./alerts.cjs');
-const { shouldPoll, shouldQuitWhenIdle, isLinked, hasStartHook, newestTranscriptMtime } = require('./idle.cjs');
+const { shouldPoll, shouldQuitWhenIdle, isMaster, isLinkedNode, hasStartHook, newestTranscriptMtime } = require('./idle.cjs');
 const fs = require('node:fs');
 
 const args = process.argv.slice(1);
@@ -264,6 +264,28 @@ function runApp() {
     }
   };
 
+  let quittingIdle = false;
+
+  /** Quits for being idle. A node first has its latest sessions sent to its master, which it would otherwise only do when it next starts. */
+  async function quitIdle(sendFirst) {
+    if (quittingIdle) return;
+    quittingIdle = true;
+    const before = lastActivity;
+    if (sendFirst) {
+      try {
+        await fetch(`http://localhost:${PORT}/api/flush`, { method: 'POST', headers: { 'X-HMS-Flush': '1' }, signal: AbortSignal.timeout(60_000) });
+      } catch {
+        // The master is out of reach, or the server is busy: it is sent at the next start.
+      }
+      // Something may have started while it was sending: a window opened, or Claude Code wrote again. Then it stays.
+      if (win || lastActivity > before) {
+        quittingIdle = false;
+        return;
+      }
+    }
+    quit();
+  }
+
   /** The app has nothing to do while Claude Code is not in use, so it can quit, when that is safe, and the start hook brings it back. */
   function checkIdle() {
     const settings = readJson(path.join(dataDir, 'settings.json')) || {};
@@ -280,10 +302,10 @@ function runApp() {
       watching,
       waitingCount,
       setting: settings.idle === undefined ? { quit: true, minutes: 30 } : settings.idle,
-      linked: isLinked(settings.link),
+      master: isMaster(settings.link),
       startHookInstalled,
     })) {
-      quit();
+      quitIdle(isLinkedNode(settings.link));
     }
   }
 

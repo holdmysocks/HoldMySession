@@ -1,7 +1,7 @@
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   allowFirewall, connectToMaster, disconnectFromMaster, restartApp, getLinkState, regenerateNodeToken, removeLinkedMachine, renameMachineName, setLinkRole,
-  setListen, syncNow,
+  setListen, setMachineIdle, syncNow,
 } from './link.api'
 
 export const linkStateQuery = queryOptions({
@@ -28,5 +28,6 @@ export function useLinkMutations() {
     sync: useMutation({ mutationFn: syncNow, onSuccess: refresh }),
     rename: useMutation({ mutationFn: renameMachineName, onSuccess: refresh }),
     remove: useMutation({ mutationFn: removeLinkedMachine, onSuccess: refresh }),
+    idle: useMutation({ mutationFn: setMachineIdle, onSuccess: () => { refresh() } }),
   }
 }

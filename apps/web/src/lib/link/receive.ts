@@ -1,7 +1,23 @@
 import type { Db } from '@/lib/history/sqlite'
-import { LATEST_SCHEMA_VERSION, inTransaction } from '@/lib/history/history-db'
+import { LATEST_SCHEMA_VERSION, getMeta, inTransaction, setMeta } from '@/lib/history/history-db'
 import { selfMachineId, upsertRemoteMachine } from './machines'
 import { PushSchema, type PushPayload } from './protocol'
+
+/** Where the master keeps what a node last reported as its quit-when-idle choice. */
+export const reportedIdleKey = (machineId: string) => `node_idle:${machineId}`
+
+/** What a node last reported as its quit-when-idle choice, or null. */
+export function reportedIdle(db: Db, machineId: string): { quit: boolean; minutes: 10 | 30 | 60 | 120; updatedAt?: string } | null {
+  const stored = getMeta(db, reportedIdleKey(machineId))
+  if (!stored) return null
+  try {
+    const parsed = JSON.parse(stored) as { quit?: unknown; minutes?: unknown; updatedAt?: unknown }
+    if (typeof parsed.quit !== 'boolean' || ![10, 30, 60, 120].includes(Number(parsed.minutes))) return null
+    return { quit: parsed.quit, minutes: Number(parsed.minutes) as 10 | 30 | 60 | 120, ...(typeof parsed.updatedAt === 'string' ? { updatedAt: parsed.updatedAt } : {}) }
+  } catch {
+    return null
+  }
+}
 
 export class PushRefused extends Error {
   constructor(
@@ -17,7 +33,7 @@ export class PushRefused extends Error {
  * the node's machine id, replacing what it held for those sessions. Nothing from a node can touch
  * another machine's rows, and a node cannot claim the master's own id.
  */
-export function acceptPush(db: Db, input: unknown, now: Date = new Date()): { accepted: number; name: string; nameUpdatedAt: string } {
+export function acceptPush(db: Db, input: unknown, now: Date = new Date()): { accepted: number; name: string; nameUpdatedAt: string; machineId: string } {
   const parsed = PushSchema.safeParse(input)
   if (!parsed.success) throw new PushRefused('The data sent was not in the expected form.', 400)
   const payload: PushPayload = parsed.data
@@ -35,6 +51,8 @@ export function acceptPush(db: Db, input: unknown, now: Date = new Date()): { ac
 
   return inTransaction(db, () => {
     const named = upsertRemoteMachine(db, machine, now)
+    // What the node has chosen for itself, so the master can show it next to the choice it holds for that node.
+    if (machine.idle) setMeta(db, reportedIdleKey(machine.machineId), JSON.stringify(machine.idle))
     const stamp = now.toISOString()
     const upsert = db.prepare(`
       INSERT INTO sessions (machine_id, session_key, session_id, project_key, project_path, project_display_name, session_name,
@@ -67,6 +85,6 @@ export function acceptPush(db: Db, input: unknown, now: Date = new Date()): { ac
         addUsage.run(machine.machineId, s.session_key, u.day, u.model, u.input_tokens, u.output_tokens, u.thinking_tokens, u.cache_read_tokens, u.cache_write_tokens)
       }
     }
-    return { accepted: payload.sessions.length, ...named }
+    return { accepted: payload.sessions.length, ...named, machineId: machine.machineId }
   })
 }
