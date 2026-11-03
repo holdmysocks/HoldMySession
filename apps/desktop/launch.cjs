@@ -41,4 +41,12 @@ async function portInUse(port, timeoutMs = 800, hosts = ['127.0.0.1', '::1']) {
   return false;
 }
 
-module.exports = { isBackgroundLaunch, shouldShowWindowFor, portInUse };
+/**
+ * The arguments for the copy of the app the Claude Code start hook starts. It starts in the background, with no window,
+ * unless the setting to show it is on. Run from a checkout, the program has to be told which app to run.
+ */
+function hookLaunchArgs({ packaged, appPath, showWindow, noSandbox }) {
+  return [...(packaged ? [] : [appPath]), ...(showWindow ? [] : ['--background']), ...(!packaged && noSandbox ? ['--no-sandbox'] : [])];
+}
+
+module.exports = { isBackgroundLaunch, shouldShowWindowFor, portInUse, hookLaunchArgs };

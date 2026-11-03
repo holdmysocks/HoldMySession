@@ -17,7 +17,7 @@ test('the flag is found wherever it sits among the arguments', () => {
 });
 
 const net = require('node:net');
-const { portInUse } = require('./launch.cjs');
+const { portInUse, hookLaunchArgs } = require('./launch.cjs');
 
 function listen(host) {
   return new Promise((resolve, reject) => {
@@ -56,4 +56,21 @@ test('says nothing is running when nothing listens', async () => {
   const { port } = server.address();
   await new Promise((r) => server.close(r));
   assert.strictEqual(await portInUse(port, 500), false);
+});
+
+test('the start hook starts the installed app in the background, with no window, unless told to show it', () => {
+  assert.deepStrictEqual(hookLaunchArgs({ packaged: true, appPath: '/x', showWindow: false, noSandbox: false }), ['--background']);
+  assert.deepStrictEqual(hookLaunchArgs({ packaged: true, appPath: '/x', showWindow: true, noSandbox: false }), []);
+});
+
+test('from a checkout the start hook also says which app to run', () => {
+  assert.deepStrictEqual(hookLaunchArgs({ packaged: false, appPath: '/app', showWindow: false, noSandbox: true }), ['/app', '--background', '--no-sandbox']);
+  assert.deepStrictEqual(hookLaunchArgs({ packaged: false, appPath: '/app', showWindow: true, noSandbox: false }), ['/app']);
+});
+
+test('what the hook starts is a background launch exactly when no window was asked for', () => {
+  for (const showWindow of [false, true]) {
+    const args = hookLaunchArgs({ packaged: true, appPath: '/x', showWindow, noSandbox: false });
+    assert.strictEqual(isBackgroundLaunch(args), !showWindow);
+  }
 });

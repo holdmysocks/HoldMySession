@@ -15,9 +15,9 @@ const { spawn, spawnSync } = require('node:child_process');
 const os = require('node:os');
 const { pathToFileURL } = require('node:url');
 const { createUpdater } = require('./updater.cjs');
-const { shouldShowWindowFor, portInUse } = require('./launch.cjs');
+const { shouldShowWindowFor, portInUse, hookLaunchArgs } = require('./launch.cjs');
 const { planAlerts, notificationFor, trayState, mapPathFor, planLimitAlerts, limitsText } = require('./alerts.cjs');
-const { shouldPoll, newestTranscriptMtime } = require('./idle.cjs');
+const { shouldPoll, shouldQuitWhenIdle, isLinked, hasStartHook, newestTranscriptMtime } = require('./idle.cjs');
 const fs = require('node:fs');
 
 const args = process.argv.slice(1);
@@ -64,8 +64,16 @@ async function runStartHook() {
     // Both loopback addresses are tried, and a busy server gets a moment to answer, so a running app is never
     // mistaken for a stopped one. That would start a second copy, which would show the first one's window.
     if (!(await portInUse(PORT, 1500))) {
-      // The installed program starts as the app. Run from a checkout, it has to be told which app to run.
-      const launch = app.isPackaged ? ['--background'] : [app.getAppPath(), '--background', ...(flag('--no-sandbox') ? ['--no-sandbox'] : [])];
+      // With no window, unless Settings says Claude Code starting the app should show it. The installed program starts as the
+      // app. Run from a checkout, it has to be told which app to run.
+      let showWindow = false;
+      try {
+        const dir = process.env.HOLDMYSESSION_DIR || process.env.CLAUDE_DASHBOARD_DIR || process.env.CLAUDE_DASHBOARD_HOME || path.join(os.homedir(), '.holdmysession');
+        showWindow = JSON.parse(require('node:fs').readFileSync(path.join(dir, 'settings.json'), 'utf8')).showWindowOnHookStart === true;
+      } catch {
+        // No settings file yet: the default, which is no window.
+      }
+      const launch = hookLaunchArgs({ packaged: app.isPackaged, appPath: app.getAppPath(), showWindow, noSandbox: flag('--no-sandbox') });
       const child = spawn(process.execPath, launch, { detached: true, stdio: 'ignore', windowsHide: true });
       child.unref();
     }
@@ -93,8 +101,11 @@ function runStatusline() {
 
 if (STATUSLINE) {
   runStatusline();
-} else if (NOTIFY || START) {
-  app.whenReady().then(NOTIFY ? runNotifyHook : runStartHook);
+} else if (START) {
+  // Nothing here needs Electron to be ready, and this runs on every Claude Code session and message, so it does not wait.
+  runStartHook();
+} else if (NOTIFY) {
+  app.whenReady().then(runNotifyHook);
 } else {
   runApp();
 }
@@ -208,13 +219,15 @@ function runApp() {
     rebuildTray = rebuild;
   }
 
-  // --- Activity: poll only while Claude Code is in use ---
+  // --- Activity: poll, and stay running, only while Claude Code is in use ---
 
   const HOME = os.homedir();
   const claudeDir = process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDE_HOME || path.join(HOME, '.claude');
   const dataDir = process.env.HOLDMYSESSION_DIR || process.env.CLAUDE_DASHBOARD_DIR || process.env.CLAUDE_DASHBOARD_HOME || path.join(HOME, '.holdmysession');
-  // Starts from the newest transcript on disk, so an app launched with Claude Code not in use has nothing to poll.
+  // Polling starts from the newest transcript on disk, so an app launched with Claude Code not in use has nothing to poll. The
+  // quit timer starts from the launch instead, so an app a hook has just started always gets a full quiet spell.
   let lastActivity = 0;
+  const startedAt = Date.now();
   let watching = false;
   const touchActivity = () => {
     lastActivity = Date.now();
@@ -240,6 +253,37 @@ function runApp() {
       }).on('error', () => undefined);
     } catch {
       // No data folder yet: the hooks make it when they first run.
+    }
+  }
+
+  const readJson = (file) => {
+    try {
+      return JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {
+      return null;
+    }
+  };
+
+  /** The app has nothing to do while Claude Code is not in use, so it can quit, when that is safe, and the start hook brings it back. */
+  function checkIdle() {
+    const settings = readJson(path.join(dataDir, 'settings.json')) || {};
+    let startHookInstalled = false;
+    try {
+      startHookInstalled = hasStartHook(fs.readFileSync(path.join(claudeDir, 'settings.json'), 'utf8'));
+    } catch {
+      // No Claude settings file: no hook.
+    }
+    if (shouldQuitWhenIdle({
+      nowMs: Date.now(),
+      lastActivityMs: Math.max(lastActivity, startedAt),
+      windowOpen: Boolean(win),
+      watching,
+      waitingCount,
+      setting: settings.idle === undefined ? { quit: true, minutes: 30 } : settings.idle,
+      linked: isLinked(settings.link),
+      startHookInstalled,
+    })) {
+      quit();
     }
   }
 
@@ -388,8 +432,11 @@ function runApp() {
     setInterval(pollLimits, 30_000).unref();
     setTimeout(pollLimits, 4000).unref();
     startWatching();
-    // A folder that was not there yet is watched once it is.
-    setInterval(startWatching, 60_000).unref();
+    // A folder that was not there yet is watched once it is, and a quiet spell is noticed within a minute.
+    setInterval(() => {
+      startWatching();
+      checkIdle();
+    }, 60_000).unref();
     if (BACKGROUND) dockHide();
     else showWindow();
   });

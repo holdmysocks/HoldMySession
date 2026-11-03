@@ -5,7 +5,7 @@ HoldMySession can run as a desktop app for Windows and Mac. It is the same serve
 ## Using it
 
 1. Download the zip for your system from the [releases page](https://github.com/holdmysocks/HoldMySession/releases), unzip it anywhere, and run `HoldMySession.exe` (Windows) or `HoldMySession` (Mac).
-2. Closing the window closes it, and the app keeps running in the tray. Use the tray icon to open it again, open it in a browser, turn on Start with Windows (Open at login on a Mac), restart it, or quit.
+2. Closing the window hides it. Use the tray icon to open it again, open it in a browser, turn on Start with Windows (Open at login on a Mac), restart it, or quit.
 3. Running it again while it is already running opens the existing window.
 4. `--background` starts it in the tray without opening the window.
 5. **Start with Windows** (Open at login on a Mac) is a switch in the tray menu, with a tick when on, and in Settings, under Desktop app. Both read the same system setting.
@@ -18,14 +18,14 @@ It needs the app to be in a folder it may write to (not Program Files), a releas
 
 ### Memory
 
-The desktop app is an Electron program, which has a fixed cost of its own: a bare Electron program with only a tray icon is already about 170 MB on Linux, in three processes. HoldMySession keeps what it adds as low as it can, and does nothing while Claude Code is not in use:
+The desktop app is an Electron program, which has a fixed cost of its own. HoldMySession keeps it low, and nothing is running at all while Claude Code is not in use:
 
-- **Closing the window really closes it.** The page and the process that runs it, about 85 MB, go with it, and the tray icon opens a new window. A window that was only hidden kept all of that.
+- **Closing the window really closes it.** The page and the process that runs it, about 85 MB, go with it. The tray icon opens a new window.
 - **No hardware graphics.** The dashboard is text and an SVG map, so Electron's graphics process, which is large when it uses the graphics card, stays small. Set `HOLDMYSESSION_GPU=1` to turn it back on.
-- **It polls only while Claude Code is in use.** It watches Claude's transcripts, the hook events and the status line for writes. Ten minutes after the last one, with no window open, it stops asking the server which sessions need you. Launched with nothing going on, it never starts. Asking rescans every session, which is the main thing that used to keep the server busy.
-- **Nothing is re-read that did not change.** The history scan, which reads every transcript, is skipped when none changed since the last one.
+- **It polls only while Claude Code is in use.** It watches Claude's transcripts, the hook events and the status line for writes. Ten minutes after the last one, with no window open, it stops asking the server which sessions need you. The history scan, which reads every transcript, is skipped when none changed since the last one.
+- **It can quit when Claude Code is not in use.** Settings, General, **Quit when Claude Code is not in use**, after 10 minutes, 30 minutes, 1 hour or 2 hours (30 minutes by default). The Claude Code start hook, which fires on a new session and on each message, starts it again. It never quits while its window is open, while a session needs you, when this computer is linked to another as a master or a node, or when the start hook is not on. `HOLDMYSESSION_BUSY_MS` and `HOLDMYSESSION_IDLE_MS` shorten the two waits, for testing.
 
-`HOLDMYSESSION_BUSY_MS` shortens the ten minutes, for testing.
+When the Claude Code start hook starts the app, whether after it quit or at the first session of the day, it starts in the tray with no window, and the window opens only when you open it. Starting it from the hook while it is already running does nothing, and a second copy racing the first is ignored. Settings, General, **Open the window when Claude Code starts it**, turns that around: the window opens when the hook starts the app.
 
 ### Linking machines from the app
 
