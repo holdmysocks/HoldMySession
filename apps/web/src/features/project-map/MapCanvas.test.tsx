@@ -249,6 +249,11 @@ describe('MapCanvas borders and expired subagents', () => {
     expect(detail.textContent).toBe('feature/long-branch · aaaaaaaa')
   })
 
+  it('says a quiet session is waiting on a task, on the card', () => {
+    renderInputs([{ ...input('aaaaaaaa-1111', []), backgroundTaskCount: 1 }])
+    expect(screen.getAllByText(/^Waiting on 1 task/).length).toBeGreaterThan(0)
+  })
+
   it('says how many tasks run, on its own, with the chip in the same corner', () => {
     const container = renderInputs([{ ...input('aaaaaaaa-1111', []), backgroundTaskCount: 2 }])
     expect(screen.getByText('2 tasks')).toBeTruthy()

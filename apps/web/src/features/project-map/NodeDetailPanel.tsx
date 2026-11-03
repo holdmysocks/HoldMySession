@@ -1,3 +1,4 @@
+import { waitingOnText } from '@/lib/status/waiting-on'
 import { Link } from '@tanstack/react-router'
 import type { MapNode } from '@/lib/map/project-map'
 import { formatDateTime, formatDuration, formatTokenCount } from '@/lib/utils/format'
@@ -57,9 +58,7 @@ export function NodeDetailPanel({
         <div className={`mt-1.5 text-sm ${node.needsYou ? 'text-[#FFD25A]' : 'text-[color:var(--hms-mute)]'}`}>
           {node.needsYou
             ? `${node.waiting?.text ?? 'Waiting on you'} · ${waitingFor(node, now)}`
-            : node.runningAgents > 0
-              ? `${node.waitingOnAgents ? 'Waiting on' : 'Working with'} ${node.runningAgents} ${node.runningAgents === 1 ? 'agent' : 'agents'}`
-              : statusLabel(node.status)}
+            : (isSession && waitingOnText({ agents: node.runningAgents, tasks: node.backgroundTaskCount, quiet: node.waitingOnWork })) || statusLabel(node.status)}
         </div>
       </div>
 

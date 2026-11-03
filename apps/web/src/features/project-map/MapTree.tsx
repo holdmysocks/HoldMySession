@@ -1,3 +1,4 @@
+import { waitingOnText } from '@/lib/status/waiting-on'
 import type { PositionedNode } from '@/lib/map/layout'
 import type { MapNodeStatus } from '@/lib/map/project-map'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
@@ -43,10 +44,7 @@ export function MapTree({
         const look = LOOK[node.status]
         const isSession = node.kind === 'session'
         const title = isSession && privacyMode ? anonymizeSessionName(node.title) : node.title
-        const agentsText =
-          node.runningAgents > 0
-            ? `${node.waitingOnAgents ? 'Waiting on ' : ''}${node.runningAgents} ${node.runningAgents === 1 ? 'agent' : 'agents'}${node.waitingOnAgents ? '' : ' running'}`
-            : null
+        const agentsText = isSession ? waitingOnText({ agents: node.runningAgents, tasks: node.backgroundTaskCount, quiet: node.waitingOnWork, compact: true }) : null
         const meta = isSession
           ? [agentsText ?? node.subtitle.split('·')[1]?.trim(), shortModelName(node.model)].filter(Boolean).join(' · ')
           : truncateLabel(node.subtitle, 40)

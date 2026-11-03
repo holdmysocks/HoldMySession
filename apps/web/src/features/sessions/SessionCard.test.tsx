@@ -118,4 +118,32 @@ describe('SessionCard', () => {
     expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('Untitled session')
     expect(screen.getByText('Checkout Service')).toBeTruthy()
   })
+
+  describe('while it waits on work it started', () => {
+    const NOW = Date.parse('2026-02-25T12:00:00Z')
+    const quiet = { ...mockSession, isActive: true, lastActiveAt: '2026-02-25T11:30:00.000Z' }
+    const show = (session: SessionSummary) =>
+      render(
+        <PrivacyProvider>
+          <SessionCard now={NOW} session={session} status="active" />
+        </PrivacyProvider>,
+      )
+
+    it('says it is waiting on a background task, instead of leaving it looking done', () => {
+      show({ ...quiet, runningTasks: 1 })
+      expect(screen.getByText('Waiting on 1 background task')).toBeTruthy()
+    })
+    it('says what it waits on, agents and tasks together', () => {
+      show({ ...quiet, runningSubagents: 2, runningTasks: 3 })
+      expect(screen.getByText('Waiting on 2 agents and 3 background tasks')).toBeTruthy()
+    })
+    it('says it is working with them while it is still writing', () => {
+      show({ ...quiet, lastActiveAt: '2026-02-25T11:59:30.000Z', runningTasks: 1 })
+      expect(screen.getByText('Working with 1 background task')).toBeTruthy()
+    })
+    it('says nothing extra when nothing is running', () => {
+      show(quiet)
+      expect(screen.queryByText(/Waiting on|Working with/)).toBeNull()
+    })
+  })
 })

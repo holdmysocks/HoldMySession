@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { isQuiet, waitingOnText } from '@/lib/status/waiting-on'
 import { copyText } from '@/lib/utils/copy-text'
 import { Link } from '@tanstack/react-router'
 import type { SessionSummary } from '@/lib/parsers/types'
@@ -29,9 +30,7 @@ export function SessionCard({
   const displayBranch = session.branch ? anonymizeBranch(session.branch) : null
   const waiting = status === 'needs-you'
   // A session with agents working is not done. Say what it is doing: waiting on them, or working beside them.
-  const agents = session.runningSubagents ?? 0
-  const quiet = now - new Date(session.lastActiveAt).getTime() > 2 * 60_000
-  const agentsLine = agents > 0 ? `${quiet ? 'Waiting on' : 'Working with'} ${agents} ${agents === 1 ? 'agent' : 'agents'}` : null
+  const agentsLine = waitingOnText({ agents: session.runningSubagents ?? 0, tasks: session.runningTasks ?? 0, quiet: isQuiet(session.lastActiveAt, now) })
   const waitingText = session.hasOpenQuestion
     ? 'Asked you a question'
     : describeWaiting({ notification: session.notification }).text

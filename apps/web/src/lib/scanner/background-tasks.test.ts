@@ -5,6 +5,7 @@ import * as path from 'node:path'
 import {
   BACKGROUND_TASK_QUIET_MS,
   backgroundTaskDir,
+  backgroundTaskDirs,
   countRunningBackgroundTasks,
   hasExitLine,
   hasRunningBackgroundTask,
@@ -105,5 +106,61 @@ describe('countRunningBackgroundTasks', () => {
 
   it('is 0 for a folder that does not exist', async () => {
     expect(await countRunningBackgroundTasks(path.join(dir, 'missing'), NOW)).toBe(0)
+  })
+})
+
+describe('backgroundTaskDirs', () => {
+  let temp: string
+
+  beforeEach(() => {
+    temp = fs.mkdtempSync(path.join(os.tmpdir(), 'bg-dirs-'))
+  })
+  afterEach(() => {
+    fs.rmSync(temp, { recursive: true, force: true })
+  })
+
+  const make = (...parts: string[]) => fs.mkdirSync(path.join(temp, ...parts), { recursive: true })
+
+  it('finds the current layout, with the user id in the folder name', () => {
+    make('claude-501', '-Users-me-app', 'abc', 'tasks')
+    expect(backgroundTaskDirs('-Users-me-app', 'abc', temp)).toEqual([path.join(temp, 'claude-501', '-Users-me-app', 'abc', 'tasks')])
+  })
+
+  it('finds the older layout, with no user id', () => {
+    make('claude', 'D--MCLA', 'abc', 'tasks')
+    expect(backgroundTaskDirs('D--MCLA', 'abc', temp)).toEqual([path.join(temp, 'claude', 'D--MCLA', 'abc', 'tasks')])
+  })
+
+  it('finds both when both are there, and only this session', () => {
+    make('claude', 'p', 'abc', 'tasks')
+    make('claude-0', 'p', 'abc', 'tasks')
+    make('claude-0', 'p', 'other', 'tasks')
+    expect(backgroundTaskDirs('p', 'abc', temp).sort()).toEqual([path.join(temp, 'claude', 'p', 'abc', 'tasks'), path.join(temp, 'claude-0', 'p', 'abc', 'tasks')].sort())
+  })
+
+  it('ignores folders that only look similar', () => {
+    make('claude-0Jtbmh', 'p', 'abc', 'tasks')
+    make('claudette', 'p', 'abc', 'tasks')
+    make('not-claude', 'p', 'abc', 'tasks')
+    expect(backgroundTaskDirs('p', 'abc', temp)).toEqual([])
+  })
+
+  it('is empty when there is no temp folder or no tasks', () => {
+    expect(backgroundTaskDirs('p', 'abc', path.join(temp, 'missing'))).toEqual([])
+    make('claude-0', 'p', 'abc')
+    expect(backgroundTaskDirs('p', 'abc', temp)).toEqual([])
+  })
+
+  it('counts the running tasks in every folder it finds', async () => {
+    make('claude', 'p', 'abc', 'tasks')
+    make('claude-7', 'p', 'abc', 'tasks')
+    for (const [folder, name] of [['claude', 'a.output'], ['claude-7', 'b.output'], ['claude-7', 'c.output']]) {
+      const file = path.join(temp, folder, 'p', 'abc', 'tasks', name)
+      fs.writeFileSync(file, 'working\n')
+      fs.utimesSync(file, new Date(NOW - 1000), new Date(NOW - 1000))
+    }
+    expect(await countRunningBackgroundTasks(backgroundTaskDirs('p', 'abc', temp), NOW)).toBe(3)
+    expect(await hasRunningBackgroundTask(backgroundTaskDirs('p', 'abc', temp), NOW)).toBe(true)
+    expect(await countRunningBackgroundTasks([], NOW)).toBe(0)
   })
 })

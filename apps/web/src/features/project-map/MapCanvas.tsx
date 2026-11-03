@@ -5,6 +5,7 @@ import type { MapNodeStatus } from '@/lib/map/project-map'
 import { boundsOf, fitView, zoomAt, type FitOptions, type MapView, type ViewSize } from '@/lib/map/viewport'
 import { GRID_SIZE, dragPositions, nodesInBox, toggleId, type Placed } from '@/lib/map/editing'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
+import { waitingOnText } from '@/lib/status/waiting-on'
 import { expiredSubagentsLabel, kindLabel, relationTag, shortModelName, statusLabel, truncateLabel } from './format-node'
 
 /** A card's new top-left corner, in map coordinates. */
@@ -575,8 +576,8 @@ function NodeView({ node, selected, multiSelected, editMode, canMove, onClick, o
           relation={relationTag(node.parentRelation)}
           kind={node.needsYou ? (node.waiting?.kind === 'question' ? 'Question' : node.waiting?.kind === 'plan' ? 'Plan' : node.waiting?.kind === 'permission' ? 'Permission' : 'Waiting') : null}
           pulse={node.status === 'active' || node.status === 'running'}
-          agents={node.runningAgents}
-          waitingOnAgents={node.waitingOnAgents}
+          waiting={waitingOnText({ agents: node.runningAgents, tasks: node.backgroundTaskCount, quiet: node.waitingOnWork, compact: true })}
+          waitingOnWork={node.waitingOnWork}
           detailChars={detailRoom(node.width, chipTextOf(node.backgroundTaskCount, expired))}
         />
       ) : (
@@ -652,8 +653,8 @@ function SessionLines({
   relation,
   kind,
   pulse,
-  agents,
-  waitingOnAgents,
+  waiting,
+  waitingOnWork,
   detailChars,
 }: {
   sessionTitle: string
@@ -666,16 +667,18 @@ function SessionLines({
   /** What a needs-you session is waiting for, shown in place of the message count. */
   kind: string | null
   pulse: boolean
-  /** Subagents working now, and whether this session is just waiting for them. */
-  agents: number
-  waitingOnAgents: boolean
+  /** What the session waits on or works with, such as "Waiting on 2 agents, 1 task". Null when nothing is running. */
+  waiting: string | null
+  /** The session is quiet and only waiting, as opposed to working beside what it started. */
+  waitingOnWork: boolean
   /** How many characters of the branch and id fit beside the card's chip. */
   detailChars: number
 }) {
   const wordWidth = look.word.length * 6.6 + 16
-  // Only a session that is just waiting on its agents swaps its message count for that; otherwise the flowing lines already show them.
-  const agentsText = agents > 0 && waitingOnAgents ? `Waiting on ${agents} ${agents === 1 ? 'agent' : 'agents'}` : null
-  const meta = [kind ?? relation, kind ? null : agentsText ?? messages, model].filter(Boolean).join(' · ')
+  // Only a session that is just waiting swaps its message count for that; otherwise the flowing lines and the chip already show it.
+  const agentsText = waitingOnWork ? waiting : null
+  // The model is left off when the card says what it waits on, so that does not get cut short.
+  const meta = [kind ?? relation, kind ? null : agentsText ?? messages, agentsText ? null : model].filter(Boolean).join(' · ')
   const detail = [branch, sessionId.slice(0, 8)].filter(Boolean).join(' · ')
   return (
     <>

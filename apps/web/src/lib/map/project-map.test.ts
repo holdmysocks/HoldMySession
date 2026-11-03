@@ -463,3 +463,23 @@ describe('buildProjectMap: forks', () => {
     expect(forkParents([self]).size).toBe(0)
   })
 })
+
+describe('a session waiting on background tasks', () => {
+  // summary() last wrote some time before NOW.
+  const quiet = (n: number) => input({ backgroundTaskCount: n, summary: summary({ isActive: false, lastActiveAt: new Date(NOW - 10 * 60_000).toISOString() }) })
+
+  it('is running, not done, while a task runs, and says it is waiting', () => {
+    const node = build([quiet(1)]).nodes.find((n) => n.kind === 'session')!
+    expect(node.status).toBe('active')
+    expect(node.backgroundTaskCount).toBe(1)
+    expect(node.waitingOnWork).toBe(true)
+  })
+  it('is not waiting while the session itself is still writing', () => {
+    const busy = input({ backgroundTaskCount: 2, summary: summary({ isActive: true, lastActiveAt: new Date(NOW - 20_000).toISOString() }) })
+    expect(build([busy]).nodes.find((n) => n.kind === 'session')!.waitingOnWork).toBe(false)
+  })
+  it('is not waiting with nothing running', () => {
+    const none = input({ summary: summary({ isActive: false, lastActiveAt: new Date(NOW - 10 * 60_000).toISOString() }) })
+    expect(build([none]).nodes.find((n) => n.kind === 'session')!.waitingOnWork).toBe(false)
+  })
+})

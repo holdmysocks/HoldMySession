@@ -4,7 +4,7 @@ import { scanAllSessionsWithPaths } from '@/lib/scanner/session-scanner'
 import type { SessionSummaryWithPath } from '@/lib/scanner/session-scanner'
 import { parseDetail } from '@/lib/parsers/session-parser'
 import { readSubagentLastActivity } from '@/lib/parsers/subagent-discovery'
-import { backgroundTaskDir, countRunningBackgroundTasks } from '@/lib/scanner/background-tasks'
+import { backgroundTaskDirs, countRunningBackgroundTasks } from '@/lib/scanner/background-tasks'
 import { findPendingQuestions } from '@/lib/map/pending-requests'
 import { buildProjectMap, tokenTotal } from '@/lib/map/project-map'
 import type { MapSessionInput } from '@/lib/map/project-map'
@@ -56,7 +56,7 @@ export async function computeProjectMap(projectKey: string): Promise<ProjectMapR
       summary: session,
       agents: detail.agents,
       subagentLastActivity: await readSubagentLastActivity(sessionDir),
-      backgroundTaskCount: await countRunningBackgroundTasks(backgroundTaskDir(session.projectKey, session.sessionId)),
+      backgroundTaskCount: await countRunningBackgroundTasks(backgroundTaskDirs(session.projectKey, session.sessionId)),
       pendingQuestions: detail.pendingQuestions,
       lastNotificationAt: notifications.get(session.sessionId) ?? null,
       notification: notificationInfo(notificationDetails.get(session.sessionId)),

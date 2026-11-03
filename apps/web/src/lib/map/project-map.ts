@@ -72,7 +72,8 @@ export interface MapNode {
   /** Session nodes: subagents working now (the ones drawn under it). 0 for subagent nodes. */
   runningAgents: number
   /** Session nodes: the session itself has been quiet for a while, so it is waiting on its agents rather than working beside them. */
-  waitingOnAgents: boolean
+  /** The session's own transcript is quiet while agents or background tasks it started are still running. */
+  waitingOnWork: boolean
 }
 
 export interface MapEdge {
@@ -128,7 +129,7 @@ export function sessionStatus(input: MapSessionInput, nowMs: number): SessionSta
   return deriveSessionStatus(
     {
       // A session with agents still working is not done, even when its own transcript has gone quiet.
-      isActive: input.summary.isActive || input.agents.length - expiredSubagentCount(input, nowMs) > 0,
+      isActive: input.summary.isActive || input.agents.length - expiredSubagentCount(input, nowMs) > 0 || (input.backgroundTaskCount ?? 0) > 0,
       lastActiveAt: input.summary.lastActiveAt,
       lastStopReason: input.summary.lastStopReason,
       lastNotificationAt: input.lastNotificationAt,
@@ -214,7 +215,7 @@ function sessionNode(
         ? describeWaiting({ question: input.pendingQuestions[0]?.questions[0]?.question, notification: input.notification })
         : null,
     runningAgents,
-    waitingOnAgents: runningAgents > 0 && nowMs - Date.parse(summary.lastActiveAt) > PARENT_QUIET_MS,
+    waitingOnWork: (runningAgents > 0 || (input.backgroundTaskCount ?? 0) > 0) && nowMs - Date.parse(summary.lastActiveAt) > PARENT_QUIET_MS,
   }
 }
 
@@ -260,7 +261,7 @@ function subagentNode(sessionId: string, agent: AgentInvocation, index: number):
     pendingQuestions: [],
     waiting: null,
     runningAgents: 0,
-    waitingOnAgents: false,
+    waitingOnWork: false,
   }
 }
 

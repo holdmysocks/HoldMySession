@@ -52,7 +52,41 @@ export function isTranscriptTail(tail: string): boolean {
   }
 }
 
-/** The folder where Claude Code keeps a session's task output. Only exists on the machine that ran the session. */
+/**
+ * Where Claude Code keeps task output has changed between versions: `<temp>/claude/...` before, and now
+ * `<temp>/claude-<user id>/...`. So every folder directly under a temp folder that is named `claude` or `claude-` and a
+ * number is looked in. On a Mac or Linux, /tmp is tried as well as the system's temp folder, which on a Mac is not /tmp.
+ */
+const CLAUDE_FOLDER = /^claude(?:-\d+)?$/
+
+function tempRoots(tempDir?: string): string[] {
+  const roots = tempDir !== undefined ? [tempDir] : [os.tmpdir(), ...(process.platform === 'win32' ? [] : ['/tmp', '/private/tmp'])]
+  return [...new Set(roots)]
+}
+
+/**
+ * Every folder a session's task output could be in. Only one exists, on the computer that ran the session, and only
+ * while the session has tasks.
+ */
+export function backgroundTaskDirs(projectDirName: string, sessionId: string, tempDir?: string): string[] {
+  const found: string[] = []
+  for (const root of tempRoots(tempDir)) {
+    let names: string[]
+    try {
+      names = fs.readdirSync(root)
+    } catch {
+      continue
+    }
+    for (const name of names) {
+      if (!CLAUDE_FOLDER.test(name)) continue
+      const dir = path.join(root, name, projectDirName, sessionId, 'tasks')
+      if (!found.includes(dir) && fs.existsSync(dir)) found.push(dir)
+    }
+  }
+  return found
+}
+
+/** The folder where Claude Code kept a session's task output in the older layout. Only exists on the machine that ran the session. */
 export function backgroundTaskDir(
   projectDirName: string,
   sessionId: string,
@@ -77,7 +111,13 @@ async function readTail(file: string, size: number): Promise<string> {
  * How many tasks in `dir` are running: output with no exit line, not a transcript, not empty, and
  * written within BACKGROUND_TASK_QUIET_MS of `nowMs`.
  */
-export async function countRunningBackgroundTasks(dir: string, nowMs: number = Date.now()): Promise<number> {
+export async function countRunningBackgroundTasks(dirOrDirs: string | string[], nowMs: number = Date.now()): Promise<number> {
+  if (Array.isArray(dirOrDirs)) {
+    let total = 0
+    for (const dir of dirOrDirs) total += await countRunningBackgroundTasks(dir, nowMs)
+    return total
+  }
+  const dir = dirOrDirs
   try {
     const entries = await fs.promises.readdir(dir)
     let count = 0
@@ -97,6 +137,6 @@ export async function countRunningBackgroundTasks(dir: string, nowMs: number = D
 }
 
 /** True when at least one task in `dir` is still running. */
-export async function hasRunningBackgroundTask(dir: string, nowMs: number = Date.now()): Promise<boolean> {
+export async function hasRunningBackgroundTask(dir: string | string[], nowMs: number = Date.now()): Promise<boolean> {
   return (await countRunningBackgroundTasks(dir, nowMs)) > 0
 }

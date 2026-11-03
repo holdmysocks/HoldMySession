@@ -4,7 +4,7 @@ import { getProjectsDir, getProjectsDirFor, getDataSources, extractSessionId } f
 import type { DataSource } from '../utils/claude-path'
 import { scanProjects, scanProjectsFrom } from './project-scanner'
 import { hasRecentRecord, isSessionActive } from './active-detector'
-import { backgroundTaskDir, hasRunningBackgroundTask } from './background-tasks'
+import { backgroundTaskDirs, countRunningBackgroundTasks } from './background-tasks'
 import { countRunningSubagents } from '../parsers/subagent-discovery'
 import { SUBAGENT_CACHE_WINDOW_MS } from '../status/session-status'
 import { parseSummary, parseFullScan } from '../parsers/session-parser'
@@ -80,13 +80,14 @@ async function sessionState(
   sessionId: string,
   lastActiveAt: string,
   projectsDirOverride?: string,
-): Promise<{ active: boolean; subagents: number }> {
+): Promise<{ active: boolean; subagents: number; tasks: number }> {
   const sessionDir = path.join(projectsDirOverride ?? getProjectsDir(), projectDirName, sessionId)
   const subagents = await countRunningSubagents(sessionDir, Date.now(), SUBAGENT_CACHE_WINDOW_MS)
   const transcriptActive =
     (await isSessionActive(projectDirName, sessionId, projectsDirOverride)) && hasRecentRecord(lastActiveAt)
-  const active = transcriptActive || subagents > 0 || (await hasRunningBackgroundTask(backgroundTaskDir(projectDirName, sessionId)))
-  return { active, subagents }
+  const tasks = await countRunningBackgroundTasks(backgroundTaskDirs(projectDirName, sessionId))
+  const active = transcriptActive || subagents > 0 || tasks > 0
+  return { active, subagents, tasks }
 }
 
 /**
@@ -115,8 +116,8 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
       const cached = summaryCache.get(filePath)
       if (cached && cached.mtimeMs === stat.mtimeMs) {
         // Refresh active status even for cached entries
-        const { active, subagents } = await sessionState(project.dirName, sessionId, cached.summary.lastActiveAt)
-        const entry = { ...cached.summary, isActive: active, runningSubagents: subagents, filePath, projectDisplayName }
+        const { active, subagents, tasks } = await sessionState(project.dirName, sessionId, cached.summary.lastActiveAt)
+        const entry = { ...cached.summary, isActive: active, runningSubagents: subagents, runningTasks: tasks, filePath, projectDisplayName }
         summaries.push(entry)
         scanned.push({ summary: entry, filePath, output: cached.output })
         continue
@@ -133,9 +134,10 @@ async function scanSessionsInternal(): Promise<SessionSummaryWithPath[]> {
       )
 
       if (summary) {
-        const { active, subagents } = await sessionState(project.dirName, sessionId, summary.lastActiveAt)
+        const { active, subagents, tasks } = await sessionState(project.dirName, sessionId, summary.lastActiveAt)
         summary.isActive = active
         summary.runningSubagents = subagents
+        summary.runningTasks = tasks
         const output = await applyFullScan(summary, filePath)
 
         summaryCache.set(filePath, {
@@ -209,11 +211,12 @@ export async function scanSessionsFromSource(source: DataSource): Promise<Sessio
 
       const cached = summaryCache.get(filePath)
       if (cached && cached.mtimeMs === stat.mtimeMs) {
-        const { active, subagents } = await sessionState(project.dirName, sessionId, cached.summary.lastActiveAt, projectsDirOverride)
+        const { active, subagents, tasks } = await sessionState(project.dirName, sessionId, cached.summary.lastActiveAt, projectsDirOverride)
         const entry = {
           ...cached.summary,
           isActive: active,
           runningSubagents: subagents,
+          runningTasks: tasks,
           projectDisplayName,
           sourceId: source.id,
           sourceLabel: source.label,
@@ -234,9 +237,10 @@ export async function scanSessionsFromSource(source: DataSource): Promise<Sessio
       )
 
       if (summary) {
-        const { active, subagents } = await sessionState(project.dirName, sessionId, summary.lastActiveAt, projectsDirOverride)
+        const { active, subagents, tasks } = await sessionState(project.dirName, sessionId, summary.lastActiveAt, projectsDirOverride)
         summary.isActive = active
         summary.runningSubagents = subagents
+        summary.runningTasks = tasks
         const output = await applyFullScan(summary, filePath)
         summary.sourceId = source.id
         summary.sourceLabel = source.label

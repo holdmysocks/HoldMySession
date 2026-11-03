@@ -17,6 +17,8 @@ export interface SessionSummary {
   isActive: boolean
   /** Subagents of this session that are working now. The session is not done while there are any. */
   runningSubagents?: number
+  /** Background tasks, such as a long shell command, still running for this session. */
+  runningTasks?: number
   toolCallCount: number
   model: string | null
   version: string | null
