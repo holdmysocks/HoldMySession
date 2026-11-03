@@ -71,19 +71,37 @@ function tempRoots(tempDir?: string): string[] {
 export function backgroundTaskDirs(projectDirName: string, sessionId: string, tempDir?: string): string[] {
   const found: string[] = []
   for (const root of tempRoots(tempDir)) {
-    let names: string[]
-    try {
-      names = fs.readdirSync(root)
-    } catch {
-      continue
-    }
-    for (const name of names) {
-      if (!CLAUDE_FOLDER.test(name)) continue
+    for (const name of claudeFolders(root)) {
       const dir = path.join(root, name, projectDirName, sessionId, 'tasks')
       if (!found.includes(dir) && fs.existsSync(dir)) found.push(dir)
     }
   }
   return found
+}
+
+/**
+ * The folders named claude or claude-<number> in a temp folder, remembered for a few seconds. A scan asks for every session in
+ * turn, and listing a temp folder, which can hold hundreds of entries, once per session made each scan slow.
+ */
+const FOLDER_LIST_MS = 10_000
+const folderLists = new Map<string, { at: number; names: string[] }>()
+
+function claudeFolders(root: string, nowMs: number = Date.now()): string[] {
+  const known = folderLists.get(root)
+  if (known && nowMs - known.at < FOLDER_LIST_MS) return known.names
+  let names: string[]
+  try {
+    names = fs.readdirSync(root).filter((name) => CLAUDE_FOLDER.test(name))
+  } catch {
+    names = []
+  }
+  folderLists.set(root, { at: nowMs, names })
+  return names
+}
+
+/** For tests: forget what was listed. */
+export function forgetFolderLists(): void {
+  folderLists.clear()
 }
 
 /** The folder where Claude Code kept a session's task output in the older layout. Only exists on the machine that ran the session. */

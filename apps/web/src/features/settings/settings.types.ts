@@ -62,6 +62,15 @@ export const LimitsSchema = z.object({
   alerts: z.boolean().default(true),
 })
 
+/** How long Claude Code must go unused before the desktop app quits to save memory, in minutes. */
+export const IDLE_MINUTES = [10, 30, 60, 120] as const
+
+export const IdleSchema = z.object({
+  /** Desktop app: quit after Claude Code has gone unused, and start again with the next session or message. */
+  quit: z.boolean().default(true),
+  minutes: z.union([z.literal(10), z.literal(30), z.literal(60), z.literal(120)]).default(30),
+})
+
 export const SettingsSchema = z.object({
   version: z.literal(1),
   subscriptionTier: z
@@ -76,6 +85,7 @@ export const SettingsSchema = z.object({
   needsYouAlerts: z.boolean().default(true),
   /** The subscription limits. `fiveHour` auto draws the 5-hour meter only for a plan Claude Code reports one for. */
   limits: LimitsSchema.default({ fiveHour: 'auto', alerts: true }),
+  idle: IdleSchema.default({ quit: true, minutes: 30 }),
   link: LinkSchema.default({ role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' }),
   projects: ProjectsSchema.default({ scratch: 'group', scratchByName: false, hidden: [] }),
   pricingOverrides: z
@@ -101,6 +111,7 @@ export type Settings = z.infer<typeof SettingsSchema>
 export type AutoScanSetting = z.infer<typeof AutoScanSchema>
 export type LinkSetting = z.infer<typeof LinkSchema>
 export type LimitsSetting = z.infer<typeof LimitsSchema>
+export type IdleSetting = z.infer<typeof IdleSchema>
 export type FiveHourMode = (typeof FIVE_HOUR_MODES)[number]
 export type ProjectsSetting = z.infer<typeof ProjectsSchema>
 export type ScratchMode = (typeof SCRATCH_MODES)[number]
@@ -327,6 +338,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoUpdate: true,
   needsYouAlerts: true,
   limits: { fiveHour: 'auto', alerts: true },
+  idle: { quit: true, minutes: 30 },
   link: { role: 'node', masterUrl: '', masterUrls: [], masterToken: '', nodeToken: '', listen: 'local' },
   projects: { scratch: 'group', scratchByName: false, hidden: [] },
   pricingOverrides: {},

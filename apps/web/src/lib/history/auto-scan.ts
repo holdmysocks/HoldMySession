@@ -1,4 +1,7 @@
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { readSettingsFile } from '@/lib/settings-file'
+import { getProjectsDir } from '@/lib/utils/claude-path'
 import { openHistoryDb } from './history-db'
 import { runHistoryScan } from './scan'
 
@@ -22,7 +25,42 @@ export interface AutoScanDeps {
   lastFinishedMs: () => number | null
   scan: () => Promise<unknown>
   now: () => number
+  /** Whether any transcript was written since this time. A scan reads them all, so it is not worth doing when none were. */
+  changedSince: (sinceMs: number) => boolean
 }
+
+/**
+ * Whether a session transcript under the Claude folder was written after `sinceMs`. Looks at file times only, which is far
+ * cheaper than the scan it saves. Errs toward yes when the folder cannot be read.
+ */
+export function transcriptsChangedSince(sinceMs: number, projectsDir: string = getProjectsDir()): boolean {
+  let projects: string[]
+  try {
+    projects = fs.readdirSync(projectsDir)
+  } catch {
+    return true
+  }
+  for (const project of projects) {
+    let names: string[]
+    try {
+      names = fs.readdirSync(path.join(projectsDir, project))
+    } catch {
+      continue
+    }
+    for (const name of names) {
+      if (!name.endsWith('.jsonl')) continue
+      try {
+        if (fs.statSync(path.join(projectsDir, project, name)).mtimeMs > sinceMs) return true
+      } catch {
+        // Gone since it was listed.
+      }
+    }
+  }
+  return false
+}
+
+/** When a due scan last found nothing changed, so it is not looked into again until the interval has passed. */
+let lastUnchangedCheckMs: number | null = null
 
 const defaultDeps: AutoScanDeps = {
   settings: () => readSettingsFile().autoScan,
@@ -37,16 +75,31 @@ const defaultDeps: AutoScanDeps = {
   },
   scan: () => runHistoryScan(),
   now: () => Date.now(),
+  changedSince: (sinceMs) => transcriptsChangedSince(sinceMs),
 }
 
 /** One look at the clock: scans if it is due. The setting is read every time, so changes apply without a restart. */
 export async function autoScanTick(deps: AutoScanDeps = defaultDeps): Promise<'scanned' | 'skipped'> {
   const { enabled, intervalMinutes } = deps.settings()
-  if (!isScanDue({ enabled, intervalMinutes, lastFinishedMs: enabled ? deps.lastFinishedMs() : null, now: deps.now() })) {
-    return 'skipped'
+  const now = deps.now()
+  const lastFinishedMs = enabled ? deps.lastFinishedMs() : null
+  if (!isScanDue({ enabled, intervalMinutes, lastFinishedMs, now })) return 'skipped'
+  // Nothing written since the last scan means nothing new to find. Looking again waits for the interval.
+  if (lastFinishedMs !== null) {
+    if (lastUnchangedCheckMs !== null && now - lastUnchangedCheckMs < intervalMinutes * 60_000) return 'skipped'
+    if (!deps.changedSince(lastFinishedMs)) {
+      lastUnchangedCheckMs = now
+      return 'skipped'
+    }
   }
+  lastUnchangedCheckMs = null
   await deps.scan()
   return 'scanned'
+}
+
+/** For tests: forget the last check. */
+export function resetAutoScanState(): void {
+  lastUnchangedCheckMs = null
 }
 
 let started = false

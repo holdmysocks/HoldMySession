@@ -28,6 +28,20 @@ export const setOpenAtLogin = createServerFn({ method: 'POST' })
     return { desktop: true, openAtLogin: bridge.setOpenAtLogin(data.enabled), alerts: readSettingsFile().needsYouAlerts, platform: process.platform }
   })
 
+/**
+ * Whether the desktop app quits when Claude Code has gone unused, and after how long. Written to the settings file,
+ * which the desktop program reads itself, since it may not be asking the server at the time.
+ */
+export const setIdleQuit = createServerFn({ method: 'POST' })
+  .validator((input: unknown) => z.object({ quit: z.boolean().optional(), minutes: z.union([z.literal(10), z.literal(30), z.literal(60), z.literal(120)]).optional() }).parse(input))
+  .handler(async ({ data }): Promise<{ quit: boolean; minutes: 10 | 30 | 60 | 120 }> => {
+    const { readSettingsFile, writeSettingsFile } = await import('@/lib/settings-file')
+    const current = readSettingsFile()
+    const idle = { quit: data.quit ?? current.idle.quit, minutes: data.minutes ?? current.idle.minutes }
+    writeSettingsFile({ ...current, idle })
+    return idle
+  })
+
 /** Turns the needs-you alerts on or off. The desktop app reads the setting each time it asks which sessions wait. */
 export const setNeedsYouAlerts = createServerFn({ method: 'POST' })
   .validator((input: unknown) => z.object({ enabled: z.boolean() }).parse(input))

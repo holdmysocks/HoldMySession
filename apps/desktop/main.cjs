@@ -17,6 +17,8 @@ const { pathToFileURL } = require('node:url');
 const { createUpdater } = require('./updater.cjs');
 const { shouldShowWindowFor, portInUse } = require('./launch.cjs');
 const { planAlerts, notificationFor, trayState, mapPathFor, planLimitAlerts, limitsText } = require('./alerts.cjs');
+const { shouldPoll, shouldQuitWhenIdle, isLinked, hasStartHook } = require('./idle.cjs');
+const fs = require('node:fs');
 
 const args = process.argv.slice(1);
 const flag = (name) => args.includes(name);
@@ -24,6 +26,10 @@ const NOTIFY = flag('--holdmysession-notify');
 const START = flag('--holdmysession-start');
 const STATUSLINE = flag('--holdmysession-statusline');
 const BACKGROUND = flag('--background');
+
+// The dashboard is a few pages of text and an SVG map, so it does not need the graphics card, and without it the
+// graphics process, which is the biggest part of the app's memory after the window, stays small. HOLDMYSESSION_GPU=1 turns it back on.
+if (!process.env.HOLDMYSESSION_GPU) app.disableHardwareAcceleration();
 
 // Started only to answer a hook: no Dock icon for it on a Mac, which would flash for a moment each time.
 if (process.platform === 'darwin' && (NOTIFY || START || STATUSLINE)) app.dock?.hide();
@@ -156,16 +162,11 @@ function runApp() {
         shell.openExternal(url);
       }
     });
-    // Closing the window hides it. The app keeps running in the tray until Quit.
-    win.on('close', (event) => {
-      if (!quitting) {
-        event.preventDefault();
-        win.hide();
-        dockHide();
-      }
-    });
+    // Closing the window closes it, and its page and the process that runs it go with it. A window that is only hidden keeps
+    // all of that in memory. The app keeps running in the tray until Quit, and the tray opens a new window.
     win.on('closed', () => {
       win = null;
+      dockHide();
     });
   }
 
@@ -205,6 +206,70 @@ function runApp() {
     setInterval(rebuild, 30_000).unref();
     tray.on('click', showWindow);
     rebuildTray = rebuild;
+  }
+
+  // --- Activity: poll, and stay running, only while Claude Code is in use ---
+
+  const HOME = os.homedir();
+  const claudeDir = process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDE_HOME || path.join(HOME, '.claude');
+  const dataDir = process.env.HOLDMYSESSION_DIR || process.env.CLAUDE_DASHBOARD_DIR || process.env.CLAUDE_DASHBOARD_HOME || path.join(HOME, '.holdmysession');
+  let lastActivity = Date.now();
+  let watching = false;
+  const touchActivity = () => {
+    lastActivity = Date.now();
+  };
+
+  // A recursive watch costs next to nothing while nothing is written, and fires when Claude Code writes a transcript. The
+  // hook events and the status line's limits count as well. Without a watch, everything polls as it always did.
+  function startWatching() {
+    if (watching) return;
+    try {
+      const watcher = fs.watch(path.join(claudeDir, 'projects'), { recursive: true, persistent: false }, touchActivity);
+      watcher.on('error', () => {
+        watching = false;
+      });
+      watching = true;
+    } catch {
+      watching = false;
+    }
+    try {
+      fs.watch(dataDir, { persistent: false }, (_event, name) => {
+        if (name === 'events.jsonl' || name === 'usage.json') touchActivity();
+      }).on('error', () => undefined);
+    } catch {
+      // No data folder yet: the hooks make it when they first run.
+    }
+  }
+
+  const readJson = (file) => {
+    try {
+      return JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {
+      return null;
+    }
+  };
+
+  /** The app has nothing to do while Claude Code is not in use, so it can quit, when that is safe, and the start hook brings it back. */
+  function checkIdle() {
+    const settings = readJson(path.join(dataDir, 'settings.json')) || {};
+    let startHookInstalled = false;
+    try {
+      startHookInstalled = hasStartHook(fs.readFileSync(path.join(claudeDir, 'settings.json'), 'utf8'));
+    } catch {
+      // No Claude settings file: no hook.
+    }
+    if (shouldQuitWhenIdle({
+      nowMs: Date.now(),
+      lastActivityMs: lastActivity,
+      windowOpen: Boolean(win),
+      watching,
+      waitingCount,
+      setting: settings.idle === undefined ? { quit: true, minutes: 30 } : settings.idle,
+      linked: isLinked(settings.link),
+      startHookInstalled,
+    })) {
+      quit();
+    }
   }
 
   // --- Alerts: tell the user when a session starts waiting on them ---
@@ -247,7 +312,10 @@ function runApp() {
   }
 
   // The limits: a notification as a window passes 75% and 90%, and when one that was run up resets.
+  const busy = () => shouldPoll({ nowMs: Date.now(), lastActivityMs: lastActivity, windowOpen: Boolean(win), watching });
+
   async function pollLimits() {
+    if (!busy()) return;
     try {
       const response = await fetch(`http://localhost:${PORT}/api/limits`, { signal: AbortSignal.timeout(5000) });
       if (!response.ok) return;
@@ -264,6 +332,7 @@ function runApp() {
   }
 
   async function pollNeedsYou() {
+    if (!busy()) return;
     try {
       const response = await fetch(`http://localhost:${PORT}/api/needs-you`, { signal: AbortSignal.timeout(5000) });
       if (!response.ok) return;
@@ -347,6 +416,12 @@ function runApp() {
     setTimeout(pollNeedsYou, 2500).unref();
     setInterval(pollLimits, 30_000).unref();
     setTimeout(pollLimits, 4000).unref();
+    startWatching();
+    // A folder that was not there yet is watched once it is, and a quiet spell is noticed within a minute.
+    setInterval(() => {
+      startWatching();
+      checkIdle();
+    }, 60_000).unref();
     if (BACKGROUND) dockHide();
     else showWindow();
   });

@@ -6,6 +6,7 @@ import {
   BACKGROUND_TASK_QUIET_MS,
   backgroundTaskDir,
   backgroundTaskDirs,
+  forgetFolderLists,
   countRunningBackgroundTasks,
   hasExitLine,
   hasRunningBackgroundTask,
@@ -114,6 +115,7 @@ describe('backgroundTaskDirs', () => {
 
   beforeEach(() => {
     temp = fs.mkdtempSync(path.join(os.tmpdir(), 'bg-dirs-'))
+    forgetFolderLists()
   })
   afterEach(() => {
     fs.rmSync(temp, { recursive: true, force: true })
@@ -149,6 +151,16 @@ describe('backgroundTaskDirs', () => {
     expect(backgroundTaskDirs('p', 'abc', path.join(temp, 'missing'))).toEqual([])
     make('claude-0', 'p', 'abc')
     expect(backgroundTaskDirs('p', 'abc', temp)).toEqual([])
+  })
+
+  it('lists a temp folder once for many sessions, not once each', () => {
+    make('claude-5', 'p', 'a', 'tasks')
+    expect(backgroundTaskDirs('p', 'a', temp)).toHaveLength(1)
+    // A folder made a moment later is not seen until the list is old, which is the price of not listing it every time.
+    make('claude-6', 'p', 'a', 'tasks')
+    expect(backgroundTaskDirs('p', 'a', temp)).toHaveLength(1)
+    forgetFolderLists()
+    expect(backgroundTaskDirs('p', 'a', temp)).toHaveLength(2)
   })
 
   it('counts the running tasks in every folder it finds', async () => {

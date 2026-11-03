@@ -16,6 +16,15 @@ Settings, Updates has **Check for updates**, **Update now** and **Install update
 
 It needs the app to be in a folder it may write to (not Program Files), a release with a zip for the system (`HoldMySession-<version>-win-x64.zip`, `-mac-arm64.zip`, `-mac-x64.zip`) and `SHA256SUMS.txt`, and a public releases page, since the download is anonymous. Anything else shows a Download link instead.
 
+### Memory
+
+The desktop app is an Electron program, which has a fixed cost of its own. HoldMySession keeps it low, and nothing is running at all while Claude Code is not in use:
+
+- **Closing the window really closes it.** The page and the process that runs it, about 85 MB, go with it. The tray icon opens a new window.
+- **No hardware graphics.** The dashboard is text and an SVG map, so Electron's graphics process, which is large when it uses the graphics card, stays small. Set `HOLDMYSESSION_GPU=1` to turn it back on.
+- **It polls only while Claude Code is in use.** It watches Claude's transcripts, the hook events and the status line for writes. Ten minutes after the last one, with no window open, it stops asking the server which sessions need you. The history scan, which reads every transcript, is skipped when none changed since the last one.
+- **It can quit when Claude Code is not in use.** Settings, General, **Quit when Claude Code is not in use**, after 10 minutes, 30 minutes, 1 hour or 2 hours (30 minutes by default). The Claude Code start hook, which fires on a new session and on each message, starts it again. It never quits while its window is open, while a session needs you, when this computer is linked to another as a master or a node, or when the start hook is not on. `HOLDMYSESSION_BUSY_MS` and `HOLDMYSESSION_IDLE_MS` shorten the two waits, for testing.
+
 ### Linking machines from the app
 
 On a master, Settings, Linked machines shows the machine's addresses (local network, tailnet and computer name) and a **pairing code** to paste on each node, which holds every address and the token, so a node works over either network. Turning on **Listen on the network** asks Windows for the firewall permission it needs (Windows shows its own permission prompt), limited to your own network and the tailnet, and the page offers **Restart now** to apply it. If you decline the prompt, the card says what is missing and has an **Allow through the firewall** button. On a Mac the system asks the first time. A node only makes outgoing connections, so it needs no firewall permission, and when it cannot connect it says why (refused, no answer, name not found).
