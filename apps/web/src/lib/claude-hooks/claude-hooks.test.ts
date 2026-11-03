@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { addHook, hookCommands, installedCommand, isHookComplete, isHookInstalled, removeHook } from './claude-hooks'
+import { addHook, hookCommands, installedCommand, isHookInstalled, removeHook } from './claude-hooks'
 
 const commands = hookCommands({ appDir: 'C:\\Apps\\HoldMySession\\apps\\web' })
 
@@ -102,30 +102,11 @@ describe('adding and removing', () => {
     expect(isHookInstalled(noStart, 'start')).toBe(false)
   })
 
-  it('does not mistake a hook of someone else for ours', () => {
+  it('does not mistake a hook of someone else for ours, or a partly installed hook for installed', () => {
     expect(isHookInstalled({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'echo hi' }] }] } }, 'notify')).toBe(false)
+    expect(isHookInstalled({ hooks: { Stop: [{ hooks: [{ type: 'command', command: commands.notify }] }] } }, 'notify')).toBe(false)
     expect(isHookInstalled(null, 'notify')).toBe(false)
     expect(isHookInstalled({ hooks: 'nonsense' }, 'notify')).toBe(false)
-    expect(isHookComplete(null, 'notify')).toBe(false)
-  })
-
-  it('counts a hook in some of its events as installed, but not complete', () => {
-    const partly = { hooks: { Stop: [{ hooks: [{ type: 'command', command: commands.notify }] }] } }
-    expect(isHookInstalled(partly, 'notify')).toBe(true)
-    expect(isHookComplete(partly, 'notify')).toBe(false)
-    expect(isHookComplete(addHook({}, 'notify', commands.notify), 'notify')).toBe(true)
-  })
-
-  it('starts HoldMySession on a message as well as a session, and an older start hook is completed in place', () => {
-    const older = { hooks: { SessionStart: [{ hooks: [{ type: 'command', command: commands.start }] }] } }
-    expect(isHookInstalled(older, 'start')).toBe(true)
-    expect(isHookComplete(older, 'start')).toBe(false)
-    const upgraded = addHook(older, 'start', commands.start) as { hooks: Record<string, unknown[]> }
-    expect(isHookComplete(upgraded, 'start')).toBe(true)
-    // The command that was there is updated, not added twice.
-    expect(upgraded.hooks.SessionStart).toHaveLength(1)
-    expect(upgraded.hooks.UserPromptSubmit).toHaveLength(1)
-    expect(Object.keys(removeHook(upgraded, 'start'))).toEqual([])
   })
 })
 

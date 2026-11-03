@@ -5,14 +5,13 @@
  * claude-settings-file.ts.
  *
  * - notify: Notification and Stop events, which feed the "Needs you" panel and recent events.
- * - start: SessionStart and UserPromptSubmit, which start HoldMySession if it is not already running. The second brings
- *   it back when it quit for lack of use and a session that was already open is used again.
+ * - start: SessionStart, which starts HoldMySession if it is not already running.
  */
 export type HookKind = 'notify' | 'start'
 
 export const HOOK_EVENTS: Record<HookKind, string[]> = {
   notify: ['Notification', 'Stop'],
-  start: ['SessionStart', 'UserPromptSubmit'],
+  start: ['SessionStart'],
 }
 
 /** Words that mark a hook command as ours. The installed app uses the flags, a source checkout the script names. */
@@ -69,17 +68,12 @@ function groupsOf(settings: Json, event: string): HookGroup[] {
   return Array.isArray(groups) ? (groups as HookGroup[]) : []
 }
 
-const hasOurs = (settings: Json, kind: HookKind, event: string) =>
-  groupsOf(settings, event).some((g) => isObject(g) && Array.isArray(g.hooks) && g.hooks.some((h) => isOurs(kind, h)))
-
-/** Whether one of our commands is in at least one event of a hook. */
+/** Whether every event of a hook has one of our commands. */
 export function isHookInstalled(settings: unknown, kind: HookKind): boolean {
-  return isObject(settings) && HOOK_EVENTS[kind].some((event) => hasOurs(settings, kind, event))
-}
-
-/** Whether it is in every event. A hook added by an older version lacks the events added since. */
-export function isHookComplete(settings: unknown, kind: HookKind): boolean {
-  return isObject(settings) && HOOK_EVENTS[kind].every((event) => hasOurs(settings, kind, event))
+  if (!isObject(settings)) return false
+  return HOOK_EVENTS[kind].every((event) =>
+    groupsOf(settings, event).some((g) => isObject(g) && Array.isArray(g.hooks) && g.hooks.some((h) => isOurs(kind, h))),
+  )
 }
 
 /** The command a hook currently uses in the file, or null if it is not installed. */

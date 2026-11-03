@@ -17,7 +17,7 @@ const { pathToFileURL } = require('node:url');
 const { createUpdater } = require('./updater.cjs');
 const { shouldShowWindowFor, portInUse } = require('./launch.cjs');
 const { planAlerts, notificationFor, trayState, mapPathFor, planLimitAlerts, limitsText } = require('./alerts.cjs');
-const { shouldPoll, shouldQuitWhenIdle, isLinked, hasStartHook } = require('./idle.cjs');
+const { shouldPoll, newestTranscriptMtime } = require('./idle.cjs');
 const fs = require('node:fs');
 
 const args = process.argv.slice(1);
@@ -208,12 +208,13 @@ function runApp() {
     rebuildTray = rebuild;
   }
 
-  // --- Activity: poll, and stay running, only while Claude Code is in use ---
+  // --- Activity: poll only while Claude Code is in use ---
 
   const HOME = os.homedir();
   const claudeDir = process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDE_HOME || path.join(HOME, '.claude');
   const dataDir = process.env.HOLDMYSESSION_DIR || process.env.CLAUDE_DASHBOARD_DIR || process.env.CLAUDE_DASHBOARD_HOME || path.join(HOME, '.holdmysession');
-  let lastActivity = Date.now();
+  // Starts from the newest transcript on disk, so an app launched with Claude Code not in use has nothing to poll.
+  let lastActivity = 0;
   let watching = false;
   const touchActivity = () => {
     lastActivity = Date.now();
@@ -224,6 +225,7 @@ function runApp() {
   function startWatching() {
     if (watching) return;
     try {
+      lastActivity = Math.max(lastActivity, newestTranscriptMtime(path.join(claudeDir, 'projects')));
       const watcher = fs.watch(path.join(claudeDir, 'projects'), { recursive: true, persistent: false }, touchActivity);
       watcher.on('error', () => {
         watching = false;
@@ -238,37 +240,6 @@ function runApp() {
       }).on('error', () => undefined);
     } catch {
       // No data folder yet: the hooks make it when they first run.
-    }
-  }
-
-  const readJson = (file) => {
-    try {
-      return JSON.parse(fs.readFileSync(file, 'utf8'));
-    } catch {
-      return null;
-    }
-  };
-
-  /** The app has nothing to do while Claude Code is not in use, so it can quit, when that is safe, and the start hook brings it back. */
-  function checkIdle() {
-    const settings = readJson(path.join(dataDir, 'settings.json')) || {};
-    let startHookInstalled = false;
-    try {
-      startHookInstalled = hasStartHook(fs.readFileSync(path.join(claudeDir, 'settings.json'), 'utf8'));
-    } catch {
-      // No Claude settings file: no hook.
-    }
-    if (shouldQuitWhenIdle({
-      nowMs: Date.now(),
-      lastActivityMs: lastActivity,
-      windowOpen: Boolean(win),
-      watching,
-      waitingCount,
-      setting: settings.idle === undefined ? { quit: true, minutes: 30 } : settings.idle,
-      linked: isLinked(settings.link),
-      startHookInstalled,
-    })) {
-      quit();
     }
   }
 
@@ -417,11 +388,8 @@ function runApp() {
     setInterval(pollLimits, 30_000).unref();
     setTimeout(pollLimits, 4000).unref();
     startWatching();
-    // A folder that was not there yet is watched once it is, and a quiet spell is noticed within a minute.
-    setInterval(() => {
-      startWatching();
-      checkIdle();
-    }, 60_000).unref();
+    // A folder that was not there yet is watched once it is.
+    setInterval(startWatching, 60_000).unref();
     if (BACKGROUND) dockHide();
     else showWindow();
   });

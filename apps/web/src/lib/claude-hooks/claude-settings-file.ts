@@ -2,7 +2,6 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { getClaudeDir } from '@/lib/utils/claude-path'
 import { dataDir } from '@/lib/data-dir'
-import { isHookComplete } from './claude-hooks'
 import { addStatusLine, foreignStatusLine, installedStatusLineCommand, removeStatusLine, statusLineCommand } from './claude-statusline'
 import { addHook, hookCommands, installedCommand, isHookInstalled, removeHook, type HookCommands, type HookKind } from './claude-hooks'
 
@@ -59,8 +58,7 @@ export function readHookState(): HookState {
   const { settings, error } = readFile(file)
   const commands = currentCommands()
   const installed = (kind: HookKind) => settings !== null && isHookInstalled(settings, kind)
-  // Out of date: the command is not the one this copy would write, or an event added since it was installed is missing.
-  const stale = (kind: HookKind) => installed(kind) && (installedCommand(settings, kind) !== commands[kind] || !isHookComplete(settings, kind))
+  const stale = (kind: HookKind) => installed(kind) && installedCommand(settings, kind) !== commands[kind]
   return {
     settingsPath: file,
     readable: settings !== null,

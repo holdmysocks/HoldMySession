@@ -1,7 +1,12 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { setHookEnabled } from './hooks.api'
-import { hookStateQuery } from './hook-state.queries'
+import { useMutation, useQuery, useQueryClient, queryOptions } from '@tanstack/react-query'
+import { getHookState, setHookEnabled } from './hooks.api'
+
+export const hookStateQuery = queryOptions({
+  queryKey: ['hook-state'],
+  queryFn: () => getHookState(),
+  refetchOnWindowFocus: true,
+})
 
 const ROWS = [
   {
@@ -47,7 +52,7 @@ export function HooksPanel() {
                 <p className="text-[13px] text-[color:var(--hms-mute)]">{row.text}</p>
                 {state.stale[row.kind] && (
                   <p className="mt-0.5 text-[13px] text-amber-400">
-                    This hook is out of date: it points to somewhere else, such as an older copy of the app, or it lacks an event added since. Turn it off and on to fix it.
+                    This hook points to somewhere else, such as an older copy of the app. Turn it off and on to fix it.
                   </p>
                 )}
                 <p className="mt-0.5 truncate font-mono text-[11px] text-[color:var(--hms-mute)] opacity-70" title={state.commands[row.kind]}>

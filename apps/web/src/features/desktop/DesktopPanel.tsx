@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient, queryOptions } from '@tanstack/react-query'
-import { getDesktopState, setIdleQuit, setNeedsYouAlerts, setOpenAtLogin } from './desktop.api'
-import { PillSelect } from '@/components/ui/PillSelect'
-import { hookStateQuery } from '@/features/hooks/hook-state.queries'
+import { getDesktopState, setNeedsYouAlerts, setOpenAtLogin } from './desktop.api'
 import { settingsQuery } from '@/features/settings/settings.queries'
 import { setLimitsSettings } from '@/features/usage/usage.api'
 
@@ -37,14 +35,7 @@ export function DesktopPanel() {
     mutationFn: (enabled: boolean) => setLimitsSettings({ data: { alerts: enabled } }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
   })
-  const { data: hooks } = useQuery(hookStateQuery)
-  const idle = useMutation({
-    mutationFn: (change: { quit?: boolean; minutes?: 10 | 30 | 60 | 120 }) => setIdleQuit({ data: change }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
-  })
   if (!data?.desktop) return null
-  const idleQuit = settings?.idle.quit ?? true
-  const idleMinutes = settings?.idle.minutes ?? 30
   const limitsOn = settings?.limits.alerts ?? true
   const mac = data.platform === 'darwin'
   const on = data.openAtLogin
@@ -110,49 +101,6 @@ export function DesktopPanel() {
       >
         <span className={`inline-block h-[21px] w-[21px] rounded-full transition-transform ${limitsOn ? 'translate-x-[26px] bg-brand-400' : 'translate-x-[3px] bg-gray-400'}`} />
       </button>
-    </section>
-    <section aria-label="Quit when idle" className="border-b border-[color:var(--hms-rule)] py-[18px]">
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-        <div className="min-w-0 max-w-[640px]">
-          <h2 className="text-base font-semibold">Quit when Claude Code is not in use</h2>
-          <p className="text-[13px] text-[color:var(--hms-mute)]">
-            Uses no memory while you are not working. HoldMySession quits after Claude Code has gone unused, and starts again with your next Claude session or message. It never quits while its window is open, while a session needs you, or when this computer is linked to another.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {idleQuit && (
-            <PillSelect
-              label="Quit after"
-              value={String(idleMinutes)}
-              onChange={(v) => idle.mutate({ minutes: Number(v) as 10 | 30 | 60 | 120 })}
-              options={[
-                { value: '10', label: 'After 10 minutes' },
-                { value: '30', label: 'After 30 minutes' },
-                { value: '60', label: 'After 1 hour' },
-                { value: '120', label: 'After 2 hours' },
-              ]}
-              align="right"
-              disabled={idle.isPending}
-            />
-          )}
-          <button
-            type="button"
-            role="switch"
-            aria-checked={idleQuit}
-            aria-label="Quit when Claude Code is not in use"
-            disabled={idle.isPending}
-            onClick={() => idle.mutate({ quit: !idleQuit })}
-            className={`relative inline-flex h-[30px] w-[52px] shrink-0 cursor-pointer items-center rounded-full border-[1.5px] transition-colors disabled:opacity-50 ${idleQuit ? 'border-brand-400 bg-brand-400/20' : 'border-[color:var(--hms-line)]'}`}
-          >
-            <span className={`inline-block h-[21px] w-[21px] rounded-full transition-transform ${idleQuit ? 'translate-x-[26px] bg-brand-400' : 'translate-x-[3px] bg-gray-400'}`} />
-          </button>
-        </div>
-      </div>
-      {idleQuit && hooks && (!hooks.start || hooks.stale.start) && (
-        <p className="mt-2 text-[13px] text-amber-400">
-          This only works with the "Start HoldMySession with Claude Code" hook switched on and up to date, in Settings, Claude Code. Until then it does not quit.
-        </p>
-      )}
     </section>
     </>
   )
