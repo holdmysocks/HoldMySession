@@ -148,4 +148,4 @@ Code is organised by feature under `apps/web/src/features`, with the scanner, pa
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+GPL-3.0. See [LICENSE](LICENSE). Based on [claude-session-dashboard](https://github.com/dlupiak/claude-session-dashboard) by Dmytro Lupiak; see [NOTICE](NOTICE).

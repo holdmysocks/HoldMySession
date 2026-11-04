@@ -10,7 +10,7 @@
 // and also written as a disk image when `xorriso` is there, compressed into a real .dmg when libdmg-hfsplus's `dmg`
 // is too (DMG_TOOL is its path if it is not on PATH). Neither signing is a developer signature, so macOS still asks once.
 
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -25,6 +25,13 @@ const stage = join(desktop, '.stage', 'app');
 const outDir = join(desktop, '.stage', 'out');
 const releaseDir = join(desktop, 'release');
 const NAME = 'HoldMySession';
+const repoRoot = join(desktop, '..', '..');
+/** The licence files of this program, and the names they have in a download, where the Electron program's own LICENSE already is. */
+const LICENSE_FILES = [
+  ['LICENSE', 'LICENSE-HoldMySession.txt'],
+  ['NOTICE', 'NOTICE.txt'],
+  ['LICENSE-claude-session-dashboard', 'LICENSE-claude-session-dashboard.txt'],
+];
 
 /** Whether a program runs, so a Mac build can use `rcodesign` and `xorriso` when they are there and say so when they are not. */
 function available(program, args = ['--version']) {
@@ -83,7 +90,7 @@ for (const f of ['dist', 'bin', 'package.json', 'package-lock.json']) cpSync(joi
 // The program's own package file: its main is the desktop main, and its version is the app's version.
 writeFileSync(
   join(stage, 'package.json'),
-  JSON.stringify({ name: 'holdmysession', productName: NAME, version, description: webPackage.description, main: 'main.cjs', license: 'MIT' }, null, 2),
+  JSON.stringify({ name: 'holdmysession', productName: NAME, version, description: webPackage.description, main: 'main.cjs', license: 'GPL-3.0-only' }, null, 2),
 );
 console.log('==> Installing the production dependencies');
 run('npm', ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], join(stage, 'web'));
@@ -147,7 +154,7 @@ for (const arch of arches) {
     quiet: true,
     appBundleId: 'com.holdmysocks.holdmysession',
     appCategoryType: 'public.app-category.developer-tools',
-    appCopyright: 'MIT License',
+    appCopyright: 'GPL-3.0-only',
     ...(platform === 'darwin' ? { icon: join(desktop, 'icons', 'icon.icns') } : {}),
   });
 
@@ -174,6 +181,10 @@ for (const arch of arches) {
       : `${NAME} ${version}\n\nOpen ${NAME}. It opens a window and keeps running in the menu bar when you close it.\nThe same app is at http://localhost:3000 in a browser.\n\nmacOS will not open an app downloaded from the internet that is not notarized, and this one is not. Once, after copying it to Applications, run:\n  xattr -dr com.apple.quarantine /Applications/${NAME}.app\nor open System Settings, Privacy and Security, and choose Open Anyway.${signed ? '' : `\nIt is also not signed. Run: codesign --force --deep --sign - ${NAME}.app`}\nYour data is kept in ~/.holdmysession. Drag the app to the Bin to uninstall.\n`,
   );
 
+  // The GPL needs its text, and where the source is, to travel with the program. The Electron program has its own LICENSE in this folder.
+  appendFileSync(join(built, 'README.txt'), `\nLicense: GPL-3.0, in ${LICENSE_FILES[0][1]}. Source code: https://github.com/holdmysocks/HoldMySession\n`);
+  for (const [from, to] of LICENSE_FILES) cpSync(join(repoRoot, from), join(built, to));
+
   const label = platform === 'win32' ? 'win' : platform === 'darwin' ? 'mac' : 'linux';
   const zip = join(releaseDir, `${NAME}-${version}-${label}-${arch}.zip`);
   rmSync(zip, { force: true });
@@ -191,6 +202,7 @@ for (const arch of arches) {
       mkdirSync(folder, { recursive: true });
       cpSync(join(built, `${NAME}.app`), join(folder, `${NAME}.app`), { recursive: true, verbatimSymlinks: true });
       symlinkSync('/Applications', join(folder, 'Applications'));
+      for (const [from, to] of LICENSE_FILES) cpSync(join(repoRoot, from), join(folder, to));
       rmSync(dmg, { force: true });
       const iso = join(desktop, '.stage', 'dmg.iso');
       rmSync(iso, { force: true });

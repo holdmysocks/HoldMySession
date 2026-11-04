@@ -3,7 +3,7 @@
   "version": "0.10.3",
   "description": "Local observability dashboard for Claude Code sessions",
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "homepage": "https://github.com/holdmysocks/HoldMySession",
   "repository": {
     "type": "git",

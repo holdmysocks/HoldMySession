@@ -57,6 +57,10 @@ npm run build        # Production build
 
 Check the [good first issue](https://github.com/holdmysocks/HoldMySession/labels/good%20first%20issue) label for beginner-friendly tasks.
 
+## License
+
+HoldMySession is licensed under the GPL-3.0 (see [LICENSE](LICENSE) and [NOTICE](NOTICE)). By opening a pull request you agree that your contribution is released under the same license.
+
 ## Questions?
 
 Open a [Discussion](https://github.com/holdmysocks/HoldMySession/discussions) or comment on the issue you're working on.
