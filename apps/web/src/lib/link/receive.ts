@@ -56,14 +56,15 @@ export function acceptPush(db: Db, input: unknown, now: Date = new Date()): { ac
     const stamp = now.toISOString()
     const upsert = db.prepare(`
       INSERT INTO sessions (machine_id, session_key, session_id, project_key, project_path, project_display_name, session_name,
-        started_at, last_active_at, duration_ms, message_count, tool_call_count, on_disk, first_seen_at, last_seen_at, cwd, project_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        started_at, last_active_at, duration_ms, message_count, tool_call_count, on_disk, first_seen_at, last_seen_at, cwd, project_name, active_ms)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (machine_id, session_key) DO UPDATE SET
         session_id = excluded.session_id, project_key = excluded.project_key, project_path = excluded.project_path,
         project_display_name = excluded.project_display_name, session_name = COALESCE(excluded.session_name, sessions.session_name),
         started_at = excluded.started_at, last_active_at = excluded.last_active_at, duration_ms = excluded.duration_ms,
         message_count = excluded.message_count, tool_call_count = excluded.tool_call_count, on_disk = excluded.on_disk,
-        last_seen_at = excluded.last_seen_at, cwd = excluded.cwd, project_name = excluded.project_name
+        last_seen_at = excluded.last_seen_at, cwd = excluded.cwd, project_name = excluded.project_name,
+        active_ms = excluded.active_ms
     `)
     const clear = db.prepare('DELETE FROM usage_daily WHERE machine_id = ? AND session_key = ?')
     const addUsage = db.prepare(`
@@ -71,16 +72,16 @@ export function acceptPush(db: Db, input: unknown, now: Date = new Date()): { ac
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     const clearActivity = db.prepare('DELETE FROM activity_daily WHERE machine_id = ? AND session_key = ?')
-    const addActivity = db.prepare('INSERT INTO activity_daily (machine_id, session_key, day, messages, tool_calls) VALUES (?, ?, ?, ?, ?)')
+    const addActivity = db.prepare('INSERT INTO activity_daily (machine_id, session_key, day, messages, tool_calls, active_ms) VALUES (?, ?, ?, ?, ?, ?)')
     for (const s of payload.sessions) {
       upsert.run(
         machine.machineId, s.session_key, s.session_id, s.project_key, s.project_path, s.project_display_name, s.session_name,
         s.started_at, s.last_active_at, s.duration_ms, s.message_count, s.tool_call_count, s.on_disk, s.first_seen_at, stamp,
-        s.cwd ?? '', s.project_name ?? '',
+        s.cwd ?? '', s.project_name ?? '', s.active_ms ?? null,
       )
       clear.run(machine.machineId, s.session_key)
       clearActivity.run(machine.machineId, s.session_key)
-      for (const a of s.activity) addActivity.run(machine.machineId, s.session_key, a.day, a.messages, a.tool_calls)
+      for (const a of s.activity) addActivity.run(machine.machineId, s.session_key, a.day, a.messages, a.tool_calls, a.active_ms ?? 0)
       for (const u of s.usage) {
         addUsage.run(machine.machineId, s.session_key, u.day, u.model, u.input_tokens, u.output_tokens, u.thinking_tokens, u.cache_read_tokens, u.cache_write_tokens)
       }

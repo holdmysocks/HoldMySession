@@ -16,6 +16,7 @@ export const ActivityRowSchema = z.object({
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   messages: z.number().int().min(0),
   tool_calls: z.number().int().min(0),
+  active_ms: z.number().int().min(0).optional(),
 })
 
 export const SessionRowSchema = z.object({
@@ -28,6 +29,7 @@ export const SessionRowSchema = z.object({
   started_at: z.string().max(40),
   last_active_at: z.string().max(40),
   duration_ms: z.number().int().min(0),
+  active_ms: z.number().int().min(0).nullable().optional(),
   message_count: z.number().int().min(0),
   tool_call_count: z.number().int().min(0),
   on_disk: z.number().int().min(0).max(1),

@@ -68,3 +68,26 @@ export function splitCount(startIso: string, endIso: string, total: number): Map
 export function splitDuration(startIso: string, endIso: string, durationMs: number): Map<string, number> {
   return splitCount(startIso, endIso, durationMs)
 }
+
+/** Gaps between messages longer than this are time away, not time working. */
+export const ACTIVE_GAP_MS = 10 * 60 * 1000
+
+/**
+ * The time spent working in a session, by local day: every gap between two consecutive messages of at most
+ * ACTIVE_GAP_MS counts, longer gaps count nothing. A gap that crosses midnight is split between the days.
+ */
+export function activeTimeByDay(timestamps: string[]): Map<string, number> {
+  const times = timestamps.map((t) => ({ t, ms: new Date(t).getTime() })).filter((x) => !Number.isNaN(x.ms)).sort((a, b) => a.ms - b.ms)
+  const out = new Map<string, number>()
+  for (let i = 1; i < times.length; i++) {
+    const gap = times[i].ms - times[i - 1].ms
+    if (gap <= 0 || gap > ACTIVE_GAP_MS) continue
+    for (const [day, ms] of overlapWeights(times[i - 1].t, times[i].t)) out.set(day, (out.get(day) ?? 0) + ms)
+  }
+  return out
+}
+
+/** A guess at the working time of a session whose messages are no longer known: about 45 seconds a message, never more than it was open. */
+export function estimateActiveMs(durationMs: number, messages: number): number {
+  return Math.max(0, Math.min(durationMs, messages * 45_000))
+}

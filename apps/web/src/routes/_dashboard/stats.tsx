@@ -44,7 +44,7 @@ function exportOptions(stats: StatsCache, prefix: string) {
   ]
 }
 
-/** Time sessions were open, counted per day, or null when the stats carry no per-day time. */
+/** Time spent working, counted per day, or null when the stats carry no per-day time. */
 function openTimeOf(stats: StatsCache): number | null {
   return stats.dailyActivity.some((d) => d.durationMs !== undefined) ? stats.dailyActivity.reduce((s, d) => s + (d.durationMs ?? 0), 0) : null
 }

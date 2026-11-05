@@ -26,3 +26,19 @@ describe('localDay', () => {
     expect(localDay('nope')).toBeNull()
   })
 })
+
+describe('active time', async () => {
+  const { activeTimeByDay, estimateActiveMs } = await import('./day-allocation')
+  it('counts gaps of up to ten minutes and skips longer ones', () => {
+    const m = activeTimeByDay(['2026-01-05T09:00:00Z', '2026-01-05T09:05:00Z', '2026-01-05T09:30:00Z', '2026-01-05T09:31:00Z'])
+    expect([...m.values()].reduce((a, b) => a + b, 0)).toBe(6 * 60_000)
+  })
+  it('does not count overlapping or unordered messages twice and ignores bad times', () => {
+    const m = activeTimeByDay(['2026-01-05T09:01:00Z', 'nope', '2026-01-05T09:00:00Z', '2026-01-05T09:01:00Z'])
+    expect([...m.values()].reduce((a, b) => a + b, 0)).toBe(60_000)
+  })
+  it('estimates from the message count, never above the time open', () => {
+    expect(estimateActiveMs(10_000_000, 4)).toBe(180_000)
+    expect(estimateActiveMs(60_000, 100)).toBe(60_000)
+  })
+})

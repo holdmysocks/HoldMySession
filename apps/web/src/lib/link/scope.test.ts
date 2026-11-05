@@ -19,7 +19,7 @@ function masterWithNodes() {
   ingestSessions(master, [{ summary: summary('mine'), detail: detail(5) }])
   const push = (machineId: string, name: string, id: string, out: number) =>
     acceptPush(master, {
-      machine: { machineId, name, nameUpdatedAt: at(1), appVersion: '1', schemaVersion: 7 },
+      machine: { machineId, name, nameUpdatedAt: at(1), appVersion: '1', schemaVersion: 8 },
       sessions: [{
         session_key: `k:${id}`, session_id: id, project_key: 'k', project_path: '/w/app', project_display_name: 'App', session_name: id,
         started_at: at(1), last_active_at: at(3), duration_ms: 2000, message_count: 8, tool_call_count: 2, on_disk: 1, first_seen_at: at(1),

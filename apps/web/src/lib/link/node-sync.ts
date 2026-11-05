@@ -68,7 +68,7 @@ function pendingBatch(db: Db, machineId: string): Pending[] {
      FROM usage_daily WHERE machine_id = ? AND session_key = ? ORDER BY day, model`,
   )
   const activityStmt = db.prepare(
-    'SELECT day, messages, tool_calls FROM activity_daily WHERE machine_id = ? AND session_key = ? ORDER BY day',
+    'SELECT day, messages, tool_calls, active_ms FROM activity_daily WHERE machine_id = ? AND session_key = ? ORDER BY day',
   )
   return rows.map((r) => ({
     key: String(r.session_key),
@@ -78,6 +78,7 @@ function pendingBatch(db: Db, machineId: string): Pending[] {
       project_path: String(r.project_path), project_display_name: String(r.project_display_name),
       session_name: r.session_name === null ? null : String(r.session_name),
       started_at: String(r.started_at), last_active_at: String(r.last_active_at), duration_ms: Number(r.duration_ms),
+      active_ms: r.active_ms === null || r.active_ms === undefined ? null : Number(r.active_ms),
       message_count: Number(r.message_count), tool_call_count: Number(r.tool_call_count), on_disk: Number(r.on_disk),
       first_seen_at: String(r.first_seen_at), cwd: r.cwd === null ? null : String(r.cwd),
       project_name: r.project_name === null ? null : String(r.project_name),
@@ -86,7 +87,7 @@ function pendingBatch(db: Db, machineId: string): Pending[] {
         thinking_tokens: Number(u.thinking_tokens), cache_read_tokens: Number(u.cache_read_tokens), cache_write_tokens: Number(u.cache_write_tokens),
       })),
       activity: activityStmt.all(machineId, String(r.session_key)).map((a) => ({
-        day: String(a.day), messages: Number(a.messages), tool_calls: Number(a.tool_calls),
+        day: String(a.day), messages: Number(a.messages), tool_calls: Number(a.tool_calls), active_ms: Number(a.active_ms),
       })),
     },
   }))

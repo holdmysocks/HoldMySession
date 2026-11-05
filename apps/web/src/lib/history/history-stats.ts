@@ -1,7 +1,7 @@
 import type { StatsCache } from '@/lib/parsers/types'
 import { projectGroupKey } from '@/lib/projects/unlinked'
 import type { Db } from './sqlite'
-import { localDay, splitDuration, splitCount } from './day-allocation'
+import { estimateActiveMs, localDay, splitDuration, splitCount } from './day-allocation'
 
 export interface HistoryStatsOptions {
   /** A project's path, or UNLINKED_PROJECT_KEY, to count only that project's sessions. */
@@ -26,7 +26,7 @@ export function selectSessions(db: Db, options: HistoryStatsOptions = {}): Sessi
   const sessions = db
     .prepare(
       `SELECT machine_id, session_key, session_id, project_path, project_display_name, project_name, cwd,
-              started_at, last_active_at, duration_ms, message_count, tool_call_count
+              started_at, last_active_at, duration_ms, active_ms, message_count, tool_call_count
        FROM sessions`,
     )
     .all()
@@ -61,12 +61,12 @@ export function statsFromHistory(db: Db, options: HistoryStatsOptions = {}): Sta
   let longest = { sessionId: '', duration: 0, messageCount: 0, timestamp: '' }
 
   // Messages and tool calls per day, exact for sessions the scanner has read since activity_daily was added.
-  const exact = new Map<string, Array<{ day: string; messages: number; tool_calls: number }>>()
-  for (const r of db.prepare('SELECT machine_id, session_key, day, messages, tool_calls FROM activity_daily').all()) {
+  const exact = new Map<string, Array<{ day: string; messages: number; tool_calls: number; active_ms: number }>>()
+  for (const r of db.prepare('SELECT machine_id, session_key, day, messages, tool_calls, active_ms FROM activity_daily').all()) {
     const k = `${r.machine_id}\u0000${r.session_key}`
     if (!keys.has(k)) continue
     const list = exact.get(k) ?? []
-    list.push({ day: String(r.day), messages: Number(r.messages), tool_calls: Number(r.tool_calls) })
+    list.push({ day: String(r.day), messages: Number(r.messages), tool_calls: Number(r.tool_calls), active_ms: Number(r.active_ms) })
     exact.set(k, list)
   }
   const bucket = (d: string) => {
@@ -86,14 +86,19 @@ export function statsFromHistory(db: Db, options: HistoryStatsOptions = {}): Sta
         const a = bucket(r.day)
         a.messageCount += r.messages
         a.toolCallCount += r.tool_calls
+        if (row.active_ms !== null) a.durationMs += r.active_ms
       }
     } else {
       // The transcript is gone, so only the totals are known. They are spread over the days the session ran.
       for (const [d, n] of splitCount(startedIso, lastActive, Number(row.message_count))) bucket(d).messageCount += n
       for (const [d, n] of splitCount(startedIso, lastActive, Number(row.tool_call_count))) bucket(d).toolCallCount += n
     }
-    // The time a session was open is spread over the days it spanned, by how much of each day it covers.
-    for (const [d, ms] of splitDuration(startedIso, lastActive, Number(row.duration_ms))) bucket(d).durationMs += ms
+    // Time is the time spent working: exact by day when the messages have been read, otherwise a guess from the
+    // message count, spread over the days the session spanned.
+    if (!rows || row.active_ms === null) {
+      const guess = estimateActiveMs(Number(row.duration_ms), Number(row.message_count))
+      for (const [d, ms] of splitDuration(startedIso, lastActive, guess)) bucket(d).durationMs += ms
+    }
     totalMessages += Number(row.message_count)
 
     const started = new Date(String(row.started_at))

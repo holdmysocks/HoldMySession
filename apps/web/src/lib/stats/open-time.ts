@@ -1,4 +1,4 @@
-import { splitDuration } from '@/lib/history/day-allocation'
+import { estimateActiveMs, splitDuration } from '@/lib/history/day-allocation'
 import type { StatsCache } from '@/lib/parsers/types'
 
 /**
@@ -8,11 +8,11 @@ import type { StatsCache } from '@/lib/parsers/types'
  */
 export function addOpenTime(
   stats: StatsCache,
-  sessions: Array<{ startedAt: string; lastActiveAt: string; durationMs: number }>,
+  sessions: Array<{ startedAt: string; lastActiveAt: string; durationMs: number; messageCount?: number }>,
 ): StatsCache {
   const byDay = new Map<string, number>()
   for (const s of sessions) {
-    for (const [day, ms] of splitDuration(s.startedAt, s.lastActiveAt || s.startedAt, s.durationMs)) {
+    for (const [day, ms] of splitDuration(s.startedAt, s.lastActiveAt || s.startedAt, s.messageCount === undefined ? s.durationMs : estimateActiveMs(s.durationMs, s.messageCount))) {
       byDay.set(day, (byDay.get(day) ?? 0) + ms)
     }
   }

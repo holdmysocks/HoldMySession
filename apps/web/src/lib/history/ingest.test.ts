@@ -149,7 +149,8 @@ describe('stats from the per-day rows', () => {
     expect(day('2026-03-03').sessionCount).toBe(0)
     expect(day('2026-03-01').messageCount).toBe(2)
     expect(day('2026-03-03').messageCount).toBe(1)
-    expect(stats.dailyActivity.reduce((s, a) => s + (a.durationMs ?? 0), 0)).toBe(2 * 86_400_000)
+    // The turns are a day apart, so no time was spent working.
+    expect(stats.dailyActivity.reduce((s, a) => s + (a.durationMs ?? 0), 0)).toBe(0)
   })
 
   it('spreads the totals of a session whose transcript is gone, with nothing lost', () => {
@@ -168,3 +169,27 @@ function turns3(): SessionDetail {
     tokensByModel: {}, toolFrequency: {},
   } as unknown as SessionDetail
 }
+
+describe('active time in the history', () => {
+  const close = (): SessionDetail =>
+    ({
+      turns: [0, 4, 8, 60].map((min, i) => ({ uuid: `c${i}`, type: 'user', timestamp: new Date(2026, 2, 1, 12, min).toISOString(), toolCalls: [] })),
+      tokensByModel: {}, toolFrequency: {},
+    }) as unknown as SessionDetail
+
+  it('counts the minutes between messages that are close together, and not the long pause', () => {
+    const db = openHistoryDb(':memory:')
+    ingestSessions(db, [{ summary: summary('s', { messageCount: 4, startedAt: at(1), lastActiveAt: at(1, 13), durationMs: 3_600_000 }), detail: close() }])
+    expect(db.prepare('SELECT active_ms FROM sessions').get()!.active_ms).toBe(8 * 60_000)
+    const stats = statsFromHistory(db)!
+    expect(stats.dailyActivity.reduce((s, a) => s + (a.durationMs ?? 0), 0)).toBe(8 * 60_000)
+  })
+
+  it('estimates from the message count for a session whose messages are gone', () => {
+    const db = openHistoryDb(':memory:')
+    ingestSessions(db, [{ summary: summary('s', { messageCount: 4, durationMs: 86_400_000 }), detail: null }])
+    expect(db.prepare('SELECT active_ms FROM sessions').get()!.active_ms).toBeNull()
+    const stats = statsFromHistory(db)!
+    expect(stats.dailyActivity.reduce((s, a) => s + (a.durationMs ?? 0), 0)).toBe(4 * 45_000)
+  })
+})

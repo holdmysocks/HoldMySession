@@ -183,6 +183,12 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX activity_daily_day ON activity_daily (day);
   `,
+  // 8: active time. Milliseconds in which Claude was being worked with (gaps between messages of at most ten minutes),
+  // by session and by local day. NULL on a session means it has not been scanned since this column was added.
+  `
+  ALTER TABLE activity_daily ADD COLUMN active_ms INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE sessions ADD COLUMN active_ms INTEGER;
+  `,
 ]
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length

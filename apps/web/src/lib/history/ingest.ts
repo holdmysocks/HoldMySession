@@ -1,7 +1,7 @@
 import type { SessionDetail, SessionSummary, TokenUsage } from '@/lib/parsers/types'
 import type { Db } from './sqlite'
 import { getMeta, inTransaction } from './history-db'
-import { localDay, splitByWeight } from './day-allocation'
+import { activeTimeByDay, localDay, splitByWeight } from './day-allocation'
 import { refreshFingerprints } from '@/lib/link/sync-hash'
 
 export interface IngestEntry {
@@ -117,14 +117,15 @@ export function ingestSessions(db: Db, entries: Iterable<IngestEntry>, now: Date
   const exists = db.prepare('SELECT 1 AS found FROM sessions WHERE machine_id = ? AND session_key = ?')
   const upsert = db.prepare(`
     INSERT INTO sessions (machine_id, session_key, session_id, project_key, project_path, project_display_name, session_name,
-      started_at, last_active_at, duration_ms, message_count, tool_call_count, on_disk, first_seen_at, last_seen_at, cwd, project_name)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+      started_at, last_active_at, duration_ms, message_count, tool_call_count, on_disk, first_seen_at, last_seen_at, cwd, project_name, active_ms)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
     ON CONFLICT (machine_id, session_key) DO UPDATE SET
       project_path = excluded.project_path, project_display_name = excluded.project_display_name,
       session_name = COALESCE(excluded.session_name, sessions.session_name),
       started_at = excluded.started_at, last_active_at = excluded.last_active_at, duration_ms = excluded.duration_ms,
       message_count = excluded.message_count, tool_call_count = excluded.tool_call_count,
-      on_disk = 1, last_seen_at = excluded.last_seen_at, cwd = excluded.cwd, project_name = excluded.project_name
+      on_disk = 1, last_seen_at = excluded.last_seen_at, cwd = excluded.cwd, project_name = excluded.project_name,
+      active_ms = COALESCE(excluded.active_ms, sessions.active_ms)
   `)
   const clearUsage = db.prepare('DELETE FROM usage_daily WHERE machine_id = ? AND session_key = ?')
   const addUsage = db.prepare(`
@@ -133,7 +134,7 @@ export function ingestSessions(db: Db, entries: Iterable<IngestEntry>, now: Date
   `)
 
   const clearActivity = db.prepare('DELETE FROM activity_daily WHERE machine_id = ? AND session_key = ?')
-  const addActivity = db.prepare('INSERT INTO activity_daily (machine_id, session_key, day, messages, tool_calls) VALUES (?, ?, ?, ?, ?)')
+  const addActivity = db.prepare('INSERT INTO activity_daily (machine_id, session_key, day, messages, tool_calls, active_ms) VALUES (?, ?, ?, ?, ?, ?)')
 
   inTransaction(db, () => {
     const seen = new Set<string>()
@@ -147,6 +148,8 @@ export function ingestSessions(db: Db, entries: Iterable<IngestEntry>, now: Date
 
       const messages = detail ? detail.turns.length : summary.messageCount
       const toolCalls = detail ? Object.values(detail.toolFrequency).reduce((a, b) => a + b, 0) : summary.toolCallCount
+      const activeByDay = detail ? activeTimeByDay(detail.turns.map((t) => t.timestamp)) : null
+      const activeTotal = activeByDay ? [...activeByDay.values()].reduce((a, b) => a + b, 0) : null
       upsert.run(
         machineId,
         key,
@@ -164,12 +167,15 @@ export function ingestSessions(db: Db, entries: Iterable<IngestEntry>, now: Date
         stamp,
         summary.cwd ?? '',
         summary.projectName,
+        activeTotal,
       )
 
       if (!detail) continue
       clearActivity.run(machineId, key)
-      for (const [day, row] of activityByDay(summary, detail, { messages, toolCalls })) {
-        addActivity.run(machineId, key, day, row.messages, row.tool_calls)
+      const rows = activityByDay(summary, detail, { messages, toolCalls })
+      for (const day of activeByDay!.keys()) if (!rows.has(day)) rows.set(day, { messages: 0, tool_calls: 0 })
+      for (const [day, row] of rows) {
+        addActivity.run(machineId, key, day, row.messages, row.tool_calls, Math.round(activeByDay!.get(day) ?? 0))
       }
       clearUsage.run(machineId, key)
       for (const [day, models] of usageByDay(summary, detail)) {
