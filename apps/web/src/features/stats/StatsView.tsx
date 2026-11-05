@@ -6,7 +6,7 @@ import { ModelShare } from './ModelShare'
 import { RhythmGrid } from './RhythmGrid'
 import { StartHours } from './StartHours'
 import { tokenBreakdown } from './token-breakdown'
-import { RANGES, type StatsRange } from './stats-range'
+import { changeText, RANGES, type StatsRange } from './stats-range'
 import { MonthForecast } from './MonthForecast'
 import type { MonthForecast as Forecast } from '@/lib/pricing/forecast'
 import { formatMoney } from '@/features/project-analytics/ProjectsTable'
@@ -57,7 +57,6 @@ export interface StatsViewProps {
   children?: ReactNode
 }
 
-const signed = (p: number) => `${p >= 0 ? '+' : '-'}${Math.abs(p)}%`
 
 /** The whole Stats page body, for everything or for one project: headline, chart, totals, rhythm, models and hours. */
 export function StatsView({
@@ -111,7 +110,7 @@ export function StatsView({
           </button>
           <div className="mt-2.5 flex flex-wrap gap-2">
             {week.tokens > 0 && <Chip>+{formatTokenCount(week.tokens)} tokens this week</Chip>}
-            {compare && compare.tokens !== null && <Chip neutral>{signed(compare.tokens)} vs {compare.label}</Chip>}
+            {compare && compare.tokens !== null && <Chip neutral>{changeText(compare.tokens)} vs {compare.label}</Chip>}
             {pct(share?.tokens) !== null && <Chip neutral>{pct(share?.tokens)}% of all your tokens</Chip>}
           </div>
           {open && (
@@ -143,7 +142,7 @@ export function StatsView({
           </div>
           <div className="mt-3.5 flex flex-wrap gap-2">
             {(weekUSD ?? 0) > 0.005 && <Chip>+{formatMoney(weekUSD!)} this week</Chip>}
-            {compare && compare.usd !== null && <Chip neutral>{signed(compare.usd)} vs {compare.label}</Chip>}
+            {compare && compare.usd !== null && <Chip neutral>{changeText(compare.usd)} vs {compare.label}</Chip>}
             {plan && multiple !== null && multiple >= 1.05 && (
               <Chip>About {multiple >= 10 ? Math.round(multiple) : multiple.toFixed(1)}x what you paid</Chip>
             )}
@@ -185,7 +184,7 @@ export function StatsView({
               {k.change !== null && (
                 <span className="text-[color:var(--hms-mute)]">
                   {k.delta ? ' · ' : ''}
-                  {signed(k.change)} vs before
+                  {changeText(k.change)} vs before
                 </span>
               )}
             </div>

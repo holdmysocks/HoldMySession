@@ -47,7 +47,7 @@ describe('stats range', () => {
   })
 })
 
-import { previousPeriod, percentChange } from './stats-range'
+import { previousPeriod, percentChange, canCompare, changeText, MIN_SESSIONS_TO_COMPARE } from './stats-range'
 
 describe('comparing with the period before', () => {
   it('finds the period of the same length just before the range', () => {
@@ -69,5 +69,49 @@ describe('comparing with the period before', () => {
     expect(percentChange(120, 100)).toBe(20)
     expect(percentChange(50, 100)).toBe(-50)
     expect(percentChange(10, 0)).toBeNull()
+  })
+})
+
+describe('whether the period before is worth comparing with', () => {
+  const stats = (days: Array<[string, number]>): StatsCache =>
+    ({
+      dailyActivity: days.map(([date, sessionCount]) => ({ date, sessionCount, messageCount: sessionCount * 10, toolCallCount: sessionCount })),
+      totalSessions: days.reduce((n, [, s]) => n + s, 0),
+    }) as unknown as StatsCache
+  const previous = { start: '2026-08-01' }
+
+  it('compares when the history reaches back to the start of that period and it holds enough sessions', () => {
+    const all = stats([['2026-07-20', 2], ['2026-08-10', MIN_SESSIONS_TO_COMPARE], ['2026-09-20', 30]])
+    expect(canCompare(all, previous, stats([['2026-08-10', MIN_SESSIONS_TO_COMPARE]]))).toBe(true)
+  })
+
+  it('does not when the history begins part way through that period, as when Claude Code deleted the older transcripts', () => {
+    // One stray old session, and everything else recent: a base of one would make the range look 159 times as big.
+    const all = stats([['2026-08-20', 1], ['2026-09-20', 158]])
+    expect(canCompare(all, previous, stats([['2026-08-20', 1]]))).toBe(false)
+  })
+
+  it('does not when the period before holds too few sessions, even if the history reaches back', () => {
+    const all = stats([['2026-07-20', 1], ['2026-08-10', MIN_SESSIONS_TO_COMPARE - 1], ['2026-09-20', 30]])
+    expect(canCompare(all, previous, stats([['2026-08-10', MIN_SESSIONS_TO_COMPARE - 1]]))).toBe(false)
+  })
+
+  it('does not with no history at all', () => {
+    expect(canCompare(stats([]), previous, stats([]))).toBe(false)
+  })
+})
+
+describe('changeText', () => {
+  it('shows an ordinary change as a percent, with its sign', () => {
+    expect(changeText(25)).toBe('+25%')
+    expect(changeText(0)).toBe('+0%')
+    expect(changeText(-8)).toBe('-8%')
+    expect(changeText(-100)).toBe('-100%')
+    expect(changeText(999)).toBe('+999%')
+  })
+  it('shows a change of ten times or more as a multiple', () => {
+    expect(changeText(1000)).toBe('11\u00d7')
+    expect(changeText(1500)).toBe('16\u00d7')
+    expect(changeText(15800)).toBe('159\u00d7')
   })
 })

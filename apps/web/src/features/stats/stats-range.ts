@@ -90,6 +90,30 @@ export function previousPeriod(range: StatsRange, today: string): { start: strin
   return { start: addDays(start, -days), end: start, label }
 }
 
+/** The fewest sessions the earlier period must hold for a comparison with it to mean anything. */
+export const MIN_SESSIONS_TO_COMPARE = 5
+
+/**
+ * Whether the period before the range is worth comparing with. The history has to reach back to its start, since a
+ * history that begins part way through it, or whose oldest transcripts Claude Code has deleted, would show the range as
+ * hundreds of times what came before, and the period has to hold enough sessions to stand for a period at all.
+ */
+export function canCompare(stats: StatsCache, previous: { start: string }, before: StatsCache): boolean {
+  let earliest: string | null = null
+  for (const d of stats.dailyActivity) if (earliest === null || d.date < earliest) earliest = d.date
+  if (earliest === null || earliest > previous.start) return false
+  return before.totalSessions >= MIN_SESSIONS_TO_COMPARE
+}
+
+/**
+ * A change as the page shows it: "+25%" or "-8%", and for a change of ten times or more "12x", since "+1100%" and
+ * "+15800%" are hard to read as anything but a mistake.
+ */
+export function changeText(percent: number): string {
+  if (percent >= 1000) return `${Math.round(percent / 100) + 1}\u00d7`
+  return `${percent >= 0 ? '+' : '-'}${Math.abs(percent)}%`
+}
+
 /** Change from `before` to `now` as a whole percent, or null when there is nothing before it to compare with. */
 export function percentChange(now: number, before: number): number | null {
   if (!(before > 0) || !Number.isFinite(now)) return null

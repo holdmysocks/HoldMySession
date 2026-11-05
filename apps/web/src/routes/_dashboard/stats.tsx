@@ -11,7 +11,7 @@ import { StatsView } from '@/features/stats/StatsView'
 import { LatestSessions } from '@/features/stats/LatestSessions'
 import { MapThumb } from '@/features/stats/MapThumb'
 import { ProjectsTable } from '@/features/project-analytics/ProjectsTable'
-import { costFrom, filterStatsRange, percentChange, previousPeriod, RANGES, rangeStartDay } from '@/features/stats/stats-range'
+import { canCompare, costFrom, filterStatsRange, percentChange, previousPeriod, RANGES, rangeStartDay } from '@/features/stats/stats-range'
 import { forecastMonth } from '@/lib/pricing/forecast'
 import { tokenBreakdown } from '@/features/stats/token-breakdown'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
@@ -108,7 +108,7 @@ function StatsPage() {
     const prev = previousPeriod(range, today)
     if (!prev || !baseStats || !stats) return null
     const before = filterStatsRange(baseStats, prev.start, prev.end)
-    if (before.dailyActivity.length === 0) return null
+    if (!canCompare(baseStats, prev, before)) return null
     const sum = (s: StatsCache, f: (d: StatsCache['dailyActivity'][number]) => number) => s.dailyActivity.reduce((n, d) => n + f(d), 0)
     return {
       label: prev.label,
