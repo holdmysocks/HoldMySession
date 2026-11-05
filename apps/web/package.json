@@ -1,6 +1,6 @@
 {
   "name": "holdmysession",
-  "version": "0.10.3",
+  "version": "0.10.4",
   "description": "Local observability dashboard for Claude Code sessions",
   "type": "module",
   "license": "GPL-3.0-only",
