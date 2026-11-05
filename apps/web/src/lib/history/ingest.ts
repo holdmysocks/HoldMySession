@@ -109,7 +109,7 @@ export function activityByDay(
  * scan as no longer on disk. A session's usage rows are replaced as a whole, so scanning twice is
  * the same as scanning once. A session whose parse failed keeps the usage it already had.
  */
-export function ingestSessions(db: Db, entries: IngestEntry[], now: Date = new Date()): IngestResult {
+export function ingestSessions(db: Db, entries: Iterable<IngestEntry>, now: Date = new Date()): IngestResult {
   const stamp = now.toISOString()
   const machineId = getMeta(db, 'machine_id') ?? ''
   const result: IngestResult = { added: 0, updated: 0, missing: 0 }

@@ -1,5 +1,6 @@
 import { scanAllSessionsWithPaths } from '@/lib/scanner/session-scanner'
-import { parseDetailsDeduplicated } from '@/lib/parsers/stats-parser'
+import { readVersionFromPackageJson } from '@/lib/app-version'
+import { digestEntries, pruneDigests } from './digest-scan'
 import type { Db } from './sqlite'
 import { openHistoryDb } from './history-db'
 import { ingestSessions } from './ingest'
@@ -47,10 +48,11 @@ async function scanOnce(existing?: Db): Promise<ScanOutcome> {
     if (summaries.length === 0) {
       outcome = { ok: true, sessionsSeen: 0, added: 0, updated: 0, missing: 0, message: 'No sessions found. History was left as it is.' }
     } else {
-      const details = await parseDetailsDeduplicated(summaries)
-      const entries = summaries.map((summary) => ({ summary, detail: details.get(summary.filePath) ?? null }))
-      const failed = entries.filter((e) => e.detail === null).length
+      // Only sessions whose files changed are read, and they are written to the history one at a time.
+      const { entries, counts } = await digestEntries(summaries, readVersionFromPackageJson())
       const result = ingestSessions(db, entries)
+      const failed = counts.failed
+      pruneDigests(summaries)
       outcome = {
         ok: true,
         sessionsSeen: summaries.length,
@@ -76,7 +78,6 @@ async function scanOnce(existing?: Db): Promise<ScanOutcome> {
   if (outcome.ok) {
     try {
       const { pushToMaster } = await import('@/lib/link/node-sync')
-      const { readVersionFromPackageJson } = await import('@/lib/app-version')
       await pushToMaster(db, readSettingsFile(), readVersionFromPackageJson())
     } catch (error) {
       console.warn('Sending to the master failed:', error)
