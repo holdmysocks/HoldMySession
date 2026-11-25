@@ -29,8 +29,6 @@ const repoRoot = join(desktop, '..', '..');
 /** The licence files of this program, and the names they have in a download, where the Electron program's own LICENSE already is. */
 const LICENSE_FILES = [
   ['LICENSE', 'LICENSE-HoldMySession.txt'],
-  ['NOTICE', 'NOTICE.txt'],
-  ['LICENSE-claude-session-dashboard', 'LICENSE-claude-session-dashboard.txt'],
 ];
 
 /** Whether a program runs, so a Mac build can use `rcodesign` and `xorriso` when they are there and say so when they are not. */
