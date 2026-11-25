@@ -1,6 +1,7 @@
 import { PillSelect } from '@/components/ui/PillSelect'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { arrangeToFit } from '@/lib/map/arrange'
 import { applyCustomPositions, layoutProjectMap, type NodePositions } from '@/lib/map/layout'
 import { usePrivacy } from '@/features/privacy/PrivacyContext'
 import { mapProjectValue, type MapProject } from './project-map.api'
@@ -43,6 +44,8 @@ export function ProjectMapPage({ project, session, onProjectChange }: ProjectMap
   const now = useNow()
   const [selectedId, setSelectedId] = useState<string | null>(session ? `session:${session}` : null)
   const [editMode, setEditMode] = useState(false)
+  const canvasBox = useRef<HTMLDivElement>(null)
+  const [refitSignal, setRefitSignal] = useState(0)
   const [panelsHidden, setPanelsHidden] = useState(false)
   // The map can fill the whole window. Escape puts it back.
   const [expanded, setExpanded] = useState(false)
@@ -95,6 +98,19 @@ export function ProjectMapPage({ project, session, onProjectChange }: ProjectMap
     for (const node of layout.nodes) next[node.id] = { x: node.x, y: node.y }
     for (const move of moves) next[move.id] = { x: Math.round(move.x * 10) / 10, y: Math.round(move.y * 10) / 10 }
     setPositions(next)
+  }
+
+  // Puts every session in a frame the shape of the canvas: trees kept whole, related ones together, overflow to new rows below.
+  function handleAutoFit() {
+    if (!baseLayout) return
+    const box = canvasBox.current
+    const arranged = arrangeToFit(baseLayout, { width: box?.clientWidth ?? 0, height: box?.clientHeight ?? 0 })
+    const next: NodePositions = {}
+    for (const [id, position] of Object.entries(positions)) {
+      if (id.startsWith('session:')) next[id] = position
+    }
+    setPositions({ ...next, ...arranged })
+    setRefitSignal((n) => n + 1)
   }
 
   function handleResetLayout() {
@@ -185,6 +201,11 @@ export function ProjectMapPage({ project, session, onProjectChange }: ProjectMap
             </label>
           )}
           {editMode && (
+            <button type="button" onClick={handleAutoFit} disabled={!baseLayout || baseLayout.nodes.length === 0} title="Arrange every session to fit the screen, with related sessions together" className={`${pill} disabled:cursor-not-allowed disabled:opacity-40`}>
+              Auto fit
+            </button>
+          )}
+          {editMode && (
             <button type="button" onClick={handleResetLayout} disabled={!hasCustomLayout} className={`${pill} disabled:cursor-not-allowed disabled:opacity-40`}>
               Reset layout
             </button>
@@ -200,7 +221,7 @@ export function ProjectMapPage({ project, session, onProjectChange }: ProjectMap
       {(editMode || saveFailed) && (
         <p className={`${column} -mt-2 text-xs text-[color:var(--hms-mute)]`}>
           {editMode
-            ? 'Drag a card to move it. It snaps to the grid, and holding Alt places it freely. Ctrl-click cards, or hold Ctrl and drag over empty space, to select several and move them together. Drag empty space to pan, scroll to zoom, arrow keys nudge. Your layout is saved on the server and follows you to other devices.'
+            ? 'Drag a card to move it. It snaps to the grid, and holding Alt places it freely. Ctrl-click cards, or hold Ctrl and drag over empty space, to select several and move them together. Drag empty space to pan, scroll to zoom, arrow keys nudge. Auto fit arranges every session to fill the screen. Your layout is saved on the server and follows you to other devices.'
             : ''}
           {saveFailed && <span role="alert" className="ml-2 text-red-400">Could not save the layout. Trying again.</span>}
         </p>
@@ -220,7 +241,7 @@ export function ProjectMapPage({ project, session, onProjectChange }: ProjectMap
             <div className="md:hidden">
               <MapTree nodes={layout.nodes} selectedId={selectedId} onSelect={setSelectedId} />
             </div>
-            <div className={`hidden md:block ${expanded ? 'h-full flex-1' : panelsHidden ? 'h-[calc(100vh-14rem)] min-h-[32rem]' : 'h-[calc(100vh-18rem)] min-h-[32rem]'}`}>
+            <div ref={canvasBox} className={`hidden md:block ${expanded ? 'h-full flex-1' : panelsHidden ? 'h-[calc(100vh-14rem)] min-h-[32rem]' : 'h-[calc(100vh-18rem)] min-h-[32rem]'}`}>
               <MapCanvas
                 key={selectedValue}
                 layout={layout}
@@ -229,6 +250,7 @@ export function ProjectMapPage({ project, session, onProjectChange }: ProjectMap
                 editMode={editMode}
                 onNodesMove={handleNodesMove}
                 snapToGrid={snapToGrid}
+                refitSignal={refitSignal}
               />
             </div>
           </>

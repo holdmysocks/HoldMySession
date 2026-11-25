@@ -24,6 +24,8 @@ interface MapCanvasProps {
   onNodesMove?: (moves: NodeMove[]) => void
   /** In editor mode, cards snap to a grid while dragged. Holding Alt places them freely. */
   snapToGrid?: boolean
+  /** Changes whenever the whole drawing should be shown again, such as after cards were arranged to fit. */
+  refitSignal?: number
 }
 
 /**
@@ -129,6 +131,7 @@ export function MapCanvas({
   editMode = false,
   onNodesMove,
   snapToGrid = false,
+  refitSignal = 0,
 }: MapCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const gridId = `map-grid-${useId().replace(/:/g, '')}`
@@ -307,6 +310,13 @@ export function MapCanvas({
   function fitAll() {
     if (bounds && size.width > 0 && size.height > 0) commitView(fitView(bounds, size, FULL_FIT))
   }
+
+  const lastRefit = useRef(refitSignal)
+  useEffect(() => {
+    if (lastRefit.current === refitSignal) return
+    lastRefit.current = refitSignal
+    fitAll()
+  })
 
   return (
     <div className="relative h-full w-full overflow-hidden">
